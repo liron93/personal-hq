@@ -1,0 +1,14 @@
+{
+  "name": "מטה אישי",
+  "short_name": "מטה אישי",
+  "description": "לוח מנכ\"ל אישי להתאוששות ובנייה מחדש",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f3ed",
+  "theme_color": "#17201d",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "lang": "he",
+  "dir": "rtl"
+}
