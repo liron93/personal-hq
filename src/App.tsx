@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowLeft, BriefcaseBusiness, Check, ChevronLeft, CircleDollarSign, Cloud, Database, Dumbbell, HeartHandshake, Home, Plus, RefreshCw, ShieldAlert, TrendingUp, X } from 'lucide-react'
 import './App.css'
+import { HomeCompany } from './HomeCompany'
 
 type DepartmentId = 'money' | 'home' | 'health' | 'career' | 'mind' | 'investments'
 type Status = 'critical' | 'recovery' | 'building'
@@ -21,7 +22,7 @@ function App() {
   const [departments, setDepartments] = useState<Department[]>(() => { const saved = localStorage.getItem('personal-hq-departments'); return saved ? JSON.parse(saved) : initialDepartments })
   const [selected, setSelected] = useState<Department | null>(null)
   const [weeklyNote, setWeeklyNote] = useState(() => localStorage.getItem('personal-hq-note') || '')
-  const [activeView, setActiveView] = useState<'hq' | 'review'>('hq')
+  const [activeView, setActiveView] = useState<'hq' | 'home' | 'review'>('home')
   const [showConnection, setShowConnection] = useState(false)
   useEffect(() => localStorage.setItem('personal-hq-departments', JSON.stringify(departments)), [departments])
   useEffect(() => localStorage.setItem('personal-hq-note', weeklyNote), [weeklyNote])
@@ -31,7 +32,7 @@ function App() {
   return <main dir="rtl" className="app-shell">
     <header className="topbar"><div className="brand"><span className="brand-mark">מ</span><span>מטה אישי</span></div><div className="topbar-actions"><button className="data-button" onClick={() => setShowConnection(true)}><Database size={15} />חיבור נתונים</button><div className="topbar-status"><span className="pulse" />מצב הקמה מחדש</div></div></header>
     <section className="hero-panel"><div><p className="eyebrow">לוח המנכ״ל · ספטמבר 2026</p><h1>לא לנהל לבד.<br /><em>לבנות מחדש, ביחד.</em></h1><p className="hero-copy">מקום אחד שרואה את כל התמונה, מציף סכנות, ומתרגם עומס לצעד הבא.</p></div><div className="score"><span>{complete}/6</span><small>צעדי התאוששות<br />נסגרו</small></div></section>
-    <nav className="nav-tabs" aria-label="ניווט"><button className={activeView === 'hq' ? 'active' : ''} onClick={() => setActiveView('hq')}>לוח מצב</button><button className={activeView === 'review' ? 'active' : ''} onClick={() => setActiveView('review')}>ישיבת הנהלה</button></nav>
+    <nav className="nav-tabs" aria-label="ניווט"><button className={activeView === 'home' ? 'active' : ''} onClick={() => setActiveView('home')}>חברת הבית</button><button className={activeView === 'home' ? <HomeCompany /> : activeView === 'hq' ? 'active' : ''} onClick={() => setActiveView('hq')}>לוח מצב</button><button className={activeView === 'review' ? 'active' : ''} onClick={() => setActiveView('review')}>ישיבת הנהלה</button></nav>
     {activeView === 'hq' ? <><>{urgent.length > 0 && <section className="alert-strip"><ShieldAlert size={19} /><span><strong>{urgent.length} תחומים</strong> דורשים התערבות קרובה. מתחילים בצעד קטן אחד בכל תחום.</span></section>}</><section className="section-heading"><div><p className="eyebrow">החטיבות שלך</p><h2>תכנית התאוששות</h2></div><span>{departments.length} תחומים</span></section><section className="department-grid">{departments.map((department) => { const Icon = meta[department.id].icon; return <button key={department.id} className={`department-card ${department.done ? 'done' : ''}`} onClick={() => setSelected(department)}><div className="card-top"><span className={`icon-box ${meta[department.id].color}`}><Icon size={20} /></span><span className={`status-dot ${department.status}`}>{department.done ? 'הושלם' : statusLabel[department.status]}</span></div><div className="card-title"><h3>{department.name}</h3><p>{department.subtitle}</p></div><div className="next-action"><span>הצעד הבא</span><strong>{department.nextAction}</strong></div><div className="card-footer"><span>{department.deadline}</span><ChevronLeft size={18} /></div></button>})}</section><button className="quick-add" onClick={() => setSelected(departments[0])}><Plus size={20} />עדכון חדש למטה</button></> : <Review note={weeklyNote} setNote={setWeeklyNote} departments={departments} onOpen={setSelected} />}
     {selected && <DepartmentDialog department={selected} onClose={() => setSelected(null)} onSave={updateDepartment} />}{showConnection && <SupabaseConnection onClose={() => setShowConnection(false)} />}<footer>הנתונים נשמרים במכשיר הזה בלבד</footer>
   </main>
