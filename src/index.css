@@ -1,5 +1,0 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-html { background: #f5f3ed; }
-body { margin: 0; min-width: 320px; }

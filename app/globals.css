@@ -1,0 +1,7 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #EDE7D9; color: #1C1815; font-family: 'Heebo', system-ui, sans-serif; }
+h1, h2 { font-family: 'Frank Ruhl Libre', serif; }
+input, select, button { font-family: inherit; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: #5B7A5A; cursor: pointer; }
+a { color: inherit; }
+::-webkit-scrollbar { display: none; }

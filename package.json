@@ -1,24 +1,16 @@
 {
   "name": "personal-hq",
+  "version": "0.1.0",
   "private": true,
-  "version": "1.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "dependencies": {
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "lucide-react": "^1.40.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^6.1.0",
-    "vite": "^8.2.2",
-    "typescript": "~6.0.2",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "@types/node": "^24.13.3"
+    "lucide-react": "^0.383.0",
+    "next": "14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
