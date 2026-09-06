@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { INK, PAPER, GREEN, GOLD, RUST, MUTED, LINE, cardStyle, inputStyle } from "@/lib/theme";
+import { INK, BG, GREEN, AMBER, ACCENT, RUST, MUTED, LINE, cardStyle, inputStyle } from "@/lib/theme";
 import { ils, toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
 import { cp } from "@/lib/store";
@@ -19,7 +19,7 @@ function ItemRow({ item, onUpdate, onDelete }) {
             {adv > 0 && !item.done && (
               <div style={{ fontSize: 11 }}>
                 <span style={{ color: GREEN }}>שולם: {ils(adv)}</span>
-                {rem > 0 && <span style={{ color: GOLD }}> · נשאר: {ils(rem)}</span>}
+                {rem > 0 && <span style={{ color: AMBER }}> · נשאר: {ils(rem)}</span>}
               </div>
             )}
             {item.supplier && <div style={{ fontSize: 11, color: MUTED }}>{item.supplier}</div>}
@@ -36,7 +36,7 @@ function ItemRow({ item, onUpdate, onDelete }) {
           <LabeledInput label="מקדמה ששולמה" value={item.advance} onBlur={v => onUpdate({ ...item, advance: toN(v) })} />
           <LabeledInput label="ספק / חברה" text value={item.supplier} onBlur={v => onUpdate({ ...item, supplier: v })} />
           <LabeledInput label="קישור" value={item.link} onBlur={v => onUpdate({ ...item, link: v })} />
-          {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: GOLD }}>פתח קישור</a>}
+          {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: ACCENT }}>פתח קישור</a>}
           <LabeledInput label="הערה" text value={item.note} onBlur={v => onUpdate({ ...item, note: v })} />
           <button onClick={() => onDelete(item.id)} style={{ fontSize: 12, color: RUST, background: "none", border: "none", cursor: "pointer", textAlign: "right", padding: 0, fontFamily: "inherit" }}>מחק פריט</button>
         </div>
@@ -69,7 +69,7 @@ export default function Items({ d, setD, mode }) {
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
         <Metric label={isReno ? "תקציב כולל" : 'סה"כ'} value={ils(total)} />
         <Metric label="שולם / מקדמות" value={ils(paid)} color={GREEN} />
-        <Metric label="נשאר" value={ils(total - paid)} color={GOLD} />
+        <Metric label="נשאר" value={ils(total - paid)} color={AMBER} />
       </div>
       {cats.map(cat => {
         const catItems = items.filter(i => i.cat === cat);
@@ -84,21 +84,21 @@ export default function Items({ d, setD, mode }) {
       {showAdd ? (
         <div style={{ ...cardStyle, padding: 14 }}>
           <div style={{ display: "grid", gap: 8 }}>
-            <input placeholder={isReno ? "פריט שיפוץ" : "שם ההוצאה"} value={nw.n} onChange={e => setNw({ ...nw, n: e.target.value })} style={inputStyle} />
+            <input className="hq-field" placeholder={isReno ? "פריט שיפוץ" : "שם ההוצאה"} value={nw.n} onChange={e => setNw({ ...nw, n: e.target.value })} style={inputStyle} />
             <div style={{ display: "flex", gap: 8 }}>
-              <input placeholder="סכום משוער" value={nw.est} onChange={e => setNw({ ...nw, est: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
-              <select value={nw.cat} onChange={e => setNw({ ...nw, cat: e.target.value })} style={{ ...inputStyle, flex: 1 }}>
+              <input className="hq-field" placeholder="סכום משוער" value={nw.est} onChange={e => setNw({ ...nw, est: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+              <select className="hq-field" value={nw.cat} onChange={e => setNw({ ...nw, cat: e.target.value })} style={{ ...inputStyle, flex: 1 }}>
                 {cats.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={addItem} style={{ flex: 1, border: "none", background: INK, color: PAPER, borderRadius: 4, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>הוסף</button>
-              <button onClick={() => setShowAdd(false)} style={{ flex: 1, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 4, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>ביטול</button>
+              <button onClick={addItem} style={{ flex: 1, border: "none", background: INK, color: BG, borderRadius: 2, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>הוסף</button>
+              <button onClick={() => setShowAdd(false)} style={{ flex: 1, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>ביטול</button>
             </div>
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: 10, border: `1px dashed ${MUTED}`, borderRadius: 4, background: "transparent", color: MUTED, cursor: "pointer", fontFamily: "inherit" }}>
+        <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: 10, border: `1px dashed ${MUTED}`, borderRadius: 2, background: "transparent", color: MUTED, cursor: "pointer", fontFamily: "inherit" }}>
           + הוסף {isReno ? "פריט שיפוץ" : "הוצאה"}
         </button>
       )}

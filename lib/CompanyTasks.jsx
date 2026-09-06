@@ -22,7 +22,7 @@ export default function CompanyTasks({ d, setD }) {
     <div>
       <Sec title="עדכון למנכ״ל" />
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input value={newUpdate} onChange={e => setNewUpdate(e.target.value)} onKeyDown={e => e.key === "Enter" && addUpdate()} placeholder="מה חדש היום?" style={{ ...inputStyle, flex: 1 }} />
+        <input className="hq-field" value={newUpdate} onChange={e => setNewUpdate(e.target.value)} onKeyDown={e => e.key === "Enter" && addUpdate()} placeholder="מה חדש היום?" style={{ ...inputStyle, flex: 1 }} />
         <button onClick={addUpdate} style={primaryBtn}><Plus size={16} /></button>
       </div>
       <div style={{ display: "grid", gap: 8, marginBottom: 24 }}>
@@ -42,7 +42,7 @@ export default function CompanyTasks({ d, setD }) {
         ))}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <input value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === "Enter" && addTask()} placeholder="משימה חדשה..." style={{ ...inputStyle, flex: 1 }} />
+        <input className="hq-field" value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === "Enter" && addTask()} placeholder="משימה חדשה..." style={{ ...inputStyle, flex: 1 }} />
         <button onClick={addTask} style={primaryBtn}><Plus size={16} /></button>
       </div>
     </div>

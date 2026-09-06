@@ -1,6 +1,6 @@
 "use client";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { INK, PAPER, GREEN, GOLD, RUST, MUTED, LINE, cardStyle } from "@/lib/theme";
+import { INK, BG, GREEN, AMBER, RUST, MUTED, LINE, cardStyle } from "@/lib/theme";
 import { ils } from "@/lib/format";
 import { Sec, Row } from "@/lib/ui";
 import { ASSET_KEYS, snapshotNow } from "./model";
@@ -8,7 +8,7 @@ import { ASSET_KEYS, snapshotNow } from "./model";
 // שלושה צבעים מ-lib/theme + שלושה גוונים תואמים לאפיקים שאין להם צבע קבוע
 const AREA_COLORS = {
   cash: GREEN,
-  stocks: GOLD,
+  stocks: AMBER,
   funds: RUST,
   crypto: "#C8A15A",
   pension: "#4F6D70",
@@ -23,7 +23,7 @@ export default function History({ d, setD }) {
   const save = () => setD(prev => snapshotNow(prev));
 
   const btn = (
-    <button onClick={save} style={{ width: "100%", border: "none", background: INK, color: PAPER, borderRadius: 4, padding: "10px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, marginBottom: 16 }}>
+    <button onClick={save} style={{ width: "100%", border: "none", background: INK, color: BG, borderRadius: 2, padding: "10px 0", cursor: "pointer", fontFamily: "inherit", fontSize: 14, marginBottom: 16 }}>
       שמור תמונת מצב עכשיו
     </button>
   );

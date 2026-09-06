@@ -43,6 +43,7 @@ export default function LoginPage() {
             type="email"
             required
             dir="ltr"
+            className="hq-field"
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="you@example.com"

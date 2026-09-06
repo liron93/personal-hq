@@ -1,7 +1,15 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #EDE7D9; color: #1C1815; font-family: 'Heebo', system-ui, sans-serif; }
-h1, h2 { font-family: 'Frank Ruhl Libre', serif; }
+html, body { margin: 0; padding: 0; background: #F6F7F9; color: #171A21; font-family: 'IBM Plex Sans Hebrew', system-ui, sans-serif; }
+h1, h2 { font-family: 'IBM Plex Sans Hebrew', system-ui, sans-serif; font-weight: 600; }
 input, select, button { font-family: inherit; }
-input[type=checkbox] { width: 16px; height: 16px; accent-color: #5B7A5A; cursor: pointer; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: #1F8A5F; cursor: pointer; }
 a { color: inherit; }
 ::-webkit-scrollbar { display: none; }
+
+/* שדה עריכה בסגנון טבלת נתונים: קו תחתון בלבד, מסגרת מלאה רק בפוקוס. הצבע כאן חוזר על ACCENT מ-lib/theme.js. */
+.hq-field { border: none; border-bottom: 1px solid #E2E5EA; border-radius: 0; outline: none; }
+.hq-field:focus { border: 1px solid #1B3A5C; border-radius: 2px; }
+
+/* קישור חזרה למנכ״ל — קו תחתון רק בהובר, לא כפתור מלא */
+.hq-back-link { border-bottom: 1px solid transparent; }
+.hq-back-link:hover { border-bottom-color: currentColor; }
