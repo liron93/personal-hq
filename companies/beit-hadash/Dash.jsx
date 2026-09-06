@@ -1,9 +1,9 @@
 "use client";
-import { Check } from "lucide-react";
-import { GREEN, RUST, GOLD, MUTED, cardStyle } from "@/lib/theme";
-import { ils, daysUntil } from "@/lib/format";
+import { Check, Plus } from "lucide-react";
+import { GREEN, RUST, GOLD, MUTED, LINE, cardStyle, primaryBtn } from "@/lib/theme";
+import { ils, daysUntil, uid } from "@/lib/format";
 import { Sec, Row, Metric, EditableNum } from "@/lib/ui";
-import { effP, iPaid } from "./model";
+import { effP, iPaid, salePayments } from "./model";
 
 function PaymentRow({ label, amount, due, done, onAmount, onDue, onToggle }) {
   const d = daysUntil(due);
@@ -22,10 +22,33 @@ function PaymentRow({ label, amount, due, done, onAmount, onDue, onToggle }) {
   );
 }
 
+// פעימה שהקונה של הדירה הנוכחית משלם לנו — תיאור חופשי, תאריך, סכום, וי כשהתקבלה
+function SalePayRow({ p, onChange, onRemove }) {
+  const d = p.due ? daysUntil(p.due) : null;
+  const urgent = !p.done && d !== null && d <= 14;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${LINE}`, gap: 8 }}>
+      <input defaultValue={p.label} key={p.id + p.label} onBlur={e => onChange({ ...p, label: e.target.value })}
+        placeholder="תיאור הפעימה" style={{ border: "none", background: "transparent", fontFamily: "inherit", fontSize: 14, color: MUTED, flex: 1, minWidth: 0 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="date" value={p.due ? p.due.slice(0, 10) : ""} onChange={e => onChange({ ...p, due: e.target.value })}
+          style={{ fontSize: 12, border: "none", background: "transparent", color: MUTED, width: 110 }} />
+        <EditableNum value={p.amount} onChange={v => onChange({ ...p, amount: v })} />
+        <button onClick={() => onChange({ ...p, done: !p.done })} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${p.done ? GREEN : (urgent ? RUST : MUTED)}`, background: p.done ? GREEN : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {p.done && <Check size={13} color="#fff" />}
+        </button>
+        <span onClick={onRemove} style={{ fontSize: 12, color: RUST, cursor: "pointer", flexShrink: 0 }}>הסר</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Dash({ d, upd, core, coreUpd }) {
   const { cfg, sale, buy, mil } = d;
+  const payments = salePayments(sale);
+  const received = payments.filter(p => p.done).reduce((s, p) => s + (p.amount || 0), 0);
   const saleNet = sale.price - sale.agentFee - sale.lawyerFee - sale.penalty - cfg.mortgageBal;
-  const gap = buy.p2 - buy.mortgage - (sale.depositDone ? sale.deposit : 0);
+  const gap = buy.p2 - buy.mortgage - received;
   const net = core.mySalary + core.wifeSalary - ((core.frozen ? 0 : core.mortgageMonthly) + cfg.newMortgageMonthly + cfg.living);
   const expTotal = d.exp.reduce((s, e) => s + effP(e), 0);
   const expPaid = d.exp.reduce((s, e) => s + iPaid(e), 0);
@@ -58,8 +81,25 @@ export default function Dash({ d, upd, core, coreUpd }) {
           onAmount={v => upd("buy.p3", v)} onDue={v => upd("buy.p3Due", v)} onToggle={() => upd("buy.p3Done", !buy.p3Done)} />
         <Row label="סכום משכנתא חדשה"><EditableNum value={buy.mortgage} onChange={v => upd("buy.mortgage", v)} /></Row>
         <Row label="משכנתא חדשה מאושרת"><input type="checkbox" checked={!!buy.mortgageOk} onChange={e => upd("buy.mortgageOk", e.target.checked)} /></Row>
-        <Row label={`מקדמת קונה התקבלה (${ils(sale.deposit)})`}><input type="checkbox" checked={!!sale.depositDone} onChange={e => upd("sale.depositDone", e.target.checked)} /></Row>
         <Row last label="פער לגישור" bold><span style={{ fontSize: 15, color: gap > 0 ? RUST : GREEN }}>{gap > 0 ? ils(gap) : "מכוסה"}</span></Row>
+      </div>
+
+      <Sec title="פעימות מהקונה" />
+      <div style={cardStyle}>
+        {payments.map(p => (
+          <SalePayRow key={p.id} p={p}
+            onChange={np => upd("sale.payments", payments.map(x => x.id === p.id ? np : x))}
+            onRemove={() => upd("sale.payments", payments.filter(x => x.id !== p.id))} />
+        ))}
+        <div style={{ padding: "10px 0 2px" }}>
+          <button
+            onClick={() => upd("sale.payments", [...payments, { id: uid(), label: "פעימה חדשה", amount: 0, due: "", done: false }])}
+            style={{ ...primaryBtn, fontSize: 13, height: 32, gap: 6 }}
+          >
+            <Plus size={14} /> הוסף פעימה
+          </button>
+        </div>
+        <Row last label="סה״כ התקבל מהקונה" bold><span style={{ fontSize: 15, color: GREEN }}>{ils(received)}</span></Row>
       </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
