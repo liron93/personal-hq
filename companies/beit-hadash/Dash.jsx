@@ -1,6 +1,6 @@
 "use client";
 import { Check } from "lucide-react";
-import { GREEN, RUST, GOLD, MUTED, cardStyle } from "@/lib/theme";
+import { GREEN, RUST, AMBER, MUTED, cardStyle } from "@/lib/theme";
 import { ils, daysUntil } from "@/lib/format";
 import { Sec, Row, Metric, EditableNum } from "@/lib/ui";
 import { effP, iPaid } from "./model";
@@ -11,8 +11,8 @@ function PaymentRow({ label, amount, due, done, onAmount, onDue, onToggle }) {
   return (
     <Row label={label}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <input type="date" value={due ? due.slice(0, 10) : ""} onChange={e => onDue(e.target.value)}
-          style={{ fontSize: 12, border: "none", background: "transparent", color: MUTED, width: 110 }} />
+        <input type="date" className="hq-field" value={due ? due.slice(0, 10) : ""} onChange={e => onDue(e.target.value)}
+          style={{ fontSize: 12, background: "transparent", color: MUTED, width: 110 }} />
         <EditableNum value={amount} onChange={onAmount} />
         <button onClick={onToggle} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${done ? GREEN : (urgent ? RUST : MUTED)}`, background: done ? GREEN : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {done && <Check size={13} color="#fff" />}
@@ -35,7 +35,7 @@ export default function Dash({ d, upd, core, coreUpd }) {
   return (
     <div>
       {cfg.mortgageBal === 0 && (
-        <div style={{ background: "#F4E3D3", color: "#6B4A22", borderRadius: 4, padding: "8px 12px", marginBottom: 14, fontSize: 13 }}>
+        <div style={{ background: "rgba(201,138,27,.12)", color: AMBER, borderRadius: 2, padding: "8px 12px", marginBottom: 14, fontSize: 13 }}>
           יתרת המשכנתא הקיימת לא הוזנה — מלא אותה למטה כדי שהחישוב יהיה מדויק
         </div>
       )}
@@ -76,7 +76,7 @@ export default function Dash({ d, upd, core, coreUpd }) {
 
       <div style={{ display: "flex", gap: 10 }}>
         <Metric label="שיפוץ שולם" value={ils(renoPaid)} sub={`מתוך ${ils(renoBgt)}`} />
-        <Metric label="שיפוץ נשאר" value={ils(renoBgt - renoPaid)} color={GOLD} />
+        <Metric label="שיפוץ נשאר" value={ils(renoBgt - renoPaid)} color={AMBER} />
       </div>
     </div>
   );

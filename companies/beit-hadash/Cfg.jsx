@@ -16,7 +16,7 @@ function CatManager({ label, stateKey, cats, upd }) {
         {cats.map((c, i) => <Row key={c} label={c} last={i === cats.length - 1}><span onClick={() => delCat(c)} style={{ fontSize: 12, color: RUST, cursor: "pointer" }}>הסר</span></Row>)}
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-        <input value={newVal} onChange={e => setNewVal(e.target.value)} onKeyDown={e => e.key === "Enter" && addCat()} placeholder="קטגוריה חדשה..." style={{ ...inputStyle, flex: 1 }} />
+        <input className="hq-field" value={newVal} onChange={e => setNewVal(e.target.value)} onKeyDown={e => e.key === "Enter" && addCat()} placeholder="קטגוריה חדשה..." style={{ ...inputStyle, flex: 1 }} />
         <button onClick={addCat} style={primaryBtn}><Plus size={14} /></button>
       </div>
     </div>
@@ -24,7 +24,7 @@ function CatManager({ label, stateKey, cats, upd }) {
 }
 
 function MonthField({ label, value, onChange, last }) {
-  return <Row label={label} last={last}><input type="month" value={value || ""} onChange={e => onChange(e.target.value)} style={{ fontSize: 13, border: "none", background: "transparent", fontFamily: "inherit" }} /></Row>;
+  return <Row label={label} last={last}><input type="month" className="hq-field" value={value || ""} onChange={e => onChange(e.target.value)} style={{ fontSize: 13, background: "transparent", fontFamily: "inherit" }} /></Row>;
 }
 
 export default function Cfg({ d, upd, core, coreUpd }) {

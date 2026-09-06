@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { INK, PAPER, GREEN, RUST, MUTED, LINE, cardStyle, inputStyle } from "@/lib/theme";
+import { INK, BG, GREEN, RUST, MUTED, LINE, cardStyle, inputStyle } from "@/lib/theme";
 import { ils, toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
 import { cp } from "@/lib/store";
@@ -72,16 +72,16 @@ export default function Budget({ d, setD }) {
       {showAdd ? (
         <div style={{ ...cardStyle, padding: 14 }}>
           <div style={{ display: "grid", gap: 8 }}>
-            <input placeholder="שם קטגוריה" value={nw.n} onChange={e => setNw({ ...nw, n: e.target.value })} style={inputStyle} />
-            <input placeholder="סכום מתוכנן" value={nw.est} onChange={e => setNw({ ...nw, est: e.target.value })} style={inputStyle} />
+            <input className="hq-field" placeholder="שם קטגוריה" value={nw.n} onChange={e => setNw({ ...nw, n: e.target.value })} style={inputStyle} />
+            <input className="hq-field" placeholder="סכום מתוכנן" value={nw.est} onChange={e => setNw({ ...nw, est: e.target.value })} style={inputStyle} />
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={addItem} style={{ flex: 1, border: "none", background: INK, color: PAPER, borderRadius: 4, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>הוסף</button>
-              <button onClick={() => setShowAdd(false)} style={{ flex: 1, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 4, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>ביטול</button>
+              <button onClick={addItem} style={{ flex: 1, border: "none", background: INK, color: BG, borderRadius: 2, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>הוסף</button>
+              <button onClick={() => setShowAdd(false)} style={{ flex: 1, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "8px 0", cursor: "pointer", fontFamily: "inherit" }}>ביטול</button>
             </div>
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: 10, border: `1px dashed ${MUTED}`, borderRadius: 4, background: "transparent", color: MUTED, cursor: "pointer", fontFamily: "inherit" }}>
+        <button onClick={() => setShowAdd(true)} style={{ width: "100%", padding: 10, border: `1px dashed ${MUTED}`, borderRadius: 2, background: "transparent", color: MUTED, cursor: "pointer", fontFamily: "inherit" }}>
           + הוסף קטגוריה
         </button>
       )}
