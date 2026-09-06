@@ -18,8 +18,14 @@ export default function LoginPage() {
       options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
     });
     setLoading(false);
-    if (error) setErr("שליחת הקישור נכשלה. בדוק את כתובת המייל ונסה שוב.");
-    else setSent(true);
+    if (error) {
+      const msg = error.message || "";
+      setErr(
+        /rate limit/i.test(msg)
+          ? "נשלחו יותר מדי בקשות התחברות בזמן קצר. המתן כמה דקות ונסה שוב."
+          : `שליחת הקישור נכשלה (${msg || "שגיאה לא ידועה"}). נסה שוב.`
+      );
+    } else setSent(true);
   }
 
   return (
