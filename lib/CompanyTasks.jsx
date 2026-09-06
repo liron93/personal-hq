@@ -5,7 +5,12 @@ import { INK, GREEN, MUTED, LINE, cardStyle, inputStyle, primaryBtn } from "@/li
 import { uid } from "@/lib/format";
 import { Sec } from "@/lib/ui";
 
-export default function Tasks({ d, setD }) {
+/*
+  רכיב משותף לכל תת-חברה: רשימת משימות + עדכון למנכ"ל.
+  מקבל d, setD ומצפה ל-d.tasks ([{id,text,done}]) ו-d.updates ([{id,date,text}]) —
+  אותו מבנה בכל model.js. אין כאן שום דבר ספציפי לתת-חברה מסוימת.
+*/
+export default function CompanyTasks({ d, setD }) {
   const [newTask, setNewTask] = useState("");
   const [newUpdate, setNewUpdate] = useState("");
   const addTask = () => { if (!newTask.trim()) return; setD(p => ({ ...p, tasks: [...p.tasks, { id: uid(), text: newTask.trim(), done: false }] })); setNewTask(""); };
@@ -17,7 +22,7 @@ export default function Tasks({ d, setD }) {
     <div>
       <Sec title="עדכון למנכ״ל" />
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input value={newUpdate} onChange={e => setNewUpdate(e.target.value)} onKeyDown={e => e.key === "Enter" && addUpdate()} placeholder="מה חדש היום בבית החדש?" style={{ ...inputStyle, flex: 1 }} />
+        <input value={newUpdate} onChange={e => setNewUpdate(e.target.value)} onKeyDown={e => e.key === "Enter" && addUpdate()} placeholder="מה חדש היום?" style={{ ...inputStyle, flex: 1 }} />
         <button onClick={addUpdate} style={primaryBtn}><Plus size={16} /></button>
       </div>
       <div style={{ display: "grid", gap: 8, marginBottom: 24 }}>

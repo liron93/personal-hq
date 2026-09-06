@@ -1,5 +1,6 @@
 import { Home, Wallet, Dumbbell, Briefcase, Brain } from "lucide-react";
 import * as beit from "./beit-hadash/model";
+import * as kesef from "./kesef/model";
 
 /*
   כל תת-חברה מרשמת את עצמה כאן:
@@ -15,7 +16,7 @@ import * as beit from "./beit-hadash/model";
 */
 export const COMPANIES = [
   { slug: "beit-hadash", name: "בית חדש", icon: Home, active: true, storeKey: beit.STORE_KEY, init: beit.INIT, summarize: beit.summarize },
-  { slug: "kesef", name: "כלכלה והשקעות", icon: Wallet, active: false },
+  { slug: "kesef", name: "כלכלה והשקעות", icon: Wallet, active: true, storeKey: kesef.STORE_KEY, init: kesef.INIT, summarize: kesef.summarize },
   { slug: "imun", name: "אימון ותזונה", icon: Dumbbell, active: false },
   { slug: "avoda", name: "חיפוש עבודה", icon: Briefcase, active: false },
   { slug: "nefesh", name: "רווחה נפשית", icon: Brain, active: false },
