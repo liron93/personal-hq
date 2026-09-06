@@ -13,9 +13,9 @@ export const iRem = i => (i.done ? 0 : Math.max(0, effP(i) - (i.advance || 0)));
 const item = (id, n, cat, est, extra = {}) => ({ id, n, cat, est, act: 0, advance: 0, done: false, note: "", supplier: "", link: "", ...extra });
 
 export const INIT = {
+  // הכנסות, החזר משכנתא קיימת, ותאריכים אישיים — נתוני ליבה משותפים, ראה lib/coreFacts.js
   cfg: {
-    mortgageBal: 0, mortgageMonthly: 8500, newMortgageMonthly: 11600, living: 14000,
-    mySalary: 17500, myRaise: 20000, wifeSalary: 15500, athensMonthly: 0, frozen: false,
+    mortgageBal: 0, newMortgageMonthly: 11600, living: 14000,
     saleMonth: "2025-12", raiseMonth: "2025-09", athensMonth: "2026-01",
     flowStart: "2025-06", flowEnd: "2027-12",
     expCats: [...EXP_CATS_DEFAULT], renoCats: [...RENO_CATS_DEFAULT],

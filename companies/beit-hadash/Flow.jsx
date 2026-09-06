@@ -3,7 +3,7 @@ import { useState } from "react";
 import { GREEN, RUST, MUTED, cardStyle, tabBtn } from "@/lib/theme";
 import { ils, MONTHS } from "@/lib/format";
 
-export default function Flow({ d }) {
+export default function Flow({ d, core }) {
   const { cfg } = d;
   const [scen, setScen] = useState("curr");
   const rows = []; let cum = 0;
@@ -15,8 +15,8 @@ export default function Flow({ d }) {
       const key = `${y}-${String(m + 1).padStart(2, "0")}`;
       const sold = key > cfg.saleMonth;
       const raise = scen === "future" && key >= cfg.raiseMonth;
-      const inc = (raise ? cfg.myRaise : cfg.mySalary) + cfg.wifeSalary + (key >= cfg.athensMonth ? cfg.athensMonthly : 0);
-      const oldM = sold ? 0 : (cfg.frozen ? 0 : cfg.mortgageMonthly);
+      const inc = (raise ? core.myRaise : core.mySalary) + core.wifeSalary + (key >= cfg.athensMonth ? core.athensMonthly : 0);
+      const oldM = sold ? 0 : (core.frozen ? 0 : core.mortgageMonthly);
       const out = oldM + cfg.newMortgageMonthly + cfg.living;
       const net = inc - out; cum += net;
       rows.push({ key, label: `${MONTHS[m]} ${y}`, inc, out, net, cum, isSale: key === cfg.saleMonth });

@@ -22,11 +22,11 @@ function PaymentRow({ label, amount, due, done, onAmount, onDue, onToggle }) {
   );
 }
 
-export default function Dash({ d, upd }) {
+export default function Dash({ d, upd, core, coreUpd }) {
   const { cfg, sale, buy, mil } = d;
   const saleNet = sale.price - sale.agentFee - sale.lawyerFee - sale.penalty - cfg.mortgageBal;
   const gap = buy.p2 - buy.mortgage - (sale.depositDone ? sale.deposit : 0);
-  const net = cfg.mySalary + cfg.wifeSalary - ((cfg.frozen ? 0 : cfg.mortgageMonthly) + cfg.newMortgageMonthly + cfg.living);
+  const net = core.mySalary + core.wifeSalary - ((core.frozen ? 0 : core.mortgageMonthly) + cfg.newMortgageMonthly + cfg.living);
   const expTotal = d.exp.reduce((s, e) => s + effP(e), 0);
   const expPaid = d.exp.reduce((s, e) => s + iPaid(e), 0);
   const renoBgt = d.reno.reduce((s, r) => s + effP(r), 0);
@@ -63,7 +63,7 @@ export default function Dash({ d, upd }) {
       </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        <Metric label="תזרים חודשי נטו" value={ils(net)} color={net >= 0 ? GREEN : RUST} sub={cfg.frozen ? "משכנתא מוקפאת" : "שתי משכנתאות"} />
+        <Metric label="תזרים חודשי נטו" value={ils(net)} color={net >= 0 ? GREEN : RUST} sub={core.frozen ? "משכנתא מוקפאת" : "שתי משכנתאות"} />
         <Metric label="הוצאות חד״פ" value={ils(expPaid)} sub={`מתוך ${ils(expTotal)}`} />
       </div>
 
@@ -71,7 +71,7 @@ export default function Dash({ d, upd }) {
       <div style={cardStyle}>
         <Row label={`מענק (${ils(mil.grant)})`}><input type="checkbox" checked={!!mil.grantDone} onChange={e => upd("mil.grantDone", e.target.checked)} /></Row>
         <Row label={`הלוואה (${ils(mil.loan)}, ללא ריבית)`}><input type="checkbox" checked={!!mil.loanDone} onChange={e => upd("mil.loanDone", e.target.checked)} /></Row>
-        <Row last label="הקפאת משכנתא"><input type="checkbox" checked={!!cfg.frozen} onChange={e => upd("cfg.frozen", e.target.checked)} /></Row>
+        <Row last label="הקפאת משכנתא"><input type="checkbox" checked={!!core.frozen} onChange={e => coreUpd("frozen", e.target.checked)} /></Row>
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>

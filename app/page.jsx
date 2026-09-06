@@ -3,9 +3,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { COMPANIES } from "@/companies/registry";
-import { INK, PAPER, CARD, GOLD, GREEN, RUST, MUTED, LINE } from "@/lib/theme";
-import { load } from "@/lib/store";
+import { INK, PAPER, CARD, GOLD, GREEN, RUST, MUTED, LINE, cardStyle } from "@/lib/theme";
+import { Sec, Row, EditableNum } from "@/lib/ui";
+import { load, useStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import * as coreFacts from "@/lib/coreFacts";
 
 function FlagDot({ flag }) {
   const color = flag === "red" ? RUST : flag === "amber" ? GOLD : GREEN;
@@ -35,6 +37,7 @@ function useSummaries() {
 
 export default function CEO() {
   const summaries = useSummaries();
+  const { data: core, upd: coreUpd, ready: coreReady } = useStore(coreFacts.STORE_KEY, coreFacts.INIT);
   const todayStr = new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
   const active = COMPANIES.filter(c => c.active);
   const items = active.map(c => ({ c, s: summaries[c.slug] })).filter(x => x.s);
@@ -69,6 +72,17 @@ export default function CEO() {
           {soonest && <span>{soonest.nextPayment.label} בעוד {soonest.daysToPay} ימים</span>}
         </div>
       </section>
+
+      {coreReady && (
+        <div style={{ marginBottom: 24 }}>
+          <Sec title="נתוני ליבה" />
+          <div style={cardStyle}>
+            <Row label="הכנסה שלי"><EditableNum value={core.mySalary} onChange={v => coreUpd("mySalary", v)} /></Row>
+            <Row label="הכנסת אשתי"><EditableNum value={core.wifeSalary} onChange={v => coreUpd("wifeSalary", v)} /></Row>
+            <Row last label="החזר משכנתא קיימת"><EditableNum value={core.mortgageMonthly} onChange={v => coreUpd("mortgageMonthly", v)} /></Row>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gap: 10 }}>
         {COMPANIES.map(c => {

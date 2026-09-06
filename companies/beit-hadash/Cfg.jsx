@@ -27,23 +27,24 @@ function MonthField({ label, value, onChange, last }) {
   return <Row label={label} last={last}><input type="month" value={value || ""} onChange={e => onChange(e.target.value)} style={{ fontSize: 13, border: "none", background: "transparent", fontFamily: "inherit" }} /></Row>;
 }
 
-export default function Cfg({ d, upd }) {
+export default function Cfg({ d, upd, core, coreUpd }) {
   const c = d.cfg;
   const N = ({ label, path, last }) => <Row label={label} last={last}><EditableNum value={c[path]} onChange={v => upd("cfg." + path, v)} /></Row>;
+  const CN = ({ label, path, last }) => <Row label={label} last={last}><EditableNum value={core[path]} onChange={v => coreUpd(path, v)} /></Row>;
   return (
     <div>
       <Sec title="משכנתאות" />
       <div style={cardStyle}>
-        <N label="החזר משכנתא קיימת/חודש" path="mortgageMonthly" />
+        <CN label="החזר משכנתא קיימת/חודש" path="mortgageMonthly" />
         <N label="החזר משכנתא חדשה/חודש" path="newMortgageMonthly" />
-        <Row last label="הקפאת משכנתא (מילואים)"><input type="checkbox" checked={!!c.frozen} onChange={e => upd("cfg.frozen", e.target.checked)} /></Row>
+        <Row last label="הקפאת משכנתא (מילואים)"><input type="checkbox" checked={!!core.frozen} onChange={e => coreUpd("frozen", e.target.checked)} /></Row>
       </div>
       <Sec title="הכנסות" />
       <div style={cardStyle}>
-        <N label="משכורת שלי — נוכחית" path="mySalary" />
-        <N label="משכורת שלי — עתידית" path="myRaise" />
-        <N label="משכורת אשתי" path="wifeSalary" />
-        <N label="הכנסת אתונה/חודש" path="athensMonthly" last />
+        <CN label="משכורת שלי — נוכחית" path="mySalary" />
+        <CN label="משכורת שלי — עתידית" path="myRaise" />
+        <CN label="משכורת אשתי" path="wifeSalary" />
+        <CN label="הכנסת אתונה/חודש" path="athensMonthly" last />
       </div>
       <Sec title="הוצאות קבועות" />
       <div style={cardStyle}><N label="הוצאות מחיה/חודש" path="living" last /></div>
