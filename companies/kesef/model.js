@@ -54,6 +54,50 @@ export function snapshotNow(d) {
 
 const cat = (id, n, est) => ({ id, n, cat: n, est, act: 0, done: false });
 
+export const DEFAULT_USD_ILS = 3.7;
+
+// פריט מעקב מניה. currentPrice ו-entry/exit price ב-USD (כפי ש-Finnhub מחזיר).
+export const newWatchItem = (symbol, name, q = {}) => ({
+  id: uid(),
+  symbol: String(symbol || "").trim().toUpperCase(),
+  name: String(name || "").trim(),
+  sector: q.sector ?? null,
+  peRatio: q.peRatio ?? null,
+  dividendYield: q.dividendYield ?? null,
+  currentPrice: q.price ?? null,
+  lastFetched: q.fetchedAt ?? null,
+  unitsHeld: 0,
+  thesis: "",
+  entry: { priceBelow: null, portfolioPercentBelow: null },
+  exit: { priceAbove: null, portfolioPercentAbove: null },
+});
+
+// כלל מוגדר = מספר חיובי. EditableNum מחזיר 0 לשדה ריק, ולכן 0/null נחשבים "לא הוגדר".
+const ruleSet = v => typeof v === "number" && v > 0;
+
+// לא מנוע המלצות — רק משקף אם המחיר/המשקל שהמשתמש עצמו קבע נחצו.
+// שני התנאים שהוגדרו בקבוצה חייבים להתקיים; תנאי שלא הוגדר לא נבדק.
+// positionValue מומר ל-₪ לפי usdIls כדי להשוות מול שווי התיק (שמנוהל ב-₪).
+export function positionStatus(item, totalNetWorth, usdIls = 1) {
+  const price = item.currentPrice || 0;
+  const positionValue = (item.unitsHeld || 0) * price * (usdIls || 1);
+  const positionPercent = totalNetWorth > 0 ? (positionValue / totalNetWorth) * 100 : 0;
+
+  const e = item.entry || {}, x = item.exit || {};
+
+  const entryChecks = [];
+  if (ruleSet(e.priceBelow)) entryChecks.push(price < e.priceBelow);
+  if (ruleSet(e.portfolioPercentBelow)) entryChecks.push(positionPercent < e.portfolioPercentBelow);
+  const inEntryZone = entryChecks.length > 0 && entryChecks.every(Boolean);
+
+  const exitChecks = [];
+  if (ruleSet(x.priceAbove)) exitChecks.push(price > x.priceAbove);
+  if (ruleSet(x.portfolioPercentAbove)) exitChecks.push(positionPercent > x.portfolioPercentAbove);
+  const inExitZone = exitChecks.length > 0 && exitChecks.every(Boolean);
+
+  return { positionValue, positionPercent, inEntryZone, inExitZone };
+}
+
 export const INIT = {
   // הכנסות + החזר משכנתא נקראים מ-lib/coreFacts.js — לא משוכפלים כאן
   assets: { cash: 0, stocks: 0, funds: 0, crypto: 0, pension: 0, kerenHishtalmut: 0 },
@@ -68,6 +112,8 @@ export const INIT = {
   tasks: [],
   updates: [],
   history: [], // צילומי שווי נקי חודשיים: { id, month:"YYYY-MM", assets:{...}, total }
+  watchlist: [], // מעקב מניות: פריטים מ-newWatchItem
+  usdIls: DEFAULT_USD_ILS, // שער המרה קבוע USD→₪, ניתן לעריכה בטאב מעקב מניות
 };
 
 // מה תת-החברה מדווחת למנכ"ל — מעט, קבוע, ומספיק כדי לכוון תשומת לב
