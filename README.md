@@ -12,6 +12,19 @@ npm run dev
 ```
 ואז לפתוח את http://localhost:3000
 
+## משתני סביבה
+
+צריך קובץ `.env.local` (לא נכנס לגיט) עם שני משתנים מפרויקט Supabase שלכם — Settings → API:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+יש דוגמה ב-`.env.example`. בפרודקשן (Vercel) אותם משתנים מוגדרים דרך Environment Variables בהגדרות הפרויקט, לא בגיט.
+
+לפני שימוש ראשון צריך גם להריץ פעם אחת את `supabase/schema.sql` ב-SQL Editor של הפרויקט, וב-Authentication → URL Configuration להוסיף את כתובת ה-localhost ואת כתובת ה-Vercel לרשימת ה-Redirect URLs.
+
 ## מבנה
 
 ```
@@ -52,5 +65,4 @@ lib/                         משותף: עיצוב, אחסון, פורמט, ר�
 
 ## הצעד הבא
 
-- חיבור ל-Supabase (החלפת `lib/store.js`) כדי שהנתונים יהיו זמינים בנייד ובמחשב באותו זמן
 - קלט אוטומטי: יומן / מייל שמזינים עדכונים לתתי-החברות בלי הקלדה
