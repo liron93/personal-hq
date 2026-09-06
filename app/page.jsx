@@ -4,25 +4,31 @@ import { useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { COMPANIES } from "@/companies/registry";
 import { INK, PAPER, CARD, GOLD, GREEN, RUST, MUTED, LINE } from "@/lib/theme";
+import { load } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 
 function FlagDot({ flag }) {
   const color = flag === "red" ? RUST : flag === "amber" ? GOLD : GREEN;
   return <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: color }} />;
 }
 
-// המנכ"ל קורא את מצב כל תת-חברה פעילה ישירות מהאחסון — בלי לפתוח אותה
+// המנכ"ל קורא את מצב כל תת-חברה פעילה דרך שכבת האחסון המשותפת — בלי לפתוח אותה
 function useSummaries() {
   const [s, setS] = useState({});
   useEffect(() => {
-    const out = {};
-    for (const c of COMPANIES) {
-      if (!c.active) continue;
-      try {
-        const raw = window.localStorage.getItem(c.storeKey);
-        out[c.slug] = c.summarize(raw ? JSON.parse(raw) : c.init);
-      } catch { out[c.slug] = c.summarize(c.init); }
-    }
-    setS(out);
+    let alive = true;
+    (async () => {
+      const out = {};
+      for (const c of COMPANIES) {
+        if (!c.active) continue;
+        try {
+          const raw = await load(c.storeKey);
+          out[c.slug] = c.summarize(raw ?? c.init);
+        } catch { out[c.slug] = c.summarize(c.init); }
+      }
+      if (alive) setS(out);
+    })();
+    return () => { alive = false; };
   }, []);
   return s;
 }
@@ -38,9 +44,17 @@ export default function CEO() {
 
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 80px" }}>
-      <div style={{ marginBottom: 36 }}>
-        <div style={{ color: MUTED, fontSize: 14, marginBottom: 4 }}>{todayStr}</div>
-        <h1 style={{ fontSize: 34, fontWeight: 700, margin: 0 }}>המנכ״ל</h1>
+      <div style={{ marginBottom: 36, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <div style={{ color: MUTED, fontSize: 14, marginBottom: 4 }}>{todayStr}</div>
+          <h1 style={{ fontSize: 34, fontWeight: 700, margin: 0 }}>המנכ״ל</h1>
+        </div>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          style={{ border: "none", background: "transparent", color: MUTED, fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 4 }}
+        >
+          התנתקות
+        </button>
       </div>
 
       <section style={{ background: CARD, color: PAPER, borderRadius: 4, padding: "22px 24px", marginBottom: 28 }}>
