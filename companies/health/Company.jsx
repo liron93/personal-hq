@@ -1,7 +1,7 @@
 
 "use client";
-import { useMemo, useState } from "react";
-import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, Pencil, Settings, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Activity, Apple, CalendarDays, Check, CirclePlus, Dumbbell, Pencil, Settings, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, summarize, todayISO, uid } from "./model";
 import { INK, BG, CARD, ACCENT, GREEN, MUTED, LINE, cardStyle, primaryBtn, tabBtn } from "@/lib/theme";
@@ -95,7 +95,7 @@ function Progress({ d }) {
 
 function Metric({ label, value }) { return <div style={{ ...cardStyle, margin: 0, padding: 14 }}><div style={{ color: MUTED, fontSize: 13 }}>{label}</div><div style={{ fontSize: 28, fontWeight: 700, marginTop: 4 }}>{value}</div></div>; }
 
-function Settings({ d, setD }) {
+function SettingsTab({ d, setD }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const exportData = () => { const blob = new Blob([JSON.stringify(d, null, 2)], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "personal-hq-health.json"; link.click(); URL.revokeObjectURL(link.href); };
   const wipe = () => { if (!confirmDelete) return setConfirmDelete(true); setD(INIT); setConfirmDelete(false); };
@@ -106,6 +106,6 @@ export default function Company() {
   const { data: d, setData: setD, ready } = useStore(STORE_KEY, INIT);
   const [tab, setTab] = useState("today");
   if (!ready) return <div style={{ padding: 40, textAlign: "center", color: MUTED }}>טוען...</div>;
-  const content = !d.profile.complete ? <Onboarding d={d} setD={setD} /> : tab === "today" ? <Today d={d} setD={setD} onTab={setTab} /> : tab === "plan" ? <Plan d={d} setD={setD} /> : tab === "food" ? <FoodLog d={d} setD={setD} /> : tab === "workouts" ? <WorkoutLog d={d} setD={setD} /> : tab === "progress" ? <Progress d={d} /> : <Settings d={d} setD={setD} />;
+  const content = !d.profile.complete ? <Onboarding d={d} setD={setD} /> : tab === "today" ? <Today d={d} setD={setD} onTab={setTab} /> : tab === "plan" ? <Plan d={d} setD={setD} /> : tab === "food" ? <FoodLog d={d} setD={setD} /> : tab === "workouts" ? <WorkoutLog d={d} setD={setD} /> : tab === "progress" ? <Progress d={d} /> : <SettingsTab d={d} setD={setD} />;
   return <div><div style={{ display: "flex", overflowX: "auto", gap: 4, marginBottom: 18 }}>{TABS.map(item => <button key={item.id} onClick={() => setTab(item.id)} style={tabBtn(tab === item.id)}>{item.label}</button>)}</div>{!d.profile.complete && <div style={{ color: ACCENT, fontSize: 13, marginBottom: 12 }}>קליטה ראשונית</div>}{content}</div>;
 }
