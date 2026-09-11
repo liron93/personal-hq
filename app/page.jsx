@@ -6,7 +6,6 @@ import { COMPANIES } from "@/companies/registry";
 import { INK, BG, AMBER, GREEN, RUST, MUTED, LINE, cardStyle } from "@/lib/theme";
 import { Sec, Row, EditableNum } from "@/lib/ui";
 import { load, useStore } from "@/lib/store";
-import { supabase } from "@/lib/supabase";
 import * as coreFacts from "@/lib/coreFacts";
 
 function FlagDot({ flag }) {
@@ -47,17 +46,9 @@ export default function CEO() {
 
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 80px" }}>
-      <div style={{ marginBottom: 36, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div style={{ color: MUTED, fontSize: 14, marginBottom: 4 }}>{todayStr}</div>
-          <h1 style={{ fontSize: 34, fontWeight: 700, margin: 0 }}>המנכ״ל</h1>
-        </div>
-        <button
-          onClick={() => supabase.auth.signOut()}
-          style={{ border: "none", background: "transparent", color: MUTED, fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 4 }}
-        >
-          התנתקות
-        </button>
+      <div style={{ marginBottom: 36 }}>
+        <div style={{ color: MUTED, fontSize: 14, marginBottom: 4 }}>{todayStr}</div>
+        <h1 style={{ fontSize: 34, fontWeight: 700, margin: 0 }}>המנכ״ל</h1>
       </div>
 
       <section style={{ background: INK, color: BG, borderRadius: 2, padding: "22px 24px", marginBottom: 28 }}>
