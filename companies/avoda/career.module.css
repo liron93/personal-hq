@@ -1,0 +1,29 @@
+.root { line-height: 1.6; }
+.root h2 { font-size: 19px; }
+.root h3 { font-size: 16px; margin: 12px 0 4px; overflow-wrap: anywhere; }
+.metrics { display: flex; gap: 8px; flex-wrap: wrap; }
+.metrics > div { min-width: 130px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-size: 13px; min-width: 0; }
+.field input, .field select, .field textarea { width: 100%; box-sizing: border-box; min-height: 42px; }
+.field textarea { resize: vertical; }
+.form { padding-top: 8px !important; padding-bottom: 16px !important; }
+.form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.toolbar, .actions, .pagination, .tabs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.toolbar { justify-content: space-between; }
+.actions { margin: 14px 0; }
+.button { min-height: 42px; padding: 8px 14px; font: inherit; cursor: pointer; }
+.button:disabled { cursor: default; opacity: .5; }
+.tabs { margin: 18px 0 8px; border-bottom: 1px solid #E2E5EA; }
+.pagination { justify-content: center; }
+.status { color: #6B7280; font-size: 12px; min-height: 24px; }
+.error { color: #C23B3B; border: 1px solid currentColor; padding: 12px; }
+.empty { padding: 28px 16px; border: 1px dashed #6B7280; }
+.next { padding: 12px; background: #fff; border-inline-start: 3px solid #1B3A5C; }
+.badge { font-size: 12px; background: #F6F7F9; padding: 3px 8px; }
+.job { padding-bottom: 4px !important; }
+.job details { margin-top: 12px; }
+.job summary { cursor: pointer; }
+.text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.root button:focus-visible, .root a:focus-visible, .root summary:focus-visible { outline: 2px solid #1B3A5C; outline-offset: 3px; }
+@media (max-width: 520px) { .grid { grid-template-columns: 1fr; gap: 0; } }
