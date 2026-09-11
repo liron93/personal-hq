@@ -1,153 +1,175 @@
 "use client";
-import { useMemo, useState } from "react";
-import { useStore } from "@/lib/store";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { cardStyle, inputStyle, primaryBtn, MUTED, RUST, tabBtn } from "@/lib/theme";
 import { Metric } from "@/lib/ui";
-import { INIT, STORE_KEY, STATUSES, parseJob, saveJob, removeJob, selectJobs, summarize, validateState } from "./model";
 import styles from "./career.module.css";
 
-const EMPTY = { company: "", role: "", url: "", status: "considering", appliedAt: "", nextStep: "", nextStepAt: "", notes: "", description: "" };
+const LABELS = {
+  considering: "שוקל/ת להגיש", applied: "הוגשה מועמדות", interview: "ראיון",
+  offer: "הצעה", rejected: "נדחתה", withdrawn: "נסגרה",
+};
+const CLOSED = new Set(["rejected", "withdrawn"]);
+const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
 
-export function CareerView({ store }) {
-  const { data, ready, status, error, commit, reload } = store;
-  const [tab, setTab] = useState("jobs");
-  const [draft, setDraft] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [validation, setValidation] = useState("");
-  const [deletingId, setDeletingId] = useState(null);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [page, setPage] = useState(1);
-  const busy = status === "saving";
-  const validated = useMemo(() => {
-    if (!data) return { state: INIT, error: "" };
-    try { return { state: validateState(data), error: "" }; }
-    catch { return { state: INIT, error: "נתוני הקריירה אינם בפורמט נתמך. לא נשנה אותם; יש לבדוק את הנתונים לפני המשך העבודה" }; }
-  }, [data]);
-  const state = validated.state;
-  const summary = summarize(state);
-  const results = selectJobs(state.jobs, query, filter, page);
+function useCareerJobs() {
+  const [jobs, setJobs] = useState([]);
+  const [state, setState] = useState("loading");
+  const [error, setError] = useState("");
 
-  function edit(job = null) {
-    setDraft(job ? Object.fromEntries(Object.keys(EMPTY).map(key => [key, job[key] ?? ""])) : { ...EMPTY });
-    setEditingId(job?.id ?? null);
-    setValidation("");
-    setDeletingId(null);
-  }
+  const load = async () => {
+    setState("loading"); setError("");
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session?.user) { setState("ready"); setJobs([]); return; }
+    const { data, error: failure } = await supabase
+      .from("career_jobs")
+      .select("id, company_name, role_title, job_url, status, applied_at, notes, next_action, next_action_at, fit_score, should_apply, tailored_questions, candidate_questions, created_at")
+      .eq("user_id", session.session.user.id)
+      .order("next_action_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    if (failure) { setError("לא ניתן לטעון את הקריירה מהענן. נסה/י שוב."); setState("error"); return; }
+    setJobs(data ?? []); setState("ready");
+  };
 
-  async function submit(event) {
-    event.preventDefault();
-    setValidation("");
-    try {
-      const next = saveJob(state, parseJob(draft), editingId);
-      if (await commit(next)) { setDraft(null); setEditingId(null); setPage(1); }
-    } catch (failure) { setValidation(failure.message); }
-  }
+  useEffect(() => { load(); }, []);
+  const update = async (id, patch) => {
+    setError("");
+    const { data, error: failure } = await supabase.from("career_jobs").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).select().single();
+    if (failure) { setError("השינוי לא נשמר. נסה/י שוב."); return false; }
+    setJobs(old => old.map(job => job.id === id ? data : job));
+    return true;
+  };
+  return { jobs, state, error, load, update };
+}
 
-  async function confirmDelete() {
-    if (await commit(removeJob(state, deletingId))) setDeletingId(null);
-  }
-
-  function field(name, label, type = "text", required = false, maxLength = 500) {
-    return <label className={styles.field}>
-      <span>{label}{required ? " *" : ""}</span>
-      <input className="hq-field" style={inputStyle} type={type} required={required} maxLength={maxLength}
-        value={draft[name]} onChange={event => setDraft({ ...draft, [name]: event.target.value })}
-        dir={type === "url" || type === "date" ? "ltr" : undefined} />
-    </label>;
-  }
-
-  if (!ready || validated.error) return <section aria-live="polite">
-    <p role={error || validated.error ? "alert" : "status"}>{validated.error || error || "טוען את המועמדויות שלך…"}</p>
-    {error && <button onClick={reload}>ניסיון נוסף</button>}
+function Actions({ title, hint, jobs, onOpen }) {
+  if (!jobs.length) return null;
+  return <section style={cardStyle} className={styles.queue}>
+    <div className={styles.toolbar}><div><h3>{title}</h3><p style={{ color: MUTED }}>{hint}</p></div><span className={styles.count}>{jobs.length}</span></div>
+    {jobs.slice(0, 6).map(job => <button key={job.id} className={styles.queueItem} onClick={() => onOpen(job)}>
+      <span>{job.next_action || "חסר צעד הבא"}</span><small>{job.company_name} · {job.role_title}{job.next_action_at ? ` · ${job.next_action_at}` : ""}</small>
+    </button>)}
   </section>;
-
-  return <div className={styles.root} dir="rtl">
-    <p style={{ color: MUTED }}>מקום אחד למשרות, מועמדויות והצעד הבא שלך.</p>
-    <div className={styles.metrics}>
-      <Metric label="מועמדויות פעילות" value={summary.activeJobs} />
-      <Metric label="ראיונות" value={summary.interviews} />
-      <Metric label="צעדים באיחור" value={summary.overdue} color={summary.overdue ? RUST : undefined} />
-    </div>
-    {summary.nextStep && <p className={styles.next}>הצעד הבא: {summary.nextStep.text} · {summary.nextStep.company}{summary.nextStep.date ? ` · ${summary.nextStep.date}` : " · ללא מועד"}</p>}
-    <nav aria-label="מחלקות הקריירה" className={styles.tabs}>
-      <button style={tabBtn(tab === "jobs")} onClick={() => setTab("jobs")}>מועמדויות</button>
-      <button style={tabBtn(tab === "plan")} onClick={() => setTab("plan")}>תוכנית השילוב</button>
-    </nav>
-    <div aria-live="polite" role="status" className={styles.status}>
-      {busy ? "שומר בענן…" : status === "saved" ? "השמירה אושרה בענן" : "השינויים נשמרים בלחיצה על שמירה"}
-    </div>
-    {error && <p role="alert" className={styles.error}>{error}</p>}
-    {tab === "plan" ? <section style={cardStyle}>
-      <h2>מערכת הקריירה שלך, בתוך Personal HQ</h2>
-      <p>מעקב מועמדויות זמין כאן כעת. קורות חיים, תרגול, ראיונות ומשוב AI יועברו בשלבים הבאים, יחד עם בקרת גישה ובדיקות.</p>
-      <p>הנתונים מהמערכת הקודמת עדיין לא הועברו. כלים אלה ממשיכים להיות זמינים בה:</p>
-      <a href="https://pm-interview-prep-ivory.vercel.app" target="_blank" rel="noopener noreferrer">פתיחת מערכת הקריירה הקיימת</a>
-      <p>קישורי משרות נשמרים כאן כקישורים בלבד. ניתוח אוטומטי עדיין לא מחובר.</p>
-    </section> : <>
-      <div className={styles.toolbar}>
-        <h2>המועמדויות שלי</h2>
-        {!draft && <button style={primaryBtn} className={styles.button} disabled={busy || !!deletingId} onClick={() => edit()}>הוספת מועמדות</button>}
-      </div>
-      {draft && <form style={cardStyle} className={styles.form} onSubmit={submit}>
-        <h3>{editingId ? "עריכת מועמדות" : "מועמדות חדשה"}</h3>
-        <fieldset disabled={busy}>
-          <div className={styles.grid}>
-            {field("company", "חברה", "text", true, 160)}
-            {field("role", "תפקיד", "text", true, 200)}
-            {field("url", "קישור למשרה", "url", false, 2048)}
-            <label className={styles.field}><span>סטטוס</span><select className="hq-field" style={inputStyle} value={draft.status} onChange={event => setDraft({ ...draft, status: event.target.value })}>
-              {Object.entries(STATUSES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select></label>
-            {field("appliedAt", "תאריך הגשה", "date")}
-            {field("nextStepAt", "מועד הצעד הבא", "date")}
-          </div>
-          {field("nextStep", "הצעד הבא")}
-          <label className={styles.field}><span>הערות</span><textarea className="hq-field" style={inputStyle} rows={3} maxLength={6000} value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label>
-          <label className={styles.field}><span>תיאור המשרה</span><textarea className="hq-field" style={inputStyle} rows={4} maxLength={12000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>
-          {validation && <p role="alert" className={styles.error}>{validation}</p>}
-          <div className={styles.actions}>
-            <button type="submit" style={primaryBtn} className={styles.button}>{busy ? "שומר…" : "שמירת מועמדות"}</button>
-            <button type="button" className={styles.button} onClick={() => { setDraft(null); setValidation(""); }}>ביטול</button>
-          </div>
-        </fieldset>
-      </form>}
-      <div className={styles.grid}>
-        <label className={styles.field}><span>חיפוש חברה או תפקיד</span><input className="hq-field" style={inputStyle} type="search" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></label>
-        <label className={styles.field}><span>סינון לפי סטטוס</span><select className="hq-field" style={inputStyle} value={filter} onChange={event => { setFilter(event.target.value); setPage(1); }}>
-          <option value="all">כל הסטטוסים</option>{Object.entries(STATUSES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select></label>
-      </div>
-      <p style={{ color: MUTED }}>{results.total} מועמדויות בתוצאות</p>
-      {!results.total && <p className={styles.empty}>{state.jobs.length ? "אין מועמדויות שמתאימות לחיפוש" : "כאן תופיע המועמדות הראשונה שלך. מספיק להתחיל בשם החברה ובתפקיד."}</p>}
-      <div aria-label="רשימת מועמדויות">
-        {results.items.map(job => <article key={job.id} style={cardStyle} className={styles.job}>
-          <div className={styles.toolbar}><h3>{job.role}</h3><span className={styles.badge}>{STATUSES[job.status]}</span></div>
-          <p>{job.company}</p>
-          <p style={{ color: MUTED }}>תאריך הגשה: {job.appliedAt || "לא הוזן"}</p>
-          {job.nextStep && <p>הצעד הבא: {job.nextStep}{job.nextStepAt ? ` · ${job.nextStepAt}` : ""}</p>}
-          {job.url && <a href={job.url} target="_blank" rel="noopener noreferrer">פתיחת המשרה באתר החברה ↗</a>}
-          {(job.notes || job.description) && <details><summary>הערות ותיאור המשרה</summary><p className={styles.text}>{job.notes || "אין הערות"}</p><p className={styles.text}>{job.description}</p></details>}
-          {deletingId === job.id ? <div role="alert" className={styles.actions}>
-            <span>למחוק את המועמדות הזאת? לא ניתן לשחזר אותה מהמסך.</span>
-            <button className={styles.button} disabled={busy} onClick={confirmDelete}>אישור מחיקה</button>
-            <button className={styles.button} disabled={busy} onClick={() => setDeletingId(null)}>ביטול</button>
-          </div> : <div className={styles.actions}>
-            <button className={styles.button} disabled={busy || !!draft || !!deletingId} onClick={() => edit(job)}>עריכה</button>
-            <button className={styles.button} disabled={busy || !!draft || !!deletingId} onClick={() => setDeletingId(job.id)}>מחיקה</button>
-          </div>}
-        </article>)}
-      </div>
-      <nav aria-label="עמודי מועמדויות" className={styles.pagination}>
-        <button className={styles.button} disabled={results.page === 1} onClick={() => setPage(results.page - 1)}>הקודם</button>
-        <span>עמוד {results.page} מתוך {results.pages}</span>
-        <button className={styles.button} disabled={results.page === results.pages} onClick={() => setPage(results.page + 1)}>הבא</button>
-      </nav>
-    </>}
-  </div>;
 }
 
 export default function Company() {
-  const store = useStore(STORE_KEY, INIT);
-  return <CareerView store={store} />;
+  const { jobs, state, error, load, update } = useCareerJobs();
+  const [tab, setTab] = useState("today");
+  const [selected, setSelected] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const currentDay = today();
+
+  const stats = useMemo(() => {
+    const active = jobs.filter(job => !CLOSED.has(job.status));
+    const actions = active.filter(job => job.next_action);
+    return {
+      active: active.length,
+      interviews: active.filter(job => job.status === "interview").length,
+      overdue: actions.filter(job => job.next_action_at && job.next_action_at < currentDay).length,
+      missing: active.filter(job => !job.next_action || !job.next_action_at).length,
+    };
+  }, [jobs, currentDay]);
+
+  const queues = useMemo(() => {
+    const active = jobs.filter(job => !CLOSED.has(job.status));
+    return {
+      overdue: active.filter(job => job.next_action_at && job.next_action_at < currentDay),
+      today: active.filter(job => job.next_action_at === currentDay),
+      upcoming: active.filter(job => job.next_action_at && job.next_action_at > currentDay).slice(0, 6),
+      missing: active.filter(job => !job.next_action || !job.next_action_at),
+    };
+  }, [jobs, currentDay]);
+
+  async function open(job) {
+    setSelected(job);
+    setDraft({ status: job.status, next_action: job.next_action || "", next_action_at: job.next_action_at || "", notes: job.notes || "" });
+    setDetail(null);
+    const { data } = await supabase.from("career_jobs").select("job_description, fit_summary, fit_pros, fit_cons, company_summary, product_summary, cover_letter, tailored_cv").eq("id", job.id).single();
+    setDetail(data ?? {});
+  }
+  async function save() {
+    if (!selected) return;
+    setSaving(true);
+    const ok = await update(selected.id, draft);
+    setSaving(false);
+    if (ok) { setSelected(null); setDetail(null); }
+  }
+  async function markDone(job) {
+    await update(job.id, { next_action: null, next_action_at: null });
+  }
+
+  if (state === "loading") return <p>טוען את חברת הקריירה…</p>;
+  if (state === "error") return <section><p role="alert">{error}</p><button style={primaryBtn} onClick={load}>ניסיון נוסף</button></section>;
+
+  const questions = Array.isArray(selected?.tailored_questions) ? selected.tailored_questions : [];
+  const practiceCount = jobs.reduce((total, job) => total + (Array.isArray(job.tailored_questions) ? job.tailored_questions.length : 0), 0);
+  return <div className={styles.root} dir="rtl">
+    <p style={{ color: MUTED }}>מרכז הפיקוד שלך למועמדויות, ראיונות והצעד הבא.</p>
+    <div className={styles.metrics}>
+      <Metric label="מועמדויות פעילות" value={stats.active} />
+      <Metric label="ראיונות" value={stats.interviews} />
+      <Metric label="באיחור" value={stats.overdue} color={stats.overdue ? RUST : undefined} />
+      <Metric label="דורש הגדרה" value={stats.missing} />
+    </div>
+    <nav aria-label="מחלקות הקריירה" className={styles.tabs}>
+      <button style={tabBtn(tab === "today")} onClick={() => setTab("today")}>היום</button>
+      <button style={tabBtn(tab === "jobs")} onClick={() => setTab("jobs")}>משרות</button>
+      <button style={tabBtn(tab === "interview")} onClick={() => setTab("interview")}>הכנה לראיון</button>
+      <button style={tabBtn(tab === "readiness")} onClick={() => setTab("readiness")}>מוכנות</button>
+    </nav>
+    {error && <p role="alert" className={styles.error}>{error}</p>}
+
+    {tab === "today" && <>
+      <Actions title="דורש טיפול עכשיו" hint="צעדים שעבר מועד" jobs={queues.overdue} onOpen={open} />
+      <Actions title="היום" hint="פעולות שמספיק לסיים היום" jobs={queues.today} onOpen={open} />
+      <Actions title="בהמשך השבוע" hint="הצעדים הקרובים שלך" jobs={queues.upcoming} onOpen={open} />
+      <Actions title="צריך להחליט מה הצעד הבא" hint="מועמדויות שלא כדאי שייעלמו" jobs={queues.missing} onOpen={open} />
+      {!Object.values(queues).some(list => list.length) && <p className={styles.empty}>אין פעולה פתוחה כרגע. אפשר לעבור למשרות כדי לעדכן את התהליך.</p>}
+    </>}
+
+    {tab === "jobs" && <section style={cardStyle}>
+      <div className={styles.toolbar}><h2>כל המשרות</h2><span style={{ color: MUTED }}>{jobs.length} רשומות</span></div>
+      <div className={styles.jobList}>{jobs.map(job => <button key={job.id} className={styles.jobRow} onClick={() => open(job)}>
+        <div><strong>{job.role_title}</strong><p>{job.company_name}</p></div>
+        <div><span className={styles.badge}>{LABELS[job.status] || job.status}</span><small>{job.next_action_at || "ללא מועד"}</small></div>
+      </button>)}</div>
+    </section>}
+
+    {tab === "interview" && <section style={cardStyle}>
+      <h2>הכנה לראיון</h2>
+      <p style={{ color: MUTED }}>בחר/י משרה כדי לראות את שאלות ההכנה שכבר נשמרו עבורה. יצירת שאלות AI חדשה תתווסף רק עם שכבת שרת מוגנת.</p>
+      {jobs.filter(job => Array.isArray(job.tailored_questions) && job.tailored_questions.length).map(job => <button key={job.id} className={styles.jobRow} onClick={() => open(job)}>
+        <div><strong>{job.role_title}</strong><p>{job.company_name}</p></div><span className={styles.badge}>{job.tailored_questions.length} שאלות</span>
+      </button>)}
+      {!jobs.some(job => Array.isArray(job.tailored_questions) && job.tailored_questions.length) && <p className={styles.empty}>עדיין אין שאלות הכנה שמורות למשרות הקיימות.</p>}
+    </section>}
+
+    {tab === "readiness" && <section style={cardStyle}>
+      <h2>מוכנות לחיפוש ולראיון</h2>
+      <div className={styles.metrics}>
+        <Metric label="שאלות הכנה שמורות" value={practiceCount} />
+        <Metric label="משרות בראיון" value={stats.interviews} />
+        <Metric label="מועמדויות שהוגשו" value={jobs.filter(job => job.status === "applied").length} />
+      </div>
+      <p style={{ color: MUTED }}>זהו מדד פתיחה. מדדי תרגול מלאים, ציונים ורצף יועברו בשלב הבא עם טבלת תרגולים ייעודית.</p>
+    </section>}
+
+    {selected && <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-label="פרטי משרה">
+      <section style={cardStyle} className={styles.modal}>
+        <div className={styles.toolbar}><div><h2>{selected.role_title}</h2><p>{selected.company_name}</p></div><button className={styles.button} onClick={() => setSelected(null)}>סגירה</button></div>
+        <div className={styles.grid}>
+          <label className={styles.field}><span>סטטוס</span><select style={inputStyle} value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value })}>{Object.entries(LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className={styles.field}><span>מועד הצעד הבא</span><input style={inputStyle} type="date" value={draft.next_action_at} onChange={e => setDraft({ ...draft, next_action_at: e.target.value })} /></label>
+        </div>
+        <label className={styles.field}><span>הצעד הבא</span><input style={inputStyle} value={draft.next_action} onChange={e => setDraft({ ...draft, next_action: e.target.value })} placeholder="למשל: לשלוח פולואפ למגייס/ת" /></label>
+        <label className={styles.field}><span>הערות</span><textarea style={inputStyle} rows={3} value={draft.notes} onChange={e => setDraft({ ...draft, notes: e.target.value })} /></label>
+        <div className={styles.actions}><button style={primaryBtn} className={styles.button} disabled={saving} onClick={save}>{saving ? "שומר…" : "שמירת עדכון"}</button>{selected.next_action && <button className={styles.button} disabled={saving} onClick={() => markDone(selected)}>סימון הצעד כבוצע</button>}</div>
+        {detail?.fit_summary && <details><summary>ניתוח התאמה</summary><p className={styles.text}>{detail.fit_summary}</p></details>}
+        {questions.length > 0 && <details open><summary>שאלות הכנה לראיון</summary>{questions.map((q, i) => <article key={i} className={styles.question}><strong>{q.question || `שאלה ${i + 1}`}</strong>{q.suggested_answer && <p>{q.suggested_answer}</p>}</article>)}</details>}
+        {detail?.job_description && <details><summary>תיאור המשרה</summary><p className={styles.text}>{detail.job_description}</p></details>}
+      </section>
+    </div>}
+  </div>;
 }
