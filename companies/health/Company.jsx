@@ -1,7 +1,7 @@
 
 "use client";
 import { useMemo, useState } from "react";
-import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, Pencil, Settings, Trash2 } from "lucide-react";
+import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, Pencil, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, summarize, todayISO, uid } from "./model";
 import { INK, BG, CARD, ACCENT, GREEN, MUTED, LINE, cardStyle, primaryBtn, tabBtn } from "@/lib/theme";
@@ -12,7 +12,7 @@ const TABS = [
   { id: "food", label: "יומן אוכל", icon: Apple },
   { id: "workouts", label: "יומן אימונים", icon: Dumbbell },
   { id: "progress", label: "התקדמות", icon: Activity },
-  { id: "settings", label: "הגדרות ומגבלות", icon: Settings },
+  { id: "settings", label: "הגדרות ומגבלות", icon: SettingsIcon },
 ];
 
 const field = { width: "100%", padding: "12px", minHeight: 44, border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 16, fontFamily: "inherit", background: CARD, color: INK };
