@@ -9,7 +9,7 @@ import styles from "./career.module.css";
 const EMPTY = { company: "", role: "", url: "", status: "considering", appliedAt: "", nextStep: "", nextStepAt: "", notes: "", description: "" };
 
 export function CareerView({ store }) {
-  const { data, setData, ready, status, error, reload } = store;
+  const { data, setData, ready, status, error, reload, sync, syncError, retrySync } = store;
   const [tab, setTab] = useState("jobs");
   const [draft, setDraft] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -76,8 +76,15 @@ export function CareerView({ store }) {
       <button style={tabBtn(tab === "plan")} onClick={() => setTab("plan")}>תוכנית השילוב</button>
     </nav>
     <div aria-live="polite" role="status" className={styles.status}>
-      השינויים נשמרים אוטומטית במכשיר זה, ומסתנכרנים לענן כשמחוברים לחשבון
+      {sync === "syncing" ? "שומר…"
+        : sync === "synced" ? "נשמר במכשיר ומסונכרן לענן"
+        : sync === "local" ? "נשמר במכשיר זה בלבד. יסתנכרן לענן עם התחברות"
+        : sync === "sync-error" ? "נשמר במכשיר זה, אך הסנכרון לענן נכשל"
+        : "השינויים נשמרים אוטומטית במכשיר זה"}
     </div>
+    {sync === "sync-error" && <p role="alert" className={styles.error}>
+      {syncError || "הסנכרון לענן נכשל. הנתונים בטוחים במכשיר הזה."} <button className={styles.button} onClick={retrySync}>נסה שוב</button>
+    </p>}
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {tab === "plan" ? <section style={cardStyle}>
       <h2>מערכת הקריירה שלך, בתוך Personal HQ</h2>
