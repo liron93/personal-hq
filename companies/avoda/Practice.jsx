@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { MUTED, GREEN, cardStyle, inputStyle } from "@/lib/theme";
 import { togglePracticed } from "./model";
-import { CATEGORIES, DIFFICULTY_LABELS, selectQuestions } from "./practice";
+import { CATEGORIES, DIFFICULTY_LABELS, selectQuestions } from "./practice-state";
 import styles from "./career.module.css";
 
 const DIFFICULTY_COLOR = { easy: GREEN, medium: "#C98A1B", hard: "#C23B3B" };

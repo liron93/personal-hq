@@ -2,7 +2,7 @@
 import { MUTED, GREEN, RUST, AMBER, cardStyle } from "@/lib/theme";
 import { Sec, Metric } from "@/lib/ui";
 import { STATUSES } from "./model";
-import { practiceStats } from "./practice";
+import { practiceStats } from "./practice-state";
 import styles from "./career.module.css";
 
 // לוח מוכנות — סיכום מצב חברת הקריירה: משרות, התקדמות תרגול, מצב קורות חיים.
