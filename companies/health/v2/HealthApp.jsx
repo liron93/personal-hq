@@ -25,10 +25,15 @@ function Header({ tab, setTab, more, setMore }) {
 function Nav({ tab, setTab }) { return <><aside className={css.desktopAside}>{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={tab===id?css.active:""}><Icon size={18}/> {label}</button>)}</aside><nav className={css.bottomNav} aria-label="ניווט חברת אימון ותזונה">{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={css.navItem+" "+(tab===id?css.active:"")} aria-current={tab===id?"page":undefined}><Icon/><span>{label}</span></button>)}</nav></>; }
 
 function Onboarding({ d, setD }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(d.profile.onboardingStep || 0);
   const [draft, setDraft] = useState(d.profile);
-  const finish = () => setD(p => ({ ...p, profile: { ...draft, complete: true } }));
-  const next = () => step < 3 ? setStep(step + 1) : finish();
+  const saveStep = (nextStep) => {
+    setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: nextStep } }));
+    setStep(nextStep);
+  };
+  const finish = () => setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: 4, complete: true } }));
+  const next = () => step < 3 ? saveStep(step + 1) : finish();
+  const previous = () => { if (step > 0) saveStep(step - 1); };
   const titles = [
     "לאן חשוב לך להגיע?",
     "יש תאריך או אירוע שמניע אותך?",
@@ -45,17 +50,32 @@ function Onboarding({ d, setD }) {
     ? ["מתחיל/ה מאפס", "חוזר/ת אחרי הפסקה", "כבר בשגרה", "עוד לא בטוח/ה"]
     : ["פעם אחת", "פעמיים", "3 פעמים", "נלמד תוך כדי"];
   const choiceKey = step === 2 ? "experience" : "availability";
+  const updateDraft = (key, value) => setDraft(current => ({ ...current, [key]: value }));
   const content = step === 0 ? (
-    <label>היעד שלך<textarea className={css.field} value={draft.goal || ""} onChange={e => setDraft({ ...draft, goal: e.target.value })} placeholder="למשל: להיכנס לכושר לקראת החתונה, להרגיש חזק יותר, או לחזור לאנרגיה" /></label>
+    <label>היעד שלך<textarea className={css.field} value={draft.goal || ""} onChange={e => updateDraft("goal", e.target.value)} placeholder="למשל: להיכנס לכושר לקראת החתונה, להרגיש חזק יותר, או לחזור לאנרגיה" /></label>
   ) : step === 1 ? (
     <div className={css.form}>
-      <label>מה האירוע או התאריך?<input className={css.field} value={draft.event || ""} onChange={e => setDraft({ ...draft, event: e.target.value })} placeholder="למשל: החתונה שלנו" /></label>
-      <label>מתי זה קורה? <span className={css.eyebrow}>אופציונלי</span><input className={css.field} dir="ltr" type="date" value={draft.targetDate || ""} onChange={e => setDraft({ ...draft, targetDate: e.target.value })} /></label>
+      <label>מה האירוע או התאריך?<input className={css.field} value={draft.event || ""} onChange={e => updateDraft("event", e.target.value)} placeholder="למשל: החתונה שלנו" /></label>
+      <label>מתי זה קורה? <span className={css.eyebrow}>אופציונלי</span><input className={css.field} dir="ltr" type="date" value={draft.targetDate || ""} onChange={e => updateDraft("targetDate", e.target.value)} /></label>
     </div>
   ) : (
-    <div className={css.choiceGrid}>{choices.map(value => <button key={value} onClick={() => setDraft({ ...draft, [choiceKey]: value })} className={css.choice+" "+(draft[choiceKey] === value ? css.selected : "")}>{value}</button>)}</div>
+    <div className={css.choiceGrid}>{choices.map(value => <button key={value} onClick={() => updateDraft(choiceKey, value)} className={css.choice+" "+(draft[choiceKey] === value ? css.selected : "")}>{value}</button>)}</div>
   );
-  return <main className={css.onboard}><p className={css.eyebrow}>כמה שאלות קצרות · {step + 1} מתוך 4</p><div className={css.progressLine}>{[0,1,2,3].map(i => <i key={i} className={i <= step ? css.done : ""} />)}</div><section className={css.card+" "+css.stack}><h2 className={css.title}>{titles[step]}</h2><p className={css.subtle}>{helper[step]}</p>{content}<button className={css.primary+" "+css.wide} onClick={next}>{step === 3 ? "למסך היום" : "המשך"}<ChevronLeft size={18}/></button>{step < 3 && <button className={css.optional} onClick={next}>נמשיך בלי לבחור כרגע</button>}</section></main>;
+  return <main className={css.onboard}>
+    <Link href="/" className={css.back}>חזרה למנכ״ל</Link>
+    <p className={css.eyebrow}>כמה שאלות קצרות · {step + 1} מתוך 4</p>
+    <div className={css.progressLine}>{[0,1,2,3].map(i => <i key={i} className={i <= step ? css.done : ""} />)}</div>
+    <section className={css.card+" "+css.stack}>
+      <h2 className={css.title}>{titles[step]}</h2>
+      <p className={css.subtle}>{helper[step]}</p>
+      {content}
+      <div className={css.onboardingActions}>
+        {step > 0 && <button className={css.secondary} onClick={previous}>חזרה</button>}
+        <button className={css.primary+" "+(step > 0 ? "" : css.wide)} onClick={next}>{step === 3 ? "למסך היום" : "המשך"}<ChevronLeft size={18}/></button>
+      </div>
+      {step < 3 && <button className={css.optional} onClick={next}>נמשיך בלי לבחור כרגע</button>}
+    </section>
+  </main>;
 }
 function Today({ d, setTab, setComposer }) {
   const today=localISO(), meals=d.meals.filter(x=>x.date===today).length, workouts=d.workouts.filter(x=>x.date===today&&!x.skipped).length;
