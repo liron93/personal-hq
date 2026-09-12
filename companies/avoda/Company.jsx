@@ -1,175 +1,217 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { cardStyle, inputStyle, primaryBtn, MUTED, RUST, tabBtn } from "@/lib/theme";
-import { Metric } from "@/lib/ui";
 import styles from "./career.module.css";
 
-const LABELS = {
-  considering: "שוקל/ת להגיש", applied: "הוגשה מועמדות", interview: "ראיון",
-  offer: "הצעה", rejected: "נדחתה", withdrawn: "נסגרה",
+const STATUS = {
+  considering: "לבדיקה",
+  applied: "הוגשה",
+  interview: "ראיון",
+  offer: "הצעה",
+  rejected: "נדחתה",
+  withdrawn: "נסגרה",
 };
-const CLOSED = new Set(["rejected", "withdrawn"]);
+const NAV = [
+  ["today", "היום"],
+  ["jobs", "משרות"],
+  ["profile", "פרופיל"],
+  ["cv", "קורות חיים"],
+];
+const blankProfile = { full_name: "", job_title: "", years_experience: "", experience_areas: "", looking_for: "", target_companies: "", strengths: "", improvement_areas: "", additional_notes: "" };
+const blankJob = { company_name: "", role_title: "", job_url: "", job_description: "", status: "considering", next_action: "", next_action_at: "", notes: "" };
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+const arrayValue = value => value.split(",").map(item => item.trim()).filter(Boolean);
+const profileForm = profile => ({ ...blankProfile, ...profile, years_experience: profile?.years_experience ?? "", experience_areas: (profile?.experience_areas || []).join(", "), target_companies: (profile?.target_companies || []).join(", ") });
 
-function useCareerJobs() {
+function useCareerData() {
+  const [user, setUser] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [cvs, setCvs] = useState([]);
   const [state, setState] = useState("loading");
   const [error, setError] = useState("");
 
   const load = async () => {
     setState("loading"); setError("");
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session?.user) { setState("ready"); setJobs([]); return; }
-    const { data, error: failure } = await supabase
-      .from("career_jobs")
-      .select("id, company_name, role_title, job_url, status, applied_at, notes, next_action, next_action_at, fit_score, should_apply, tailored_questions, candidate_questions, created_at")
-      .eq("user_id", session.session.user.id)
-      .order("next_action_at", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false });
-    if (failure) { setError("לא ניתן לטעון את הקריירה מהענן. נסה/י שוב."); setState("error"); return; }
-    setJobs(data ?? []); setState("ready");
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) { setUser(null); setState("ready"); return; }
+    setUser(auth.user);
+    const [jobsResult, profileResult, cvResult] = await Promise.all([
+      supabase.from("career_jobs").select("*").eq("user_id", auth.user.id).order("updated_at", { ascending: false }),
+      supabase.from("career_profiles").select("*").eq("user_id", auth.user.id).maybeSingle(),
+      supabase.from("career_cvs").select("*").eq("user_id", auth.user.id).order("created_at", { ascending: false }),
+    ]);
+    const firstError = jobsResult.error || profileResult.error || cvResult.error;
+    if (firstError) { setError("לא ניתן לטעון את נתוני הקריירה כרגע."); setState("error"); return; }
+    setJobs(jobsResult.data || []); setProfile(profileResult.data || null); setCvs(cvResult.data || []); setState("ready");
   };
-
   useEffect(() => { load(); }, []);
-  const update = async (id, patch) => {
-    setError("");
-    const { data, error: failure } = await supabase.from("career_jobs").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).select().single();
-    if (failure) { setError("השינוי לא נשמר. נסה/י שוב."); return false; }
-    setJobs(old => old.map(job => job.id === id ? data : job));
-    return true;
+
+  const saveJob = async (draft, id) => {
+    if (!user) return { error: "יש להתחבר לפני שמירה." };
+    const payload = { ...draft, user_id: user.id, updated_at: new Date().toISOString() };
+    const result = id
+      ? await supabase.from("career_jobs").update(payload).eq("id", id).select().single()
+      : await supabase.from("career_jobs").insert(payload).select().single();
+    if (result.error) return { error: "המשרה לא נשמרה. בדוק/י את השדות ונסה/י שוב." };
+    setJobs(items => id ? items.map(item => item.id === id ? result.data : item) : [result.data, ...items]);
+    if (id) await supabase.from("career_job_activity").insert({ user_id: user.id, job_id: id, activity_type: "updated", summary: "פרטי המשרה עודכנו" });
+    return { data: result.data };
   };
-  return { jobs, state, error, load, update };
+  const saveProfile = async (draft) => {
+    if (!user) return { error: "יש להתחבר לפני שמירה." };
+    const payload = {
+      user_id: user.id, full_name: draft.full_name || null, job_title: draft.job_title || null,
+      years_experience: draft.years_experience === "" ? null : Number(draft.years_experience),
+      experience_areas: arrayValue(draft.experience_areas), looking_for: draft.looking_for || null,
+      target_companies: arrayValue(draft.target_companies), strengths: draft.strengths || null,
+      improvement_areas: draft.improvement_areas || null, additional_notes: draft.additional_notes || null,
+      setup_completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    };
+    const result = await supabase.from("career_profiles").upsert(payload).select().single();
+    if (result.error) return { error: "הפרופיל לא נשמר." };
+    setProfile(result.data); return { data: result.data };
+  };
+  const uploadCv = async file => {
+    if (!user) return { error: "יש להתחבר לפני העלאת קובץ." };
+    if (file.type !== "application/pdf") return { error: "אפשר להעלות PDF בלבד." };
+    if (file.size > 10 * 1024 * 1024) return { error: "גודל הקובץ המרבי הוא 10MB." };
+    const path = user.id + "/" + crypto.randomUUID() + "-" + file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const upload = await supabase.storage.from("career-documents").upload(path, file, { contentType: "application/pdf", upsert: false });
+    if (upload.error) return { error: "הקובץ לא עלה. נסה/י שוב." };
+    const deactivate = await supabase.from("career_cvs").update({ is_active: false, updated_at: new Date().toISOString() }).eq("user_id", user.id).eq("is_active", true);
+    if (deactivate.error) return { error: "הקובץ עלה אך לא ניתן לעדכן את גרסת הקו״ח הפעילה." };
+    const saved = await supabase.from("career_cvs").insert({ user_id: user.id, storage_path: path, filename: file.name, mime_type: file.type, size_bytes: file.size, is_active: true, updated_at: new Date().toISOString() }).select().single();
+    if (saved.error) return { error: "הקובץ עלה אך רשומת הקו״ח לא נשמרה." };
+    setCvs(items => [saved.data, ...items.map(item => ({ ...item, is_active: false }))]); return { data: saved.data };
+  };
+  const makeActive = async id => {
+    if (!user) return;
+    await supabase.from("career_cvs").update({ is_active: false, updated_at: new Date().toISOString() }).eq("user_id", user.id).eq("is_active", true);
+    const saved = await supabase.from("career_cvs").update({ is_active: true, updated_at: new Date().toISOString() }).eq("id", id).select().single();
+    if (!saved.error) setCvs(items => items.map(item => ({ ...item, is_active: item.id === id })));
+  };
+  return { user, jobs, profile, cvs, state, error, load, saveJob, saveProfile, uploadCv, makeActive };
 }
 
-function Actions({ title, hint, jobs, onOpen }) {
-  if (!jobs.length) return null;
-  return <section style={cardStyle} className={styles.queue}>
-    <div className={styles.toolbar}><div><h3>{title}</h3><p style={{ color: MUTED }}>{hint}</p></div><span className={styles.count}>{jobs.length}</span></div>
-    {jobs.slice(0, 6).map(job => <button key={job.id} className={styles.queueItem} onClick={() => onOpen(job)}>
-      <span>{job.next_action || "חסר צעד הבא"}</span><small>{job.company_name} · {job.role_title}{job.next_action_at ? ` · ${job.next_action_at}` : ""}</small>
-    </button>)}
+function Notice({ children, kind = "info" }) { return <p className={kind === "error" ? styles.error : styles.notice} role={kind === "error" ? "alert" : undefined}>{children}</p>; }
+function Status({ value }) { return <span className={styles["status_" + value] || styles.status}>{STATUS[value] || value}</span>; }
+
+function Today({ jobs, onOpen, onNavigate }) {
+  const day = today();
+  const active = jobs.filter(job => !["rejected", "withdrawn"].includes(job.status));
+  const due = active.filter(job => job.next_action_at && job.next_action_at <= day).sort((a,b) => (a.next_action_at || "").localeCompare(b.next_action_at || ""));
+  const missing = active.filter(job => !job.next_action || !job.next_action_at);
+  const focus = due[0] || missing[0];
+  return <div className={styles.stack}>
+    <section className={styles.hero}>
+      <span>מרכז הפיקוד של הקריירה</span>
+      <h2>{focus ? "יש פעולה אחת שכדאי לקדם עכשיו." : "הצינור שלך מסודר לעכשיו."}</h2>
+      <p>{focus ? focus.company_name + " · " + focus.role_title : "אפשר להוסיף משרה או לעדכן את הפעולה הבאה בכל תהליך פתוח."}</p>
+      {focus && <button className={styles.primary} onClick={() => onOpen(focus)}>להמשיך במשרה</button>}
+    </section>
+    <section className={styles.kpis}>
+      <Metric label="פעילות" value={active.length} />
+      <Metric label="ראיונות" value={active.filter(job => job.status === "interview").length} />
+      <Metric label="דורש טיפול" value={due.length} warn={due.length > 0} />
+      <Metric label="ללא צעד הבא" value={missing.length} />
+    </section>
+    <section className={styles.panel}>
+      <div className={styles.sectionTitle}><div><p>תור הפעולות</p><h3>מה יקדם אותך השבוע</h3></div><button className={styles.textButton} onClick={() => onNavigate("jobs")}>לכל המשרות</button></div>
+      {due.length ? due.slice(0,5).map(job => <button className={styles.actionRow} onClick={() => onOpen(job)} key={job.id}><span><strong>{job.next_action}</strong><small>{job.company_name} · {job.role_title}</small></span><time>{job.next_action_at}</time></button>) : <Empty label="אין פעולה דחופה כרגע" action="הוספת משרה" onClick={() => onNavigate("jobs")} />}
+    </section>
+  </div>;
+}
+
+function Jobs({ jobs, onSave, onOpen }) {
+  const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState(blankJob);
+  const [message, setMessage] = useState("");
+  const visible = jobs.filter(job => (filter === "all" || job.status === filter) && (job.company_name + " " + job.role_title).toLowerCase().includes(query.toLowerCase()));
+  const create = async event => {
+    event.preventDefault(); setMessage("");
+    if (!draft.company_name.trim() || !draft.role_title.trim()) { setMessage("יש למלא חברה ותפקיד."); return; }
+    const result = await onSave(draft);
+    if (result.error) { setMessage(result.error); return; }
+    setDraft(blankJob); setAdding(false);
+  };
+  return <div className={styles.stack}>
+    <section className={styles.panel}>
+      <div className={styles.sectionTitle}><div><p>צינור מועמדויות</p><h2>משרות</h2></div><button className={styles.primary} onClick={() => setAdding(value => !value)}>{adding ? "סגירה" : "+ משרה חדשה"}</button></div>
+      {adding && <form className={styles.form} onSubmit={create}>
+        <div className={styles.formGrid}><Field label="חברה" value={draft.company_name} onChange={value => setDraft({...draft, company_name:value})} required /><Field label="תפקיד" value={draft.role_title} onChange={value => setDraft({...draft, role_title:value})} required /></div>
+        <Field label="קישור למשרה" type="url" value={draft.job_url} onChange={value => setDraft({...draft, job_url:value})} placeholder="נשמר כקישור בלבד; לא מבוצעת משיכה אוטומטית" />
+        <Field label="תיאור המשרה" multiline value={draft.job_description} onChange={value => setDraft({...draft, job_description:value})} />
+        <div className={styles.formGrid}><SelectStatus value={draft.status} onChange={value => setDraft({...draft, status:value})} /><Field label="הפעולה הבאה" value={draft.next_action} onChange={value => setDraft({...draft, next_action:value})} /><Field label="מועד" type="date" value={draft.next_action_at} onChange={value => setDraft({...draft, next_action_at:value})} /></div>
+        {message && <Notice kind="error">{message}</Notice>}<button className={styles.primary}>שמירת משרה</button>
+      </form>}
+      <div className={styles.listTools}><input aria-label="חיפוש משרות" placeholder="חיפוש חברה או תפקיד" value={query} onChange={event => setQuery(event.target.value)} /><select aria-label="סינון סטטוס" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">כל הסטטוסים</option>{Object.entries(STATUS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+      <div className={styles.jobList}>{visible.map(job => <button onClick={() => onOpen(job)} key={job.id} className={styles.jobCard}><span className={styles.jobIdentity}><strong>{job.role_title}</strong><small>{job.company_name}</small></span><span><Status value={job.status} /><small>{job.next_action_at || "ללא מועד"}</small></span></button>)}</div>
+      {!visible.length && <Empty label={jobs.length ? "לא נמצאו משרות בסינון הזה" : "עדיין אין משרות במרכז הקריירה"} action="הוספת המשרה הראשונה" onClick={() => setAdding(true)} />}
+    </section>
+  </div>;
+}
+
+function JobDetail({ job, onClose, onSave }) {
+  const [draft, setDraft] = useState({...blankJob, ...job, next_action_at: job.next_action_at || ""});
+  const [message, setMessage] = useState("");
+  const save = async event => { event.preventDefault(); const result = await onSave(draft, job.id); if (result.error) setMessage(result.error); else onClose(); };
+  const qs = Array.isArray(job.tailored_questions) ? job.tailored_questions : [];
+  return <div className={styles.sheetBackdrop} role="dialog" aria-modal="true" aria-label="פרטי משרה"><section className={styles.sheet}>
+    <div className={styles.sectionTitle}><div><p>{job.company_name}</p><h2>{job.role_title}</h2></div><button className={styles.close} onClick={onClose}>סגירה</button></div>
+    <form className={styles.form} onSubmit={save}>
+      <div className={styles.formGrid}><SelectStatus value={draft.status} onChange={value => setDraft({...draft, status:value})} /><Field label="פעולה הבאה" value={draft.next_action} onChange={value => setDraft({...draft, next_action:value})} /><Field label="מועד" type="date" value={draft.next_action_at} onChange={value => setDraft({...draft, next_action_at:value})} /></div>
+      <Field label="הערות" multiline value={draft.notes || ""} onChange={value => setDraft({...draft, notes:value})} />
+      <Field label="קישור למשרה" type="url" value={draft.job_url || ""} onChange={value => setDraft({...draft, job_url:value})} />
+      {message && <Notice kind="error">{message}</Notice>}<button className={styles.primary}>שמירת עדכון</button>
+    </form>
+    <Detail title="התאמה" text={job.fit_summary} /><Detail title="תיאור המשרה" text={job.job_description} />
+    {qs.length > 0 && <section className={styles.detail}><h3>שאלות הכנה שמורות</h3>{qs.map((item,index) => <article className={styles.question} key={index}><strong>{item.question || "שאלה " + (index + 1)}</strong>{item.suggested_answer && <p>{item.suggested_answer}</p>}</article>)}</section>}
+  </section></div>;
+}
+
+function Profile({ profile, onSave }) {
+  const [draft, setDraft] = useState(profileForm(profile));
+  const [message, setMessage] = useState("");
+  useEffect(() => setDraft(profileForm(profile)), [profile]);
+  const save = async event => { event.preventDefault(); setMessage(""); const result = await onSave(draft); setMessage(result.error || "הפרופיל נשמר."); };
+  return <section className={styles.panel}><div className={styles.sectionTitle}><div><p>הקשר מקצועי</p><h2>הפרופיל שלי</h2></div></div><p className={styles.muted}>הנתונים נשמרים בחשבון שלך ומשמשים בעתיד להתאמה והכנה. אין מפתח AI בשלב זה.</p>
+    <form className={styles.form} onSubmit={save}><div className={styles.formGrid}><Field label="שם מלא" value={draft.full_name} onChange={value => setDraft({...draft,full_name:value})}/><Field label="תפקיד נוכחי / יעד" value={draft.job_title} onChange={value => setDraft({...draft,job_title:value})}/><Field label="שנות ניסיון" type="number" value={draft.years_experience} onChange={value => setDraft({...draft,years_experience:value})}/><Field label="תחומי ניסיון" value={draft.experience_areas} onChange={value => setDraft({...draft,experience_areas:value})} placeholder="מופרד בפסיקים"/></div><Field label="מה אני מחפש/ת" multiline value={draft.looking_for} onChange={value => setDraft({...draft,looking_for:value})}/><Field label="חברות יעד" value={draft.target_companies} onChange={value => setDraft({...draft,target_companies:value})} placeholder="מופרד בפסיקים"/><div className={styles.formGrid}><Field label="חוזקות" multiline value={draft.strengths} onChange={value => setDraft({...draft,strengths:value})}/><Field label="נקודות לחיזוק" multiline value={draft.improvement_areas} onChange={value => setDraft({...draft,improvement_areas:value})}/></div><Field label="הערות נוספות" multiline value={draft.additional_notes} onChange={value => setDraft({...draft,additional_notes:value})}/>{message && <Notice>{message}</Notice>}<button className={styles.primary}>שמירת פרופיל</button></form></section>;
+}
+
+function CvCenter({ cvs, onUpload, onActive }) {
+  const [message, setMessage] = useState("");
+  const upload = async event => { const file = event.target.files?.[0]; if (!file) return; setMessage("מעלה קובץ…"); const result = await onUpload(file); setMessage(result.error || "קובץ הקו״ח נשמר בצורה פרטית."); event.target.value = ""; };
+  return <section className={styles.panel}><div className={styles.sectionTitle}><div><p>מסמכים מקצועיים</p><h2>מרכז קורות החיים</h2></div></div><p className={styles.muted}>PDF בלבד, עד 10MB. הקובץ מאוחסן ב־Storage פרטי ומוגן לפי חשבון המשתמש.</p>
+    <label className={styles.dropzone}><input type="file" accept="application/pdf" onChange={upload}/><strong>העלאת קורות חיים</strong><span>בחר/י קובץ PDF מהמכשיר</span></label>{message && <Notice>{message}</Notice>}
+    <div className={styles.cvList}>{cvs.map(cv => <article className={styles.cvCard} key={cv.id}><span><strong>{cv.filename}</strong><small>{cv.is_active ? "גרסה פעילה" : "גרסה קודמת"} · {new Date(cv.created_at).toLocaleDateString("he-IL")}</small></span>{cv.is_active ? <span className={styles.active}>פעיל</span> : <button className={styles.secondary} onClick={() => onActive(cv.id)}>הפוך לפעיל</button>}</article>)}</div>{!cvs.length && <Empty label="עדיין אין קובץ קו״ח בחשבון" action="העלאת PDF" onClick={() => document.querySelector('input[type=file]')?.click()} />}
   </section>;
 }
 
+function Field({ label, value, onChange, type="text", multiline, placeholder, required }) { return <label className={styles.field}><span>{label}</span>{multiline ? <textarea value={value || ""} onChange={event => onChange(event.target.value)} placeholder={placeholder} rows="4" /> : <input required={required} type={type} value={value || ""} onChange={event => onChange(event.target.value)} placeholder={placeholder} />}</label>; }
+function SelectStatus({ value, onChange }) { return <label className={styles.field}><span>סטטוס</span><select value={value} onChange={event => onChange(event.target.value)}>{Object.entries(STATUS).map(([id,label]) => <option key={id} value={id}>{label}</option>)}</select></label>; }
+function Detail({ title, text }) { return text ? <section className={styles.detail}><h3>{title}</h3><p>{text}</p></section> : null; }
+function Metric({ label, value, warn }) { return <div className={styles.metric}><span>{label}</span><strong className={warn ? styles.warn : ""}>{value}</strong></div>; }
+function Empty({ label, action, onClick }) { return <div className={styles.empty}><p>{label}</p><button className={styles.secondary} onClick={onClick}>{action}</button></div>; }
+
 export default function Company() {
-  const { jobs, state, error, load, update } = useCareerJobs();
-  const [tab, setTab] = useState("today");
+  const data = useCareerData();
+  const [view, setView] = useState("today");
   const [selected, setSelected] = useState(null);
-  const [draft, setDraft] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [detail, setDetail] = useState(null);
-  const currentDay = today();
-
-  const stats = useMemo(() => {
-    const active = jobs.filter(job => !CLOSED.has(job.status));
-    const actions = active.filter(job => job.next_action);
-    return {
-      active: active.length,
-      interviews: active.filter(job => job.status === "interview").length,
-      overdue: actions.filter(job => job.next_action_at && job.next_action_at < currentDay).length,
-      missing: active.filter(job => !job.next_action || !job.next_action_at).length,
-    };
-  }, [jobs, currentDay]);
-
-  const queues = useMemo(() => {
-    const active = jobs.filter(job => !CLOSED.has(job.status));
-    return {
-      overdue: active.filter(job => job.next_action_at && job.next_action_at < currentDay),
-      today: active.filter(job => job.next_action_at === currentDay),
-      upcoming: active.filter(job => job.next_action_at && job.next_action_at > currentDay).slice(0, 6),
-      missing: active.filter(job => !job.next_action || !job.next_action_at),
-    };
-  }, [jobs, currentDay]);
-
-  async function open(job) {
-    setSelected(job);
-    setDraft({ status: job.status, next_action: job.next_action || "", next_action_at: job.next_action_at || "", notes: job.notes || "" });
-    setDetail(null);
-    const { data } = await supabase.from("career_jobs").select("job_description, fit_summary, fit_pros, fit_cons, company_summary, product_summary, cover_letter, tailored_cv").eq("id", job.id).single();
-    setDetail(data ?? {});
-  }
-  async function save() {
-    if (!selected) return;
-    setSaving(true);
-    const ok = await update(selected.id, draft);
-    setSaving(false);
-    if (ok) { setSelected(null); setDetail(null); }
-  }
-  async function markDone(job) {
-    await update(job.id, { next_action: null, next_action_at: null });
-  }
-
-  if (state === "loading") return <p>טוען את חברת הקריירה…</p>;
-  if (state === "error") return <section><p role="alert">{error}</p><button style={primaryBtn} onClick={load}>ניסיון נוסף</button></section>;
-
-  const questions = Array.isArray(selected?.tailored_questions) ? selected.tailored_questions : [];
-  const practiceCount = jobs.reduce((total, job) => total + (Array.isArray(job.tailored_questions) ? job.tailored_questions.length : 0), 0);
+  if (data.state === "loading") return <p className={styles.loading}>טוען את חברת הקריירה…</p>;
+  if (!data.user) return <section className={styles.authRequired}><h2>כדי לעבוד עם הקריירה צריך להתחבר</h2><p>המערכת לא מציגה ולא שומרת נתוני קריירה ללא משתמש מחובר.</p></section>;
+  if (data.state === "error") return <section><Notice kind="error">{data.error}</Notice><button className={styles.primary} onClick={data.load}>ניסיון נוסף</button></section>;
   return <div className={styles.root} dir="rtl">
-    <p style={{ color: MUTED }}>מרכז הפיקוד שלך למועמדויות, ראיונות והצעד הבא.</p>
-    <div className={styles.metrics}>
-      <Metric label="מועמדויות פעילות" value={stats.active} />
-      <Metric label="ראיונות" value={stats.interviews} />
-      <Metric label="באיחור" value={stats.overdue} color={stats.overdue ? RUST : undefined} />
-      <Metric label="דורש הגדרה" value={stats.missing} />
-    </div>
-    <nav aria-label="מחלקות הקריירה" className={styles.tabs}>
-      <button style={tabBtn(tab === "today")} onClick={() => setTab("today")}>היום</button>
-      <button style={tabBtn(tab === "jobs")} onClick={() => setTab("jobs")}>משרות</button>
-      <button style={tabBtn(tab === "interview")} onClick={() => setTab("interview")}>הכנה לראיון</button>
-      <button style={tabBtn(tab === "readiness")} onClick={() => setTab("readiness")}>מוכנות</button>
-    </nav>
-    {error && <p role="alert" className={styles.error}>{error}</p>}
-
-    {tab === "today" && <>
-      <Actions title="דורש טיפול עכשיו" hint="צעדים שעבר מועד" jobs={queues.overdue} onOpen={open} />
-      <Actions title="היום" hint="פעולות שמספיק לסיים היום" jobs={queues.today} onOpen={open} />
-      <Actions title="בהמשך השבוע" hint="הצעדים הקרובים שלך" jobs={queues.upcoming} onOpen={open} />
-      <Actions title="צריך להחליט מה הצעד הבא" hint="מועמדויות שלא כדאי שייעלמו" jobs={queues.missing} onOpen={open} />
-      {!Object.values(queues).some(list => list.length) && <p className={styles.empty}>אין פעולה פתוחה כרגע. אפשר לעבור למשרות כדי לעדכן את התהליך.</p>}
-    </>}
-
-    {tab === "jobs" && <section style={cardStyle}>
-      <div className={styles.toolbar}><h2>כל המשרות</h2><span style={{ color: MUTED }}>{jobs.length} רשומות</span></div>
-      <div className={styles.jobList}>{jobs.map(job => <button key={job.id} className={styles.jobRow} onClick={() => open(job)}>
-        <div><strong>{job.role_title}</strong><p>{job.company_name}</p></div>
-        <div><span className={styles.badge}>{LABELS[job.status] || job.status}</span><small>{job.next_action_at || "ללא מועד"}</small></div>
-      </button>)}</div>
-    </section>}
-
-    {tab === "interview" && <section style={cardStyle}>
-      <h2>הכנה לראיון</h2>
-      <p style={{ color: MUTED }}>בחר/י משרה כדי לראות את שאלות ההכנה שכבר נשמרו עבורה. יצירת שאלות AI חדשה תתווסף רק עם שכבת שרת מוגנת.</p>
-      {jobs.filter(job => Array.isArray(job.tailored_questions) && job.tailored_questions.length).map(job => <button key={job.id} className={styles.jobRow} onClick={() => open(job)}>
-        <div><strong>{job.role_title}</strong><p>{job.company_name}</p></div><span className={styles.badge}>{job.tailored_questions.length} שאלות</span>
-      </button>)}
-      {!jobs.some(job => Array.isArray(job.tailored_questions) && job.tailored_questions.length) && <p className={styles.empty}>עדיין אין שאלות הכנה שמורות למשרות הקיימות.</p>}
-    </section>}
-
-    {tab === "readiness" && <section style={cardStyle}>
-      <h2>מוכנות לחיפוש ולראיון</h2>
-      <div className={styles.metrics}>
-        <Metric label="שאלות הכנה שמורות" value={practiceCount} />
-        <Metric label="משרות בראיון" value={stats.interviews} />
-        <Metric label="מועמדויות שהוגשו" value={jobs.filter(job => job.status === "applied").length} />
-      </div>
-      <p style={{ color: MUTED }}>זהו מדד פתיחה. מדדי תרגול מלאים, ציונים ורצף יועברו בשלב הבא עם טבלת תרגולים ייעודית.</p>
-    </section>}
-
-    {selected && <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-label="פרטי משרה">
-      <section style={cardStyle} className={styles.modal}>
-        <div className={styles.toolbar}><div><h2>{selected.role_title}</h2><p>{selected.company_name}</p></div><button className={styles.button} onClick={() => setSelected(null)}>סגירה</button></div>
-        <div className={styles.grid}>
-          <label className={styles.field}><span>סטטוס</span><select style={inputStyle} value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value })}>{Object.entries(LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className={styles.field}><span>מועד הצעד הבא</span><input style={inputStyle} type="date" value={draft.next_action_at} onChange={e => setDraft({ ...draft, next_action_at: e.target.value })} /></label>
-        </div>
-        <label className={styles.field}><span>הצעד הבא</span><input style={inputStyle} value={draft.next_action} onChange={e => setDraft({ ...draft, next_action: e.target.value })} placeholder="למשל: לשלוח פולואפ למגייס/ת" /></label>
-        <label className={styles.field}><span>הערות</span><textarea style={inputStyle} rows={3} value={draft.notes} onChange={e => setDraft({ ...draft, notes: e.target.value })} /></label>
-        <div className={styles.actions}><button style={primaryBtn} className={styles.button} disabled={saving} onClick={save}>{saving ? "שומר…" : "שמירת עדכון"}</button>{selected.next_action && <button className={styles.button} disabled={saving} onClick={() => markDone(selected)}>סימון הצעד כבוצע</button>}</div>
-        {detail?.fit_summary && <details><summary>ניתוח התאמה</summary><p className={styles.text}>{detail.fit_summary}</p></details>}
-        {questions.length > 0 && <details open><summary>שאלות הכנה לראיון</summary>{questions.map((q, i) => <article key={i} className={styles.question}><strong>{q.question || `שאלה ${i + 1}`}</strong>{q.suggested_answer && <p>{q.suggested_answer}</p>}</article>)}</details>}
-        {detail?.job_description && <details><summary>תיאור המשרה</summary><p className={styles.text}>{detail.job_description}</p></details>}
-      </section>
-    </div>}
+    <aside className={styles.sidebar}><div className={styles.brand}><span>HQ</span><strong>קריירה</strong></div><nav aria-label="מחלקות קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav><div className={styles.user}>{data.user.email}</div></aside>
+    <main className={styles.main}><nav className={styles.mobileNav} aria-label="ניווט קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav>
+      {view === "today" && <Today jobs={data.jobs} onOpen={setSelected} onNavigate={setView}/>}
+      {view === "jobs" && <Jobs jobs={data.jobs} onOpen={setSelected} onSave={data.saveJob}/>}
+      {view === "profile" && <Profile profile={data.profile} onSave={data.saveProfile}/>}
+      {view === "cv" && <CvCenter cvs={data.cvs} onUpload={data.uploadCv} onActive={data.makeActive}/>}
+    </main>
+    {selected && <JobDetail job={selected} onClose={() => setSelected(null)} onSave={data.saveJob}/>}
   </div>;
 }
