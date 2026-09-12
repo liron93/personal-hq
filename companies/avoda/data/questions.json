@@ -1,0 +1,1292 @@
+[
+  {
+    "id": "pri-001",
+    "category": "Prioritization",
+    "subcategory": "Frameworks",
+    "difficulty": "medium",
+    "question": "יש לך 10 פיצ'רים ב-backlog ו-3 חודשי פיתוח. איך תחליטי מה לבנות?",
+    "frameworks": ["RICE", "ICE", "MoSCoW"],
+    "tags": ["prioritization", "roadmap", "frameworks"],
+    "hint": "התחילי עם הגדרת המטרה העסקית, אחר כך השתמשי ב-RICE: Reach, Impact, Confidence, Effort"
+  },
+  {
+    "id": "pri-002",
+    "category": "Prioritization",
+    "subcategory": "Stakeholders",
+    "difficulty": "hard",
+    "question": "המנמ\"כ רוצה פיצ'ר אחד, ה-CEO רוצה אחר, והמשתמשים מבקשים דבר שלישי. איך מתעדפום?",
+    "frameworks": ["Stakeholder mapping", "Impact vs Effort"],
+    "tags": ["stakeholders", "conflict", "prioritization"],
+    "hint": "חשבו על מי האוונר של המטרה העסקית, ומה מניע כל stakeholder"
+  },
+  {
+    "id": "pri-003",
+    "category": "Prioritization",
+    "subcategory": "Trade-offs",
+    "difficulty": "medium",
+    "question": "איך תחליטי בין פיצ'ר שמגדיל retention לפיצ'ר שמגדיל acquisition?",
+    "frameworks": ["North Star Metric", "Growth loops"],
+    "tags": ["retention", "acquisition", "trade-offs"],
+    "hint": "חשבו על השלב שבו המוצר נמצא ועל ה-LTV vs CAC"
+  },
+  {
+    "id": "pri-004",
+    "category": "Prioritization",
+    "subcategory": "Bugs vs Features",
+    "difficulty": "easy",
+    "question": "יש לך באג קריטי שמשפיע על 5% מהמשתמשים ופיצ'ר חדש שיגדיל revenue ב-20%. מה קודם?",
+    "frameworks": ["Risk assessment", "Impact analysis"],
+    "tags": ["bugs", "features", "risk"],
+    "hint": "חשבו על חומרת הנזק, מי המשתמשים המושפעים, ומה עלות ה-opportunity"
+  },
+  {
+    "id": "pri-005",
+    "category": "Prioritization",
+    "subcategory": "Data-driven",
+    "difficulty": "hard",
+    "question": "יש לך נתוני שימוש שמראים שפיצ'ר A יש לו DAU גבוה אבל satisfaction נמוך, ופיצ'ר B DAU נמוך אבל satisfaction גבוה. מה תעדיפי לשפר?",
+    "frameworks": ["PMF analysis", "Jobs to be done"],
+    "tags": ["data", "DAU", "satisfaction"],
+    "hint": "DAU גבוה עם satisfaction נמוך = כאב פתור. חקרי למה אנשים חוזרים למרות שהם לא מרוצים"
+  },
+  {
+    "id": "pri-006",
+    "category": "Prioritization",
+    "subcategory": "Frameworks",
+    "difficulty": "easy",
+    "question": "הסבירו את מסגרת ה-RICE וכיצד תשתמשו בה בפועל",
+    "frameworks": ["RICE"],
+    "tags": ["RICE", "frameworks", "basics"],
+    "hint": "Reach × Impact × Confidence ÷ Effort. תנו דוגמה מספרית מוחשית"
+  },
+  {
+    "id": "pri-007",
+    "category": "Prioritization",
+    "subcategory": "Roadmap",
+    "difficulty": "medium",
+    "question": "איך בונים roadmap ל-12 חודשים כשיש הרבה אי-ודאות בשוק?",
+    "frameworks": ["Now/Next/Later", "OKRs"],
+    "tags": ["roadmap", "uncertainty", "planning"],
+    "hint": "חשבו על Now/Next/Later במקום תאריכים מדויקים. מה חובה, מה ייתכן, מה חלום"
+  },
+  {
+    "id": "pri-008",
+    "category": "Prioritization",
+    "subcategory": "Customer vs Business",
+    "difficulty": "hard",
+    "question": "פיצ'ר שמשתמשים אוהבים אבל לא מייצר כסף, או פיצ'ר שהמשתמשים אדישים אליו אבל מגדיל revenue ב-30%?",
+    "frameworks": ["Value exchange", "Business model canvas"],
+    "tags": ["revenue", "user-value", "trade-offs"],
+    "hint": "חשבו על הקשר ארוך הטווח בין user value ל-business value. מוצר בריא צריך את שניהם"
+  },
+  {
+    "id": "pri-009",
+    "category": "Prioritization",
+    "subcategory": "Technical debt",
+    "difficulty": "medium",
+    "question": "הצוות מבקש רבעון שלם לטיפול ב-technical debt. איך תחליטי אם לאשר?",
+    "frameworks": ["Risk vs reward", "Velocity analysis"],
+    "tags": ["technical-debt", "engineering", "trade-offs"],
+    "hint": "בקשי נתונים: כמה זמן מתבזבז על bugs? מה קצב הפיתוח כעת לעומת שנה שעברה?"
+  },
+  {
+    "id": "pri-010",
+    "category": "Prioritization",
+    "subcategory": "Opportunity sizing",
+    "difficulty": "hard",
+    "question": "איך תעדיפי בין כניסה לשוק חדש לבין העמקה בשוק הקיים?",
+    "frameworks": ["TAM/SAM/SOM", "Ansoff matrix"],
+    "tags": ["market-entry", "expansion", "strategy"],
+    "hint": "חשבו על גודל ההזדמנות, יתרון תחרותי, עלות הכניסה, וה-opportunity cost"
+  },
+  {
+    "id": "met-001",
+    "category": "Metrics",
+    "subcategory": "North Star",
+    "difficulty": "medium",
+    "question": "מהי ה-North Star Metric של Spotify ולמה?",
+    "frameworks": ["North Star Metric", "Input/Output metrics"],
+    "tags": ["north-star", "spotify", "streaming"],
+    "hint": "חשבו מה מייצג ערך אמיתי ל-Spotify: האם זה time listening, monthly active users, או משהו אחר?"
+  },
+  {
+    "id": "met-002",
+    "category": "Metrics",
+    "subcategory": "Feature Launch",
+    "difficulty": "medium",
+    "question": "השקת פיצ'ר חדש — אילו מטריקות תמדדי בשבוע הראשון?",
+    "frameworks": ["AARRR", "Counter metrics"],
+    "tags": ["launch", "monitoring", "KPIs"],
+    "hint": "חשבו על adoption, engagement, performance, ו-guardrail metrics (מה לא צריך לרדת)"
+  },
+  {
+    "id": "met-003",
+    "category": "Metrics",
+    "subcategory": "Decline",
+    "difficulty": "hard",
+    "question": "DAU של המוצר ירד ב-20% בשבוע האחרון. איך תחקרי את הסיבה?",
+    "frameworks": ["Segmentation", "Funnel analysis"],
+    "tags": ["decline", "debugging", "investigation"],
+    "hint": "פרקי לפלחים: גיאוגרפיה, פלטפורמה, cohort, ערוץ רכישה. אחר כך בדקו אם זה acquisition, activation, או retention"
+  },
+  {
+    "id": "met-004",
+    "category": "Metrics",
+    "subcategory": "Success Definition",
+    "difficulty": "easy",
+    "question": "איך תגדירי הצלחה לפיצ'ר notifications חדש?",
+    "frameworks": ["Goal tree", "OKRs"],
+    "tags": ["notifications", "success-metrics", "definition"],
+    "hint": "חשבו על: open rate, action rate, unsubscribe rate, ו-impact על core metric"
+  },
+  {
+    "id": "met-005",
+    "category": "Metrics",
+    "subcategory": "Retention",
+    "difficulty": "medium",
+    "question": "מה ההבדל בין retention, churn, ו-resurrection? איך כל אחד מודד?",
+    "frameworks": ["Cohort analysis", "Retention curves"],
+    "tags": ["retention", "churn", "cohorts"],
+    "hint": "retention = % שחוזרים, churn = % שעוזבים, resurrection = משתמשים שחזרו אחרי שעזבו"
+  },
+  {
+    "id": "met-006",
+    "category": "Metrics",
+    "subcategory": "A/B Testing",
+    "difficulty": "hard",
+    "question": "A/B test הראה שגרסה B מגדילה clicks ב-10% אבל מורידה revenue ב-5%. מה תעשי?",
+    "frameworks": ["Statistical significance", "Guardrail metrics"],
+    "tags": ["ab-test", "trade-offs", "revenue"],
+    "hint": "חשבו מה חשוב יותר לעסק עכשיו. גם בדקו האם הנתונים מובהקים סטטיסטית ולמשך כמה זמן"
+  },
+  {
+    "id": "met-007",
+    "category": "Metrics",
+    "subcategory": "Funnel",
+    "difficulty": "medium",
+    "question": "conversion rate של onboarding ירד מ-60% ל-40%. איך תאבחני?",
+    "frameworks": ["Funnel analysis", "Session recording"],
+    "tags": ["onboarding", "conversion", "funnel"],
+    "hint": "פרקי את ה-funnel לשלבים. איפה בדיוק אנשים נוטשים? האם זה שינוי בקוד, תוכן, או סגמנט משתמשים?"
+  },
+  {
+    "id": "met-008",
+    "category": "Metrics",
+    "subcategory": "Engagement",
+    "difficulty": "easy",
+    "question": "מה ההבדל בין DAU, WAU ו-MAU? מתי להשתמש בכל אחד?",
+    "frameworks": ["Engagement metrics", "Stickiness"],
+    "tags": ["DAU", "MAU", "engagement"],
+    "hint": "תלוי ב-use case: אפליקציית מזג אוויר = DAU, LinkedIn = WAU, נסיעות = MAU"
+  },
+  {
+    "id": "met-009",
+    "category": "Metrics",
+    "subcategory": "Revenue",
+    "difficulty": "hard",
+    "question": "MRR גדל ב-15% אבל NPS ירד ב-20 נקודות. מה המשמעות ומה עושים?",
+    "frameworks": ["Leading vs lagging indicators", "Churn prediction"],
+    "tags": ["MRR", "NPS", "growth"],
+    "hint": "NPS הוא leading indicator לchurn. גידול ב-MRR עם ירידה ב-NPS = גידול שנשרף מהר"
+  },
+  {
+    "id": "met-010",
+    "category": "Metrics",
+    "subcategory": "Health metrics",
+    "difficulty": "medium",
+    "question": "אילו 5 מטריקות תרצי לראות בדשבורד יומי כ-PM?",
+    "frameworks": ["HEART framework", "OKRs"],
+    "tags": ["dashboard", "daily-metrics", "monitoring"],
+    "hint": "חשבו על: health (errors, latency), engagement, business output, ו-leading indicators לבעיות"
+  },
+  {
+    "id": "met-011",
+    "category": "Metrics",
+    "subcategory": "Experimentation",
+    "difficulty": "hard",
+    "question": "איך תדעי שה-A/B test שלך מובהק סטטיסטית? כמה זמן להמתין?",
+    "frameworks": ["Statistical significance", "Sample size calculation"],
+    "tags": ["ab-test", "statistics", "experimentation"],
+    "hint": "p-value < 0.05, sample size מחושב מראש, minimum detectable effect. הימנעי מ-peeking"
+  },
+  {
+    "id": "met-012",
+    "category": "Metrics",
+    "subcategory": "LTV",
+    "difficulty": "medium",
+    "question": "כיצד תחשבו LTV למשתמש ומדוע זה חשוב להחלטות מוצר?",
+    "frameworks": ["LTV/CAC", "Cohort LTV"],
+    "tags": ["LTV", "monetization", "unit-economics"],
+    "hint": "LTV = ARPU × Gross Margin × Average Lifetime. חשוב כי מגדיר כמה אפשר להשקיע ב-acquisition"
+  },
+  {
+    "id": "est-001",
+    "category": "Estimation",
+    "subcategory": "Market size",
+    "difficulty": "medium",
+    "question": "הערכי את מספר הדירות המושכרות בתל אביב",
+    "frameworks": ["Top-down", "Bottom-up"],
+    "tags": ["real-estate", "israel", "market-size"],
+    "hint": "התחילי מאוכלוסיית תל אביב (~450k), חשבו על % שכירים, גודל משק בית ממוצע"
+  },
+  {
+    "id": "est-002",
+    "category": "Estimation",
+    "subcategory": "Revenue",
+    "difficulty": "hard",
+    "question": "הערכי את ה-revenue השנתי של Wolt בישראל",
+    "frameworks": ["Bottom-up estimation", "Market sizing"],
+    "tags": ["wolt", "israel", "revenue", "food-delivery"],
+    "hint": "מספר הזמנות ביום × ערך הזמנה ממוצע × עמלה (20-25%) × 365"
+  },
+  {
+    "id": "est-003",
+    "category": "Estimation",
+    "subcategory": "Users",
+    "difficulty": "medium",
+    "question": "כמה אנשים בישראל משתמשים ב-WhatsApp ביום?",
+    "frameworks": ["Top-down", "Penetration rate"],
+    "tags": ["whatsapp", "israel", "DAU"],
+    "hint": "ישראל ~9.5M. כמה עם סמארטפון? מה % whatsapp users? מה % שפותחים ביום?"
+  },
+  {
+    "id": "est-004",
+    "category": "Estimation",
+    "subcategory": "Infrastructure",
+    "difficulty": "hard",
+    "question": "כמה servers צריך Google כדי לשמור את כל תמונות Gmail?",
+    "frameworks": ["Capacity planning", "Data estimation"],
+    "tags": ["google", "infrastructure", "storage"],
+    "hint": "כמה משתמשים Gmail? כמה emails ביום? כמה images לmail? גודל ממוצע לתמונה? storage per server?"
+  },
+  {
+    "id": "est-005",
+    "category": "Estimation",
+    "subcategory": "Market size",
+    "difficulty": "easy",
+    "question": "הערכי את שוק אפליקציות הפיטנס בישראל",
+    "frameworks": ["TAM/SAM/SOM", "Bottom-up"],
+    "tags": ["fitness", "israel", "market-size"],
+    "hint": "כמה ישראלים מתאמנים? כמה ישלמו לאפליקציה? כמה לחודש? האם זה נישה או mass market?"
+  },
+  {
+    "id": "est-006",
+    "category": "Estimation",
+    "subcategory": "Time",
+    "difficulty": "medium",
+    "question": "כמה זמן ייקח לבנות MVP לאפליקציית dating לשוק הישראלי?",
+    "frameworks": ["Scoping", "Sprint planning"],
+    "tags": ["mvp", "dating", "planning"],
+    "hint": "הגדירו מה MVP: login, profiles, matching, chat. חשבו על team size ו-velocity"
+  },
+  {
+    "id": "est-007",
+    "category": "Estimation",
+    "subcategory": "Revenue",
+    "difficulty": "hard",
+    "question": "הערכי את ה-revenue של Netflix בישראל",
+    "frameworks": ["Bottom-up", "ARPU"],
+    "tags": ["netflix", "israel", "subscription", "revenue"],
+    "hint": "כמה מנויים? ×ARPU ישראלי (כ-₪30-50 לחודש) × 12"
+  },
+  {
+    "id": "est-008",
+    "category": "Estimation",
+    "subcategory": "Cost",
+    "difficulty": "medium",
+    "question": "מה עלות תפעול chatbot בשירות לקוחות שמטפל ב-10,000 פניות ביום?",
+    "frameworks": ["Cost modeling", "Unit economics"],
+    "tags": ["chatbot", "AI", "cost"],
+    "hint": "חשבו על: API costs (tokens), infrastructure, maintenance, human escalation %"
+  },
+  {
+    "id": "est-009",
+    "category": "Estimation",
+    "subcategory": "Market size",
+    "difficulty": "medium",
+    "question": "הערכי כמה עסקים קטנים בישראל עשויים לשלם על כלי AI לניהול",
+    "frameworks": ["TAM/SAM/SOM", "Willingness to pay"],
+    "tags": ["SMB", "AI", "israel", "market-size"],
+    "hint": "כמה עסקים קטנים בישראל? כמה יש להם 3+ עובדים? מה % שישלמו? כמה לחודש?"
+  },
+  {
+    "id": "est-010",
+    "category": "Estimation",
+    "subcategory": "Usage",
+    "difficulty": "easy",
+    "question": "כמה שאלות ב-Google נשלחות בישראל ביום?",
+    "frameworks": ["Top-down", "Per-capita"],
+    "tags": ["google", "search", "israel"],
+    "hint": "אוכלוסייה × % שמשתמשים בגוגל × מספר חיפושים ממוצע ביום"
+  },
+  {
+    "id": "ps-001",
+    "category": "Product Sense",
+    "subcategory": "Improvement",
+    "difficulty": "medium",
+    "question": "איך הייתם משפרים את חוויית ה-onboarding של LinkedIn?",
+    "frameworks": ["Jobs to be done", "User journey"],
+    "tags": ["linkedin", "onboarding", "UX"],
+    "hint": "התחילי מהבנת המטרות השונות של משתמשים (מחפשי עבודה, מגייסים, networkers). מה ה-aha moment לכל אחד?"
+  },
+  {
+    "id": "ps-002",
+    "category": "Product Sense",
+    "subcategory": "Design",
+    "difficulty": "hard",
+    "question": "עצבי מוצר שעוזר לאנשים מעל גיל 65 לנהל את הבריאות שלהם דיגיטלית",
+    "frameworks": ["User research", "Accessibility"],
+    "tags": ["elderly", "health", "accessibility", "design"],
+    "hint": "חשבו על: גודל טקסט, מורכבות, trust, קשרי משפחה, ספקי בריאות. מי המשתמש הראשי מול מי משלם?"
+  },
+  {
+    "id": "ps-003",
+    "category": "Product Sense",
+    "subcategory": "Favorite product",
+    "difficulty": "easy",
+    "question": "ספרו על מוצר שאתם אוהבים ואיך הייתם משפרים אותו",
+    "frameworks": ["Product critique", "User value"],
+    "tags": ["favorite-product", "critique", "improvement"],
+    "hint": "בחרו מוצר שאתם משתמשים בו באמת. מה הוא עושה טוב? איפה הכאב? מה הייתי עושה אחרת?"
+  },
+  {
+    "id": "ps-004",
+    "category": "Product Sense",
+    "subcategory": "New product",
+    "difficulty": "hard",
+    "question": "Google רוצה להיכנס לשוק ביטוח הרכב. כיצד תגשי לבעיה?",
+    "frameworks": ["Problem space", "Competitive analysis"],
+    "tags": ["google", "insurance", "new-product"],
+    "hint": "מה היתרון של Google? נתוני navigation, AI, distribution. מה האתגרים? רגולציה, trust, underwriting"
+  },
+  {
+    "id": "ps-005",
+    "category": "Product Sense",
+    "subcategory": "Trade-offs",
+    "difficulty": "medium",
+    "question": "Airbnb שוקלת להוסיף פיצ'ר שמאפשר hosts לראות profile מלא של guests לפני אישור. מה היתרונות והחסרונות?",
+    "frameworks": ["Two-sided marketplace", "Trust & safety"],
+    "tags": ["airbnb", "marketplace", "trust", "discrimination"],
+    "hint": "יתרונות: safety לhosts. חסרונות: פוטנציאל לאפליה, פגיעה ב-conversion, רגולציה. מה עדיף?"
+  },
+  {
+    "id": "ps-006",
+    "category": "Product Sense",
+    "subcategory": "Critique",
+    "difficulty": "medium",
+    "question": "מה הבעיה הגדולה ביותר ב-Twitter/X היום ואיך תפתרי אותה?",
+    "frameworks": ["Root cause analysis", "User segments"],
+    "tags": ["twitter", "social-media", "critique"],
+    "hint": "חשבו על: content quality, misinformation, monetization, creator economy. בחרו בעיה אחת ו-dive deep"
+  },
+  {
+    "id": "ps-007",
+    "category": "Product Sense",
+    "subcategory": "New feature",
+    "difficulty": "medium",
+    "question": "WhatsApp רוצה להוסיף פיצ'ר אחד לעסקים קטנים. מה תמליצי?",
+    "frameworks": ["User research", "Jobs to be done"],
+    "tags": ["whatsapp", "SMB", "feature"],
+    "hint": "מה עסקים קטנים עושים ב-WhatsApp היום? payments, scheduling, catalog. מה הכאב הגדול ביותר?"
+  },
+  {
+    "id": "ps-008",
+    "category": "Product Sense",
+    "subcategory": "Monetization",
+    "difficulty": "hard",
+    "question": "Waze לא מייצרת revenue ישיר. הצעי 3 מודלי monetization שלא יפגעו בחוויית המשתמש",
+    "frameworks": ["Monetization models", "User value preservation"],
+    "tags": ["waze", "monetization", "ads"],
+    "hint": "חשבו על: local ads (שלא יפריעו לנהיגה), data partnerships, premium features, fleet/B2B"
+  },
+  {
+    "id": "ps-009",
+    "category": "Product Sense",
+    "subcategory": "Future",
+    "difficulty": "hard",
+    "question": "כיצד לדעתך ייראה מוצר הבנקאות הדיגיטלית בעוד 5 שנים?",
+    "frameworks": ["Trend analysis", "Vision setting"],
+    "tags": ["fintech", "banking", "future", "vision"],
+    "hint": "חשבו על AI, embedded finance, open banking, decentralization. מה כאב היום שייפתר?"
+  },
+  {
+    "id": "ps-010",
+    "category": "Product Sense",
+    "subcategory": "User research",
+    "difficulty": "easy",
+    "question": "איך הייתם מגלים אם יש product-market fit למוצר חדש?",
+    "frameworks": ["PMF survey", "Retention curves"],
+    "tags": ["PMF", "research", "validation"],
+    "hint": "שאלת Sean Ellis: 'עד כמה תהיי מאוכזבת אם המוצר ייסגר?' >40% = PMF. גם cohort retention curves"
+  },
+  {
+    "id": "ps-011",
+    "category": "Product Sense",
+    "subcategory": "Redesign",
+    "difficulty": "medium",
+    "question": "עצבי מחדש את חוויית ה-checkout ב-Amazon בשלושה שלבים",
+    "frameworks": ["UX principles", "Conversion optimization"],
+    "tags": ["amazon", "checkout", "UX", "ecommerce"],
+    "hint": "חשבו על friction reduction: מה מעכב? כמה שלבים יש? מה אפשר להסיר? one-click vs. security"
+  },
+  {
+    "id": "ps-012",
+    "category": "Product Sense",
+    "subcategory": "International",
+    "difficulty": "hard",
+    "question": "Wolt רוצה להיכנס לשוק חדש — הודו. אילו אתגרים ייחודיים יהיו ואיך תגשי אליהם?",
+    "frameworks": ["Market entry", "Localization"],
+    "tags": ["wolt", "india", "market-entry", "localization"],
+    "hint": "חשבו על: תשתית (כתובות), תשלום (UPI, cash), מזון (vegetarian, street food), תחרות (Zomato, Swiggy)"
+  },
+  {
+    "id": "lead-001",
+    "category": "Leadership",
+    "subcategory": "Conflict",
+    "difficulty": "medium",
+    "question": "ה-tech lead אומר שהפיצ'ר ייקח 3 חודשים, ה-CEO מצפה לו בעוד 3 שבועות. מה עושים?",
+    "frameworks": ["Negotiation", "Scoping"],
+    "tags": ["conflict", "timeline", "expectations"],
+    "hint": "אל תבטיחי מה שלא ניתן לעמוד בו. בואי עם אלטרנטיבות: MVP מוקטן, phased delivery, trade-offs מפורשים"
+  },
+  {
+    "id": "lead-002",
+    "category": "Leadership",
+    "subcategory": "Influence",
+    "difficulty": "hard",
+    "question": "אין לך סמכות פורמלית על הצוות אבל את צריכה לגרום לאנשים לעקוב אחרי הוויז'ן שלך. איך?",
+    "frameworks": ["Influence without authority", "Coalition building"],
+    "tags": ["influence", "leadership", "vision"],
+    "hint": "הבן מה מניע כל אחד, הצגי data שמדבר אל האינטרסים שלהם, בני quick wins שמדגימים ערך"
+  },
+  {
+    "id": "lead-003",
+    "category": "Leadership",
+    "subcategory": "Failure",
+    "difficulty": "medium",
+    "question": "תארו מקרה שבו השקת פיצ'ר שנכשל. מה למדת?",
+    "frameworks": ["Post-mortem", "Learning mindset"],
+    "tags": ["failure", "learning", "post-mortem"],
+    "hint": "היי ספציפית: מה היה הפיצ'ר, מה הלך לא כשורה, מה היה ה-impact, ומה שינית בגישה שלך"
+  },
+  {
+    "id": "lead-004",
+    "category": "Leadership",
+    "subcategory": "Team",
+    "difficulty": "easy",
+    "question": "איך מניעים מפתח שמשוחח בישיבות אבל לא מספק בזמן?",
+    "frameworks": ["Feedback framework", "Root cause"],
+    "tags": ["team", "performance", "feedback"],
+    "hint": "קודם הבינו למה: חוסר clarity? overwhelmed? חוסר engagement? אחר כך פידבק ישיר עם דוגמאות"
+  },
+  {
+    "id": "lead-005",
+    "category": "Leadership",
+    "subcategory": "Decision making",
+    "difficulty": "hard",
+    "question": "הצוות מחולק 50/50 על כיוון מוצר. אין נתונים מספיקים. מה עושים?",
+    "frameworks": ["Decision framework", "Reversibility test"],
+    "tags": ["decision", "uncertainty", "team"],
+    "hint": "חשבו: האם ההחלטה הפיכה? אם כן — experiment מהיר. אם לא — more data needed. הבן מה שניהם מחפשים"
+  },
+  {
+    "id": "lead-006",
+    "category": "Leadership",
+    "subcategory": "Stakeholders",
+    "difficulty": "medium",
+    "question": "stakeholder בכיר רוצה feature שאתם חושבים שהוא רעיון רע. איך מתמודדים?",
+    "frameworks": ["Structured disagreement", "Data-driven advocacy"],
+    "tags": ["stakeholders", "disagreement", "advocacy"],
+    "hint": "הביני את הצורך האמיתי מאחורי הבקשה, הציגי נתונים נגדיים, הציעי אלטרנטיבה, הציגי סיכונים"
+  },
+  {
+    "id": "lead-007",
+    "category": "Leadership",
+    "subcategory": "Prioritization under pressure",
+    "difficulty": "hard",
+    "question": "שלושה לקוחות גדולים מאיימים לעזוב אם לא תוסיפי פיצ'רים שמתנגשים עם ה-roadmap שלך. מה עושים?",
+    "frameworks": ["Customer vs product tension", "Churn risk analysis"],
+    "tags": ["customers", "churn", "roadmap", "pressure"],
+    "hint": "חשבו על ערך הלקוחות vs עלות הסטייה מהוויזן. יש פתרון שמספק שניהם? מה עלות ה-customization?"
+  },
+  {
+    "id": "lead-008",
+    "category": "Leadership",
+    "subcategory": "Communication",
+    "difficulty": "easy",
+    "question": "כיצד מתקשרים עם stakeholders שמגיעים מרקעים שונים (טכני, עסקי, עיצובי)?",
+    "frameworks": ["Communication strategy", "Audience awareness"],
+    "tags": ["communication", "stakeholders", "clarity"],
+    "hint": "כל קהל רוצה לשמוע משהו אחר: מהנדסים = complexity/feasibility, עסק = ROI, עיצוב = UX impact"
+  },
+  {
+    "id": "lead-009",
+    "category": "Leadership",
+    "subcategory": "Hiring",
+    "difficulty": "medium",
+    "question": "מה תחפשי ב-PM junior שמצטרף לצוות שלך?",
+    "frameworks": ["Hiring criteria", "Culture fit"],
+    "tags": ["hiring", "junior-PM", "team"],
+    "hint": "חשבו על: curiosity, structured thinking, communication, humility, ownership. skills אפשר ללמד"
+  },
+  {
+    "id": "lead-010",
+    "category": "Leadership",
+    "subcategory": "Vision",
+    "difficulty": "hard",
+    "question": "כיצד בונים וויז'ן מוצר שגורם לכולם ב-team להתלהב?",
+    "frameworks": ["Vision statement", "Narrative building"],
+    "tags": ["vision", "alignment", "leadership"],
+    "hint": "ויזן טוב מדבר על העתיד שהמוצר יוצר למשתמש, לא על הפיצ'רים. 'כל ילד יוכל ללמוד' > 'אפליקציית למידה'"
+  },
+  {
+    "id": "strat-001",
+    "category": "Strategy",
+    "subcategory": "Competitive",
+    "difficulty": "hard",
+    "question": "מתחרה גדול הוריד מחירים ב-30%. איך תגיבי?",
+    "frameworks": ["Competitive response", "Porter's Five Forces"],
+    "tags": ["competition", "pricing", "response"],
+    "hint": "אל תיכנסי אוטומטית למלחמת מחירים. קודם הבינו את הכוונה, ה-unit economics שלהם, ואיפה ה-moat שלך"
+  },
+  {
+    "id": "strat-002",
+    "category": "Strategy",
+    "subcategory": "Build vs Buy",
+    "difficulty": "medium",
+    "question": "הצוות מציע לפתח data pipeline מאפס במקום לקנות פתרון קיים. מה השיקולים?",
+    "frameworks": ["Build vs Buy vs Partner", "Core vs Context"],
+    "tags": ["build-vs-buy", "infrastructure", "decision"],
+    "hint": "Build: differentiator? control? long-term cost? Buy: speed, proven, vendor risk. מה core ל-business שלך?"
+  },
+  {
+    "id": "strat-003",
+    "category": "Strategy",
+    "subcategory": "Go-to-market",
+    "difficulty": "hard",
+    "question": "בנית מוצר B2B חדש. מה אסטרטגיית ה-go-to-market שלך?",
+    "frameworks": ["GTM strategy", "ICP definition"],
+    "tags": ["B2B", "GTM", "launch"],
+    "hint": "הגדירו ICP (Ideal Customer Profile), beachhead market, sales motion (PLG? enterprise?), pricing"
+  },
+  {
+    "id": "strat-004",
+    "category": "Strategy",
+    "subcategory": "Platform",
+    "difficulty": "hard",
+    "question": "מתי כדאי לבנות platform במקום point solution?",
+    "frameworks": ["Platform economics", "Network effects"],
+    "tags": ["platform", "ecosystem", "strategy"],
+    "hint": "Platform מתאים כשיש: multiple use cases, third-party value creation, network effects. Point solution מהיר יותר"
+  },
+  {
+    "id": "strat-005",
+    "category": "Strategy",
+    "subcategory": "Growth",
+    "difficulty": "medium",
+    "question": "הצמיחה האורגנית נעצרה. אילו אסטרטגיות תבחני להתחלת גדילה מחדש?",
+    "frameworks": ["Growth levers", "Ansoff matrix"],
+    "tags": ["growth", "stagnation", "strategy"],
+    "hint": "4 ריבועי Ansoff: מוצר קיים/שוק קיים (penetration), שוק חדש, מוצר חדש, diversification. מה הסיכון/תגמול?"
+  },
+  {
+    "id": "strat-006",
+    "category": "Strategy",
+    "subcategory": "Moat",
+    "difficulty": "hard",
+    "question": "מהו ה-competitive moat של המוצר שלך ואיך מחזקים אותו?",
+    "frameworks": ["Moat analysis", "Competitive advantages"],
+    "tags": ["moat", "competitive-advantage", "strategy"],
+    "hint": "סוגי moats: network effects, switching costs, proprietary data, brand, economies of scale. איזה יש לך?"
+  },
+  {
+    "id": "strat-007",
+    "category": "Strategy",
+    "subcategory": "Pricing",
+    "difficulty": "medium",
+    "question": "כיצד תקבעי תמחור למוצר SaaS חדש?",
+    "frameworks": ["Value-based pricing", "Competitive pricing"],
+    "tags": ["pricing", "SaaS", "monetization"],
+    "hint": "3 גישות: cost-plus (גרוע), competitive (בסיסי), value-based (הכי טוב). מה שווי ה-ROI ללקוח?"
+  },
+  {
+    "id": "strat-008",
+    "category": "Strategy",
+    "subcategory": "Partnerships",
+    "difficulty": "medium",
+    "question": "מתי שותפות אסטרטגית עדיפה על פיתוח עצמאי?",
+    "frameworks": ["Partnership evaluation", "Make vs Buy vs Partner"],
+    "tags": ["partnerships", "strategy", "distribution"],
+    "hint": "Partnership שווה כשהשותף: מוסיף distribution, טכנולוגיה שלוקח שנים לבנות, אמינות בתחום חדש"
+  },
+  {
+    "id": "strat-009",
+    "category": "Strategy",
+    "subcategory": "Market entry",
+    "difficulty": "hard",
+    "question": "Spotify רוצה להיכנס לשוק הפודקאסטים. כיצד תגשי?",
+    "frameworks": ["Market entry", "Content strategy"],
+    "tags": ["spotify", "podcasts", "market-entry"],
+    "hint": "Distribution advantage (existing users), content acquisition (exclusive deals), monetization, creator tools"
+  },
+  {
+    "id": "strat-010",
+    "category": "Strategy",
+    "subcategory": "Sunset",
+    "difficulty": "medium",
+    "question": "מתי כדאי להפסיק מוצר/פיצ'ר קיים?",
+    "frameworks": ["Portfolio management", "Opportunity cost"],
+    "tags": ["sunset", "discontinue", "portfolio"],
+    "hint": "שיקולים: usage trend, maintenance cost, strategic fit, user impact, alternatives. איך מנהלים את המעבר?"
+  },
+  {
+    "id": "exec-001",
+    "category": "Execution",
+    "subcategory": "Launch",
+    "difficulty": "medium",
+    "question": "תארו תהליך השקה מלא לפיצ'ר חדש משלב הרעיון ועד לאחר ה-launch",
+    "frameworks": ["Product lifecycle", "Launch checklist"],
+    "tags": ["launch", "process", "execution"],
+    "hint": "Discovery → Define → Design → Build → Test → Staged rollout → Monitor → Iterate"
+  },
+  {
+    "id": "exec-002",
+    "category": "Execution",
+    "subcategory": "Sprint",
+    "difficulty": "easy",
+    "question": "הצוות לא עומד ב-sprint commitments. מה עושים?",
+    "frameworks": ["Agile", "Root cause analysis"],
+    "tags": ["sprint", "velocity", "agile"],
+    "hint": "קודם הבינו למה: estimation issues? interruptions? scope creep? dependencies? אחר כך תקנו את הסיבה"
+  },
+  {
+    "id": "exec-003",
+    "category": "Execution",
+    "subcategory": "Scope",
+    "difficulty": "medium",
+    "question": "באמצע פיתוח גילית שהפיצ'ר יקח פי שניים מהזמן המוערך. מה עושים?",
+    "frameworks": ["Scope management", "Trade-off triangle"],
+    "tags": ["scope", "timeline", "escalation"],
+    "hint": "3 אפשרויות: scope down, push timeline, add resources. כל אחת עם tradeoffs. מי צריך לדעת ומתי?"
+  },
+  {
+    "id": "exec-004",
+    "category": "Execution",
+    "subcategory": "Rollout",
+    "difficulty": "medium",
+    "question": "כיצד מבצעים rollout מדורג לפיצ'ר עם סיכון גבוה?",
+    "frameworks": ["Feature flags", "Canary deployment"],
+    "tags": ["rollout", "risk", "feature-flags"],
+    "hint": "1% → 5% → 20% → 100%. מה ה-criteria לכל שלב? אילו מטריקות עוצרות את ה-rollout?"
+  },
+  {
+    "id": "exec-005",
+    "category": "Execution",
+    "subcategory": "Incident",
+    "difficulty": "hard",
+    "question": "יש outage — הפיצ'ר שהשקת שבר את ה-production. מה עושים?",
+    "frameworks": ["Incident management", "Communication protocol"],
+    "tags": ["incident", "production", "crisis"],
+    "hint": "מיידית: rollback. תוך שעה: communicate לstakeholders. אחרי: post-mortem ללא הטחת אשמה"
+  },
+  {
+    "id": "exec-006",
+    "category": "Execution",
+    "subcategory": "Dependencies",
+    "difficulty": "medium",
+    "question": "הפיצ'ר תלוי בצוות אחר שלא יכול לספק בזמן. מה עושים?",
+    "frameworks": ["Dependency management", "Risk mitigation"],
+    "tags": ["dependencies", "cross-team", "risk"],
+    "hint": "קודם הבינו מה ה-blocker ומה הסיבה. האם אפשר לפשט? מה parallel path? escalate אם צריך"
+  },
+  {
+    "id": "exec-007",
+    "category": "Execution",
+    "subcategory": "Quality",
+    "difficulty": "medium",
+    "question": "QA מצאה bugs קריטיים יום לפני launch מתוכנן. מה עושים?",
+    "frameworks": ["Risk assessment", "Go/No-go decision"],
+    "tags": ["QA", "bugs", "launch-decision"],
+    "hint": "הגדירו: מה קריטי? מה ה-user impact? אפשר לדחות רק חלק מה-scope? מה עלות הדחייה?"
+  },
+  {
+    "id": "exec-008",
+    "category": "Execution",
+    "subcategory": "Documentation",
+    "difficulty": "easy",
+    "question": "מה צריך להיות ב-PRD טוב?",
+    "frameworks": ["PRD template", "Documentation"],
+    "tags": ["PRD", "documentation", "process"],
+    "hint": "Problem statement, user stories, success metrics, scope (in/out), technical requirements, open questions"
+  },
+  {
+    "id": "exec-009",
+    "category": "Execution",
+    "subcategory": "Cross-functional",
+    "difficulty": "hard",
+    "question": "כיצד מנהלים פרויקט שמערב 5 צוותים שונים?",
+    "frameworks": ["RACI", "Program management"],
+    "tags": ["cross-functional", "coordination", "program-management"],
+    "hint": "הגדירו RACI ברור, weekly sync קצר, dependencies map, escalation path, shared dashboard"
+  },
+  {
+    "id": "exec-010",
+    "category": "Execution",
+    "subcategory": "Feedback loop",
+    "difficulty": "medium",
+    "question": "כיצד יוצרים לולאת פידבק אפקטיבית עם משתמשים אחרי launch?",
+    "frameworks": ["Feedback loops", "User research"],
+    "tags": ["feedback", "post-launch", "iteration"],
+    "hint": "combination: quantitative (metrics) + qualitative (interviews, support tickets, session recordings)"
+  },
+  {
+    "id": "beh-001",
+    "category": "Behavioral",
+    "subcategory": "Ownership",
+    "difficulty": "easy",
+    "question": "תארו מצב שבו לקחת ownership על משהו מחוץ לתחום האחריות הרשמי שלך",
+    "frameworks": ["STAR method"],
+    "tags": ["ownership", "initiative", "behavioral"],
+    "hint": "Situation → Task → Action → Result. הדגישו מה הייתה הבחירה האקטיבית שלך ומה ה-impact"
+  },
+  {
+    "id": "beh-002",
+    "category": "Behavioral",
+    "subcategory": "Data-driven",
+    "difficulty": "medium",
+    "question": "תארו מצב שבו הנתונים הפתיעו אותך ושינו את ההחלטה שלך",
+    "frameworks": ["STAR method", "Data-driven decision making"],
+    "tags": ["data", "decision", "behavioral"],
+    "hint": "היי ספציפית לגבי מה ציפית, מה הנתונים הראו, ואיך שינית כיוון"
+  },
+  {
+    "id": "beh-003",
+    "category": "Behavioral",
+    "subcategory": "Ambiguity",
+    "difficulty": "medium",
+    "question": "איך מתמודדים עם עבודה בסביבה עם הרבה אי-ודאות ומשימות לא ברורות?",
+    "frameworks": ["Structured ambiguity", "First principles"],
+    "tags": ["ambiguity", "clarity", "behavioral"],
+    "hint": "אל תחכו לclarity מלאה. הגדירו את מה שאתם יודעים, תעדפו מה לברר קודם, קבלו החלטות הפיכות בינתיים"
+  },
+  {
+    "id": "beh-004",
+    "category": "Behavioral",
+    "subcategory": "Cross-functional",
+    "difficulty": "medium",
+    "question": "תארו שיתוף פעולה מוצלח עם צוות שקשה לעבוד איתו",
+    "frameworks": ["STAR method", "Empathy"],
+    "tags": ["collaboration", "difficult-teams", "behavioral"],
+    "hint": "מה עשה את זה קשה? מה עשית כדי לגשר? מה למדת על עצמך?"
+  },
+  {
+    "id": "beh-005",
+    "category": "Behavioral",
+    "subcategory": "Growth",
+    "difficulty": "easy",
+    "question": "מה הפידבק הקשה ביותר שקיבלת ואיך הגבת?",
+    "frameworks": ["Growth mindset", "Feedback reception"],
+    "tags": ["feedback", "growth", "behavioral"],
+    "hint": "הראו שאתם יכולים לשמוע פידבק קשה, לעכל אותו, ולשנות בגינו. זה מראה self-awareness"
+  },
+  {
+    "id": "beh-006",
+    "category": "Behavioral",
+    "subcategory": "Prioritization",
+    "difficulty": "medium",
+    "question": "כיצד את מנהלת את הזמן שלך כ-PM עם עשרות משימות מתחרות?",
+    "frameworks": ["Time management", "Prioritization"],
+    "tags": ["time-management", "productivity", "behavioral"],
+    "hint": "חשבו על: מה רק אני יכולה לעשות? מה urgent vs important? מה אפשר לdelegate? מה לדחות?"
+  },
+  {
+    "id": "beh-007",
+    "category": "Behavioral",
+    "subcategory": "Failure",
+    "difficulty": "medium",
+    "question": "תארו כישלון מקצועי משמעותי ומה למדת ממנו",
+    "frameworks": ["STAR method", "Learning from failure"],
+    "tags": ["failure", "learning", "behavioral"],
+    "hint": "אל תמזערו את הכישלון אבל גם לא תישארו עליו. הדגישו את הלקח האמיתי שהשתנה בגישה שלך"
+  },
+  {
+    "id": "beh-008",
+    "category": "Behavioral",
+    "subcategory": "Impact",
+    "difficulty": "easy",
+    "question": "מה ה-impact הגדול ביותר שהיה לך על מוצר?",
+    "frameworks": ["Impact measurement", "Storytelling"],
+    "tags": ["impact", "achievement", "behavioral"],
+    "hint": "ספרו סיפור ספציפי עם מספרים: לפני/אחרי, מה עשית, מה השתנה. אל תהיו ענוותנים מדי"
+  },
+  {
+    "id": "beh-009",
+    "category": "Behavioral",
+    "subcategory": "Motivation",
+    "difficulty": "easy",
+    "question": "למה בחרת להיות PM ולא מהנדסת, מעצבת, או בתפקיד אחר?",
+    "frameworks": ["Self-awareness", "Career motivation"],
+    "tags": ["motivation", "career", "behavioral"],
+    "hint": "היי אותנטית. מה מושך אותך ב-PM specifically? אל תגידי 'אני אוהבת לעבוד עם אנשים' — כולם אומרים את זה"
+  },
+  {
+    "id": "beh-010",
+    "category": "Behavioral",
+    "subcategory": "Disagreement",
+    "difficulty": "hard",
+    "question": "תארו מצב שבו לא הסכמת עם ההחלטה של הבוס שלך ואיך הגבת",
+    "frameworks": ["Disagree and commit", "Structured advocacy"],
+    "tags": ["disagreement", "authority", "advocacy"],
+    "hint": "הראו שאתם יכולים לדחוף back בצורה בונה עם data, ואז commit אחרי שהחלטה התקבלה"
+  },
+  {
+    "id": "tech-001",
+    "category": "Technical",
+    "subcategory": "APIs",
+    "difficulty": "easy",
+    "question": "מהו API ולמה זה חשוב ל-PM לדעת?",
+    "frameworks": ["Technical literacy"],
+    "tags": ["API", "technical", "basics"],
+    "hint": "API = ממשק בין מערכות. PM צריך לדעת מה אפשרי, כמה זמן לוקח, ומה ה-tradeoffs"
+  },
+  {
+    "id": "tech-002",
+    "category": "Technical",
+    "subcategory": "Database",
+    "difficulty": "medium",
+    "question": "מה ההבדל בין SQL ל-NoSQL ומתי להשתמש בכל אחד?",
+    "frameworks": ["Technical decision making"],
+    "tags": ["database", "SQL", "NoSQL"],
+    "hint": "SQL: structured data, ACID, joins. NoSQL: flexible schema, scale, speed. PM צריך לדעת לשאול שאלות נכונות"
+  },
+  {
+    "id": "tech-003",
+    "category": "Technical",
+    "subcategory": "Architecture",
+    "difficulty": "hard",
+    "question": "מה ההבדל בין microservices לmonolith ומה ה-impact על מהירות ה-product team?",
+    "frameworks": ["System design", "Organizational impact"],
+    "tags": ["architecture", "microservices", "monolith"],
+    "hint": "Monolith: מהיר להתחלה, קשה לscale. Microservices: גמיש, complex ops, overhead גבוה לצוות קטן"
+  },
+  {
+    "id": "tech-004",
+    "category": "Technical",
+    "subcategory": "Performance",
+    "difficulty": "medium",
+    "question": "המוצר איטי — עמוד load לוקח 8 שניות. כיצד תגשי לפתרון כ-PM?",
+    "frameworks": ["Performance optimization", "Impact analysis"],
+    "tags": ["performance", "load-time", "UX"],
+    "hint": "קודם הבינו impact על metrics (conversion, bounce). אחר כך עם engineering: מה slow? frontend? backend? DB?"
+  },
+  {
+    "id": "tech-005",
+    "category": "Technical",
+    "subcategory": "Security",
+    "difficulty": "medium",
+    "question": "כ-PM, אילו שיקולי אבטחה חשוב שתכירי בפיתוח מוצר?",
+    "frameworks": ["Security by design", "Privacy"],
+    "tags": ["security", "privacy", "GDPR"],
+    "hint": "Authentication, authorization, data encryption, GDPR compliance, PII handling. PM צריך לשאול: מה data שאנחנו שומרים? מי רואה אותו?"
+  },
+  {
+    "id": "design-001",
+    "category": "Design",
+    "subcategory": "User Research",
+    "difficulty": "easy",
+    "question": "מה ההבדל בין usability testing לuser interviews ומתי להשתמש בכל אחד?",
+    "frameworks": ["User research methods"],
+    "tags": ["research", "usability", "interviews"],
+    "hint": "Usability: האם אנשים יכולים להשתמש במוצר? Interviews: למה הם עושים מה שהם עושים?"
+  },
+  {
+    "id": "design-002",
+    "category": "Design",
+    "subcategory": "UX",
+    "difficulty": "medium",
+    "question": "עצבי onboarding flow לאפליקציית meditation שמכוונת לאנשים עסוקים",
+    "frameworks": ["Progressive disclosure", "Jobs to be done"],
+    "tags": ["onboarding", "meditation", "UX"],
+    "hint": "אנשים עסוקים: פחות שאלות, ערך מהיר (first session תוך 2 דקות), permission requests מינימליות"
+  },
+  {
+    "id": "design-003",
+    "category": "Design",
+    "subcategory": "Accessibility",
+    "difficulty": "medium",
+    "question": "כיצד accessibility משפיעה על החלטות מוצר ולמה זה חשוב עסקית?",
+    "frameworks": ["Inclusive design", "WCAG"],
+    "tags": ["accessibility", "inclusive", "business"],
+    "hint": "15% מהאוכלוסייה עם disability. גם: SEO, legal compliance, brand, ולעתים קרובות מוביל לdesign טוב יותר לכולם"
+  },
+  {
+    "id": "design-004",
+    "category": "Design",
+    "subcategory": "Information architecture",
+    "difficulty": "medium",
+    "question": "כיצד תחליטי על navigation structure של אפליקציה מורכבת?",
+    "frameworks": ["Card sorting", "Tree testing"],
+    "tags": ["navigation", "IA", "UX"],
+    "hint": "Card sorting להבנת mental models, tree testing לבדיקה. פחות מ-7 פריטים ב-level, מושגים ברורים"
+  },
+  {
+    "id": "design-005",
+    "category": "Design",
+    "subcategory": "Prototype",
+    "difficulty": "easy",
+    "question": "מה ה-fidelity הנכון לפרוטוטייפ בשלבים שונים של המוצר?",
+    "frameworks": ["Design thinking", "Lean validation"],
+    "tags": ["prototype", "fidelity", "validation"],
+    "hint": "Early: paper/whiteboard (שעות, לא ימים). Mid: Figma flows. Late: interactive prototype לbefore dev"
+  },
+  {
+    "id": "growth-001",
+    "category": "Growth",
+    "subcategory": "Acquisition",
+    "difficulty": "medium",
+    "question": "הצגי אסטרטגיית growth לאפליקציה חדשה שנמצאת ב-0 users",
+    "frameworks": ["Growth loops", "AARRR"],
+    "tags": ["acquisition", "growth", "early-stage"],
+    "hint": "לפני growth: וודאי retention! אחר כך: איזה channel הכי יעיל? organic? paid? viral? partnerships?"
+  },
+  {
+    "id": "growth-002",
+    "category": "Growth",
+    "subcategory": "Retention",
+    "difficulty": "hard",
+    "question": "retention לאחר 30 יום הוא 15%. מה תעשי כדי לשפר אותו?",
+    "frameworks": ["Retention analysis", "Habit formation"],
+    "tags": ["retention", "churn", "improvement"],
+    "hint": "קודם הבינו מי נשאר ומי עוזב (segmentation). מה ה-aha moment? כמה זמן לוקח להגיע אליו? habits?"
+  },
+  {
+    "id": "growth-003",
+    "category": "Growth",
+    "subcategory": "Viral",
+    "difficulty": "medium",
+    "question": "כיצד הייתם בונים viral loop למוצר B2C?",
+    "frameworks": ["Viral coefficient", "Growth loops"],
+    "tags": ["viral", "referral", "growth"],
+    "hint": "Viral loop = user → value → shares/invites → new users. מה הvalue שגורם לאנשים לשתף? רצוי intrinsic"
+  },
+  {
+    "id": "growth-004",
+    "category": "Growth",
+    "subcategory": "PLG",
+    "difficulty": "hard",
+    "question": "מה זה Product-Led Growth ומתי זה מתאים?",
+    "frameworks": ["PLG", "Sales-led vs Product-led"],
+    "tags": ["PLG", "growth", "SaaS"],
+    "hint": "PLG: המוצר עצמו מוכר ומרחיב. מתאים כשיש: self-serve value, viral mechanics, low touch sales. דוגמה: Slack, Figma"
+  },
+  {
+    "id": "growth-005",
+    "category": "Growth",
+    "subcategory": "Monetization",
+    "difficulty": "medium",
+    "question": "יש לך freemium מוצר עם 10k משתמשים ו-conversion rate של 1% לpaid. איך משפרים?",
+    "frameworks": ["Freemium optimization", "Value metric"],
+    "tags": ["freemium", "conversion", "monetization"],
+    "hint": "הבינו מי ה-1% שממירים ולמה. מה value metric שמניע תשלום? האם החינמי גדול מדי? friction נכון?"
+  },
+  {
+    "id": "growth-006",
+    "category": "Growth",
+    "subcategory": "International",
+    "difficulty": "hard",
+    "question": "המוצר עובד מצוין בישראל. מה צריך לבדוק לפני expansion לאירופה?",
+    "frameworks": ["Market readiness", "Localization"],
+    "tags": ["international", "expansion", "Europe"],
+    "hint": "GDPR, payment methods, language, cultural fit, competition, pricing, support timezone, legal entity"
+  },
+  {
+    "id": "growth-007",
+    "category": "Growth",
+    "subcategory": "Activation",
+    "difficulty": "medium",
+    "question": "מה זה activation ואיך מגדירים ומשפרים אותו?",
+    "frameworks": ["AARRR", "Aha moment"],
+    "tags": ["activation", "onboarding", "aha-moment"],
+    "hint": "Activation = הגעה ל-aha moment. הגדרי: מה הפעולה שמנבאת retention? כמה זמן לוקח? מה מונע מאנשים להגיע?"
+  },
+  {
+    "id": "ai-001",
+    "category": "AI & Data",
+    "subcategory": "AI Product",
+    "difficulty": "medium",
+    "question": "כיצד שונה ניהול מוצר AI מניהול מוצר רגיל?",
+    "frameworks": ["AI product management", "Probabilistic thinking"],
+    "tags": ["AI", "ML", "product-management"],
+    "hint": "AI: probabilistic output, data dependency, hallucinations, latency, cost, bias, explainability. אין 'done'"
+  },
+  {
+    "id": "ai-002",
+    "category": "AI & Data",
+    "subcategory": "Evaluation",
+    "difficulty": "hard",
+    "question": "כיצד מודדים איכות של מוצר AI generative?",
+    "frameworks": ["LLM evaluation", "Human evaluation"],
+    "tags": ["AI", "evaluation", "quality"],
+    "hint": "Automated metrics (BLEU, ROUGE) + human eval + user behavioral signals (thumbs up/down, re-generation rate)"
+  },
+  {
+    "id": "ai-003",
+    "category": "AI & Data",
+    "subcategory": "Ethics",
+    "difficulty": "medium",
+    "question": "מהם הסיכונים האתיים בשימוש ב-AI במוצר צרכני?",
+    "frameworks": ["Responsible AI", "Risk assessment"],
+    "tags": ["AI", "ethics", "bias"],
+    "hint": "Bias, privacy, manipulation, transparency, over-reliance, misinformation. כ-PM: safeguards, transparency, human oversight"
+  },
+  {
+    "id": "ai-004",
+    "category": "AI & Data",
+    "subcategory": "Feature",
+    "difficulty": "medium",
+    "question": "חברה רוצה להוסיף AI assistant למוצר קיים. כיצד תגשי?",
+    "frameworks": ["Feature scoping", "User value"],
+    "tags": ["AI-assistant", "feature", "integration"],
+    "hint": "מה הבעיה שהוא פותר? מי ישתמש? מה accuracy מינימלית? איך מטפלים בטעויות? build vs API?"
+  },
+  {
+    "id": "ai-005",
+    "category": "AI & Data",
+    "subcategory": "Data Strategy",
+    "difficulty": "hard",
+    "question": "כיצד נתוני משתמשים הם competitive advantage ואיך בונים data moat?",
+    "frameworks": ["Data flywheel", "Network effects"],
+    "tags": ["data", "moat", "competitive"],
+    "hint": "Data flywheel: יותר users → יותר data → better model → better product → יותר users. מה הנתון הייחודי שלך?"
+  },
+  {
+    "id": "int-001",
+    "category": "Interview Meta",
+    "subcategory": "Process",
+    "difficulty": "easy",
+    "question": "כיצד תבני structured approach לתשובה על כל שאלת PM interview?",
+    "frameworks": ["STAR", "Problem framing"],
+    "tags": ["interview", "framework", "structure"],
+    "hint": "Clarify → Structure → Think out loud → Recommendation → Summarize. אל תקפצי לפתרון"
+  },
+  {
+    "id": "int-002",
+    "category": "Interview Meta",
+    "subcategory": "Questions",
+    "difficulty": "easy",
+    "question": "אילו שאלות כדאי לשאול ב-end of interview?",
+    "frameworks": ["Curiosity signals", "Culture fit"],
+    "tags": ["interview", "questions", "culture"],
+    "hint": "שאלות על: challenges of the team, success metrics for the role, culture, what you'd work on first"
+  },
+  {
+    "id": "int-003",
+    "category": "Interview Meta",
+    "subcategory": "Clarification",
+    "difficulty": "medium",
+    "question": "מראיין נותן לך שאלה עמומה מאוד. איך מגישים?",
+    "frameworks": ["Clarification technique"],
+    "tags": ["interview", "clarification", "ambiguity"],
+    "hint": "בקשי 2-3 דקות, שאלי שאלות מבהירות ספציפיות, הצגי את ה-assumptions שלך, ואחר כך קדמי"
+  },
+  {
+    "id": "case-001",
+    "category": "Case Study",
+    "subcategory": "Product diagnosis",
+    "difficulty": "hard",
+    "question": "Instagram Stories נמצא בירידה בשימוש ב-18 חודש האחרון. כ-PM, מה תעשי?",
+    "frameworks": ["Diagnosis framework", "User research"],
+    "tags": ["instagram", "stories", "decline", "case"],
+    "hint": "קודם: segmentation (גיל, גיאוגרפיה), competition (TikTok, Reels), user research. אחר כך: hypothesis + test"
+  },
+  {
+    "id": "case-002",
+    "category": "Case Study",
+    "subcategory": "New product",
+    "difficulty": "hard",
+    "question": "Microsoft רוצה לבנות מוצר B2C חדש לשוק Gen-Z. מה תמליצי?",
+    "frameworks": ["Opportunity sizing", "Brand fit"],
+    "tags": ["microsoft", "gen-z", "B2C", "case"],
+    "hint": "חשבו על: מה Microsoft יכולה לעשות טוב? (productivity, gaming, cloud). מה Gen-Z רוצה? fit בין שניהם"
+  },
+  {
+    "id": "case-003",
+    "category": "Case Study",
+    "subcategory": "Metrics deep dive",
+    "difficulty": "hard",
+    "question": "Uber רואה ש-driver satisfaction ירד ב-25% ב-Q4. מה עושים?",
+    "frameworks": ["Driver economics", "Two-sided marketplace"],
+    "tags": ["uber", "driver", "satisfaction", "case"],
+    "hint": "פרקי: האם זה כלל הדרייברים? גיאוגרפיה? שעות? מה השתנה ב-Q4? תנאים כלכליים? שינוי algorithm?"
+  },
+  {
+    "id": "case-004",
+    "category": "Case Study",
+    "subcategory": "Launch strategy",
+    "difficulty": "hard",
+    "question": "אפל רוצה להיכנס לשוק הבנקאות. הצגי launch strategy",
+    "frameworks": ["Market entry", "Brand leverage"],
+    "tags": ["apple", "banking", "fintech", "case"],
+    "hint": "יתרונות אפל: hardware (secure element), ecosystem (Apple Pay), trust, distribution. Beachhead: savings? credit?"
+  },
+  {
+    "id": "case-005",
+    "category": "Case Study",
+    "subcategory": "Turnaround",
+    "difficulty": "hard",
+    "question": "הצטרפת כ-PM לחברה שהמוצר בה לא גדל ב-2 שנים. מה עושים ב-90 הימים הראשונים?",
+    "frameworks": ["90-day plan", "Diagnosis before prescription"],
+    "tags": ["turnaround", "new-PM", "strategy"],
+    "hint": "30 ימים: listen & learn. 60 ימים: diagnosis & hypotheses. 90 ימים: quick wins + long-term plan"
+  },
+  {
+    "id": "hr-001",
+    "category": "HR & Personal",
+    "subcategory": "Self-awareness",
+    "difficulty": "easy",
+    "question": "תנו לי 3 תכונות שמתארות אותך",
+    "frameworks": [],
+    "tags": ["personal", "self-awareness", "HR"],
+    "hint": "בחרו תכונות אמיתיות שרלוונטיות לתפקיד. לכל תכונה — תנו דוגמה קצרה מהניסיון שלך. אל תגידי 'אני hardworking' — כולם אומרים את זה"
+  },
+  {
+    "id": "hr-002",
+    "category": "HR & Personal",
+    "subcategory": "Motivation",
+    "difficulty": "easy",
+    "question": "למה את/ה חושב/ת שאת/ה טוב/ה בתפקיד שלך היום?",
+    "frameworks": [],
+    "tags": ["motivation", "self-assessment", "HR"],
+    "hint": "ספרו על תוצאות קונקרטיות — מה השגת, מה שיפרת, מה אנשים אחרים אומרים עליך. גיבוי במספרים תמיד יחזק"
+  },
+  {
+    "id": "hr-003",
+    "category": "HR & Personal",
+    "subcategory": "Working relationships",
+    "difficulty": "medium",
+    "question": "איך זה לעבוד עם ה-CEO שלך?",
+    "frameworks": [],
+    "tags": ["CEO", "working-relationship", "HR"],
+    "hint": "היי כנה ומקצועי. תאר את סגנון העבודה, מה למדת, מה אתגרים. אל תתלונן — תמיד אפשר למצוא ניסוח חיובי גם לאתגרים"
+  },
+  {
+    "id": "hr-004",
+    "category": "HR & Personal",
+    "subcategory": "Introduction",
+    "difficulty": "easy",
+    "question": "ספר/י לי על עצמך",
+    "frameworks": [],
+    "tags": ["introduction", "pitch", "HR"],
+    "hint": "Present > Past > Future. מה את עושה היום, מה הביא אותך לכאן, ולמה הזדמנות הזו. שמור על 2-3 דקות, בלי לקרוא מה-CV"
+  },
+  {
+    "id": "hr-005",
+    "category": "HR & Personal",
+    "subcategory": "Weaknesses",
+    "difficulty": "medium",
+    "question": "מה החולשה הכי גדולה שלך?",
+    "frameworks": [],
+    "tags": ["weakness", "self-awareness", "HR"],
+    "hint": "בחרו חולשה אמיתית אבל לא קריטית לתפקיד. הראו מודעות עצמית + מה אתה עושה כדי להשתפר. אל תגידי 'אני perfectionist'"
+  },
+  {
+    "id": "hr-006",
+    "category": "HR & Personal",
+    "subcategory": "Career goals",
+    "difficulty": "easy",
+    "question": "איפה את/ה רואה את עצמך עוד 3-5 שנים?",
+    "frameworks": [],
+    "tags": ["career", "goals", "future"],
+    "hint": "הראו ambition אבל גם realism. קשר את התשובה לתפקיד שאליו מתראיין — אל תגידי שאתה רוצה להיות יזם אם אתה מתראיין לחברה גדולה"
+  },
+  {
+    "id": "hr-007",
+    "category": "HR & Personal",
+    "subcategory": "Leaving current job",
+    "difficulty": "medium",
+    "question": "למה את/ה עוזב/ת את התפקיד הנוכחי?",
+    "frameworks": [],
+    "tags": ["leaving", "motivation", "HR"],
+    "hint": "תמיד בצורה חיובית — מה אתה רוצה להשיג, לא מה אתה בורח ממנו. אל תדבר רע על מעסיק נוכחי"
+  },
+  {
+    "id": "hr-008",
+    "category": "HR & Personal",
+    "subcategory": "Biggest achievement",
+    "difficulty": "medium",
+    "question": "מה ההצלחה הכי גדולה שלך עד היום?",
+    "frameworks": ["STAR method"],
+    "tags": ["achievement", "success", "HR"],
+    "hint": "בחרו הצלחה שרלוונטית לתפקיד. ספרו את הסיפור: מה האתגר, מה עשית, מה התוצאה. אל תשכחו מספרים"
+  },
+  {
+    "id": "hr-009",
+    "category": "HR & Personal",
+    "subcategory": "Company research",
+    "difficulty": "easy",
+    "question": "למה את/ה רוצה לעבוד בחברה שלנו?",
+    "frameworks": [],
+    "tags": ["company", "motivation", "research"],
+    "hint": "הראו שעשיתם research: מוצר, תרבות, צמיחה, impact. קשר לערכים שלך ולמה זה הזדמנות ייחודית עבורך"
+  },
+  {
+    "id": "hr-010",
+    "category": "HR & Personal",
+    "subcategory": "Conflict",
+    "difficulty": "medium",
+    "question": "תאר/י קונפליקט עם עמית לעבודה ואיך פתרת אותו",
+    "frameworks": ["STAR method"],
+    "tags": ["conflict", "teamwork", "HR"],
+    "hint": "הראו שיש לכם conflict resolution skills: הקשבה, הבנת הצד השני, פתרון שמועיל לשניים. אל תגידי שאין לך קונפליקטים"
+  },
+  {
+    "id": "hr-011",
+    "category": "HR & Personal",
+    "subcategory": "Pressure",
+    "difficulty": "medium",
+    "question": "איך את/ה מתמודד/ת עם לחץ ועומס בעבודה?",
+    "frameworks": [],
+    "tags": ["pressure", "stress", "resilience"],
+    "hint": "תאר טכניקות ספציפיות: prioritization, communication, boundaries. תן דוגמה אמיתית ממצב לחץ שניהלת בהצלחה"
+  },
+  {
+    "id": "hr-012",
+    "category": "HR & Personal",
+    "subcategory": "Learning",
+    "difficulty": "easy",
+    "question": "מה למדת לאחרונה שמשפיע על העבודה שלך?",
+    "frameworks": [],
+    "tags": ["learning", "growth", "curiosity"],
+    "hint": "הראו curiosity ו-growth mindset. יכול להיות כלי, methodology, insight מספר, פודקאסט — כל עוד הקשבת לאיך זה שיפר משהו"
+  },
+  {
+    "id": "hr-013",
+    "category": "HR & Personal",
+    "subcategory": "Feedback",
+    "difficulty": "medium",
+    "question": "מה המנהל שלך יגיד שאת/ה צריך/ה לשפר?",
+    "frameworks": [],
+    "tags": ["feedback", "self-awareness", "HR"],
+    "hint": "זו שאלת חולשה מסווה — אותה גישה: אמיתי, עם תוכנית שיפור. עדיף לדבר על משהו שקיבלת עליו פידבק ממש"
+  },
+  {
+    "id": "hr-014",
+    "category": "HR & Personal",
+    "subcategory": "Teamwork",
+    "difficulty": "easy",
+    "question": "תאר/י את סגנון העבודה שלך בצוות",
+    "frameworks": [],
+    "tags": ["teamwork", "collaboration", "style"],
+    "hint": "היה ספציפי — לא 'אני team player'. תאר איך אתה מתקשר, מה תפקידך בדיסקוסיות, איך אתה מקבל ונותן פידבק"
+  },
+  {
+    "id": "hr-015",
+    "category": "HR & Personal",
+    "subcategory": "Salary",
+    "difficulty": "medium",
+    "question": "מה הציפיות השכר שלך?",
+    "frameworks": [],
+    "tags": ["salary", "negotiation", "HR"],
+    "hint": "אל תגיד מספר ראשון אם אפשר. בקש לדעת את ה-range של התפקיד קודם. אם חייב — תן range מבוסס מחקר שוק ודגש על הPackage הכולל"
+  }
+]
