@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, MoreHorizontal, Pencil, Settings, Trash2, TrendingUp, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, todayISO, uid } from "../model";
@@ -18,18 +19,18 @@ const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); retur
 function Empty({ children }) { return <div className={css.empty}>{children}</div>; }
 function IconButton({ label, children, ...props }) { return <button aria-label={label} className={css.iconButton} {...props}>{children}</button>; }
 function Header({ tab, setTab, more, setMore }) {
-  return <><header className={css.header}><div><p className={css.eyebrow}>החברה שלך לבריאות</p><h1 className={css.title}>אימון ותזונה</h1></div><button onClick={()=>setMore(!more)} className={css.avatar} aria-label="עוד אפשרויות"><MoreHorizontal /></button></header>
+  return <><header className={css.header}><div><Link href="/" className={css.back}>חזרה למנכ״ל</Link><p className={css.eyebrow}>המרחב האישי שלך לבריאות</p><h1 className={css.title}>אימון ותזונה</h1></div><button onClick={()=>setMore(!more)} className={css.avatar} aria-label="עוד אפשרויות"><MoreHorizontal /></button></header>
   {more && <aside className={css.card+" "+css.settings}><details open><summary>המידע שלך</summary><p>המידע נשמר בחשבון המאובטח שלך. זהו כלי לתיעוד והרגלים, לא אבחון, טיפול או תוכנית רפואית.</p><button className={css.secondary} onClick={()=>setTab("settings")}>פרטיות והגדרות</button></details></aside>}</>;
 }
 function Nav({ tab, setTab }) { return <><aside className={css.desktopAside}>{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={tab===id?css.active:""}><Icon size={18}/> {label}</button>)}</aside><nav className={css.bottomNav} aria-label="ניווט חברת אימון ותזונה">{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={css.navItem+" "+(tab===id?css.active:"")} aria-current={tab===id?"page":undefined}><Icon/><span>{label}</span></button>)}</nav></>; }
 
 function Onboarding({ d, setD }) {
   const [step,setStep]=useState(0); const [draft,setDraft]=useState(d.profile);
-  const choices = step===0 ? [["לשניהם","להרגיש יותר תנועה וסדר"],["לחזור לשגרה","קצב קטן ולא מחייב"],["רק לתעד","בלי יעד כרגע"]] : step===1 ? [["5–10 דקות","קצר ולעניין"],["15–30 דקות","זמן נוח ברוב הימים"],["עוד לא יודע/ת","נלמד תוך כדי"]] : [["בבית",""],["בחוץ",""],["חדר כושר",""],["לא משנה",""]];
+  const choices = step===0 ? [["יותר תנועה","קצב קטן שקל לשמור"],["יותר סדר באוכל","בלי חוקים נוקשים"],["רק לתעד בינתיים","בלי יעד כרגע"]] : step===1 ? [["5–10 דקות","קצר ולעניין"],["15–30 דקות","זמן נוח ברוב הימים"],["עוד לא יודע/ת","נלמד תוך כדי"]] : [["בבית",""],["בחוץ",""],["חדר כושר",""],["לא משנה",""]];
   const key = step===0 ? "goal" : step===1 ? "availability" : "equipment";
   const next=()=> step<2 ? setStep(step+1) : setD(p=>({...p,profile:{...draft,complete:true}}));
-  const title = step===0 ? "איך תרצה/י שהשבוע ירגיש?" : step===1 ? "כמה זמן ריאלי יש לך ברוב הימים?" : "מה זמין לך כרגע?";
-  return <main className={css.onboard}><p className={css.eyebrow}>קליטה קצרה</p><div className={css.progressLine}>{[0,1,2].map(i=><i key={i} className={i<=step?css.done:""}/>)}</div><section className={css.card+" "+css.stack}><h2 className={css.title}>{title}</h2><p className={css.subtle}>אפשר לשנות הכול אחר כך. אין כאן תשובה נכונה.</p><div className={css.choiceGrid}>{choices.map(([value,sub])=><button key={value} onClick={()=>setDraft({...draft,[key]:value})} className={css.choice+" "+(draft[key]===value?css.selected:"")}><strong>{value}</strong>{sub&&<small>{sub}</small>}</button>)}</div><button className={css.primary+" "+css.wide} onClick={next}>{step===2?"למסך היום":"המשך"}<ChevronLeft size={18}/></button><button className={css.optional} onClick={next}>דלג/י לעת עתה</button></section></main>;
+  const title = step===0 ? "מה יתאים לשבוע הקרוב?" : step===1 ? "כמה זמן נוח לפנות ברוב הימים?" : "מה זמין לך כרגע?";
+  return <main className={css.onboard}><p className={css.eyebrow}>קליטה קצרה</p><div className={css.progressLine}>{[0,1,2].map(i=><i key={i} className={i<=step?css.done:""}/>)}</div><section className={css.card+" "+css.stack}><h2 className={css.title}>{title}</h2><p className={css.subtle}>אפשר לשנות הכול בהמשך. בוחרים רק מה שמתאים כרגע.</p><div className={css.choiceGrid}>{choices.map(([value,sub])=><button key={value} onClick={()=>setDraft({...draft,[key]:value})} className={css.choice+" "+(draft[key]===value?css.selected:"")}><strong>{value}</strong>{sub&&<small>{sub}</small>}</button>)}</div><button className={css.primary+" "+css.wide} onClick={next}>{step===2?"למסך היום":"המשך"}<ChevronLeft size={18}/></button><button className={css.optional} onClick={next}>דלג/י לעת עתה</button></section></main>;
 }
 function Today({ d, setTab, setComposer }) {
   const today=todayISO(), meals=d.meals.filter(x=>x.date===today).length, workouts=d.workouts.filter(x=>x.date===today&&!x.skipped).length;
