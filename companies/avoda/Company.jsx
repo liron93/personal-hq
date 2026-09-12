@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import styles from "./career.module.css";
+import { PracticeHub, HistoryHub, InterviewHub, LearningHub } from "./CareerExpansion";
 
 const STATUS = {
   considering: "לבדיקה",
@@ -17,6 +18,10 @@ const NAV = [
   ["jobs", "משרות"],
   ["profile", "פרופיל"],
   ["cv", "קורות חיים"],
+  ["practice", "תרגול"],
+  ["history", "היסטוריה"],
+  ["interview", "ראיון"],
+  ["learning", "למידה"],
 ];
 const blankProfile = { full_name: "", job_title: "", years_experience: "", experience_areas: "", looking_for: "", target_companies: "", strengths: "", improvement_areas: "", additional_notes: "" };
 const blankJob = { company_name: "", role_title: "", job_url: "", job_description: "", status: "considering", next_action: "", next_action_at: "", notes: "" };
@@ -210,7 +215,11 @@ export default function Company() {
       {view === "today" && <Today jobs={data.jobs} onOpen={setSelected} onNavigate={setView}/>}
       {view === "jobs" && <Jobs jobs={data.jobs} onOpen={setSelected} onSave={data.saveJob}/>}
       {view === "profile" && <Profile profile={data.profile} onSave={data.saveProfile}/>}
-      {view === "cv" && <CvCenter cvs={data.cvs} onUpload={data.uploadCv} onActive={data.makeActive}/>}
+      {view === "cv" && <CvCenter cvs={data.cvs} onUpload={data.uploadCv} onActive={data.makeActive}/>} 
+      {view === "practice" && <PracticeHub user={data.user} jobs={data.jobs}/>} 
+      {view === "history" && <HistoryHub user={data.user}/>} 
+      {view === "interview" && <InterviewHub user={data.user} jobs={data.jobs}/>} 
+      {view === "learning" && <LearningHub user={data.user}/>}
     </main>
     {selected && <JobDetail job={selected} onClose={() => setSelected(null)} onSave={data.saveJob}/>}
   </div>;
