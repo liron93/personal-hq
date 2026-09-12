@@ -4,7 +4,7 @@ import { ACCENT } from "@/lib/theme";
 
 export default function CompanyShell({ title, children }) {
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "28px 20px 80px" }}>
+    <main style={{ maxWidth: 760, margin: "0 auto", padding: "28px clamp(16px, 4vw, 32px) 80px" }}>
       <Link href="/" className="hq-back-link" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: ACCENT, fontSize: 14, textDecoration: "none", marginBottom: 18 }}>
         <ChevronLeft size={15} style={{ transform: "rotate(180deg)" }} /> חזרה למנכ״ל
       </Link>

@@ -9,7 +9,7 @@ import styles from "./career.module.css";
 const EMPTY = { company: "", role: "", url: "", status: "considering", appliedAt: "", nextStep: "", nextStepAt: "", notes: "", description: "" };
 
 export function CareerView({ store }) {
-  const { data, ready, status, error, commit, reload } = store;
+  const { data, setData, ready, status, error, reload } = store;
   const [tab, setTab] = useState("jobs");
   const [draft, setDraft] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -18,7 +18,6 @@ export function CareerView({ store }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const busy = status === "saving";
   const validated = useMemo(() => {
     if (!data) return { state: INIT, error: "" };
     try { return { state: validateState(data), error: "" }; }
@@ -35,17 +34,19 @@ export function CareerView({ store }) {
     setDeletingId(null);
   }
 
-  async function submit(event) {
+  function submit(event) {
     event.preventDefault();
     setValidation("");
     try {
       const next = saveJob(state, parseJob(draft), editingId);
-      if (await commit(next)) { setDraft(null); setEditingId(null); setPage(1); }
+      setData(next);
+      setDraft(null); setEditingId(null); setPage(1);
     } catch (failure) { setValidation(failure.message); }
   }
 
-  async function confirmDelete() {
-    if (await commit(removeJob(state, deletingId))) setDeletingId(null);
+  function confirmDelete() {
+    setData(removeJob(state, deletingId));
+    setDeletingId(null);
   }
 
   function field(name, label, type = "text", required = false, maxLength = 500) {
@@ -75,7 +76,7 @@ export function CareerView({ store }) {
       <button style={tabBtn(tab === "plan")} onClick={() => setTab("plan")}>תוכנית השילוב</button>
     </nav>
     <div aria-live="polite" role="status" className={styles.status}>
-      {busy ? "שומר בענן…" : status === "saved" ? "השמירה אושרה בענן" : "השינויים נשמרים בלחיצה על שמירה"}
+      השינויים נשמרים אוטומטית במכשיר זה, ומסתנכרנים לענן כשמחוברים לחשבון
     </div>
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {tab === "plan" ? <section style={cardStyle}>
@@ -87,11 +88,11 @@ export function CareerView({ store }) {
     </section> : <>
       <div className={styles.toolbar}>
         <h2>המועמדויות שלי</h2>
-        {!draft && <button style={primaryBtn} className={styles.button} disabled={busy || !!deletingId} onClick={() => edit()}>הוספת מועמדות</button>}
+        {!draft && <button style={primaryBtn} className={styles.button} disabled={!!deletingId} onClick={() => edit()}>הוספת מועמדות</button>}
       </div>
       {draft && <form style={cardStyle} className={styles.form} onSubmit={submit}>
         <h3>{editingId ? "עריכת מועמדות" : "מועמדות חדשה"}</h3>
-        <fieldset disabled={busy}>
+        <fieldset>
           <div className={styles.grid}>
             {field("company", "חברה", "text", true, 160)}
             {field("role", "תפקיד", "text", true, 200)}
@@ -107,7 +108,7 @@ export function CareerView({ store }) {
           <label className={styles.field}><span>תיאור המשרה</span><textarea className="hq-field" style={inputStyle} rows={4} maxLength={12000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>
           {validation && <p role="alert" className={styles.error}>{validation}</p>}
           <div className={styles.actions}>
-            <button type="submit" style={primaryBtn} className={styles.button}>{busy ? "שומר…" : "שמירת מועמדות"}</button>
+            <button type="submit" style={primaryBtn} className={styles.button}>שמירת מועמדות</button>
             <button type="button" className={styles.button} onClick={() => { setDraft(null); setValidation(""); }}>ביטול</button>
           </div>
         </fieldset>
@@ -130,11 +131,11 @@ export function CareerView({ store }) {
           {(job.notes || job.description) && <details><summary>הערות ותיאור המשרה</summary><p className={styles.text}>{job.notes || "אין הערות"}</p><p className={styles.text}>{job.description}</p></details>}
           {deletingId === job.id ? <div role="alert" className={styles.actions}>
             <span>למחוק את המועמדות הזאת? לא ניתן לשחזר אותה מהמסך.</span>
-            <button className={styles.button} disabled={busy} onClick={confirmDelete}>אישור מחיקה</button>
-            <button className={styles.button} disabled={busy} onClick={() => setDeletingId(null)}>ביטול</button>
+            <button className={styles.button} onClick={confirmDelete}>אישור מחיקה</button>
+            <button className={styles.button} onClick={() => setDeletingId(null)}>ביטול</button>
           </div> : <div className={styles.actions}>
-            <button className={styles.button} disabled={busy || !!draft || !!deletingId} onClick={() => edit(job)}>עריכה</button>
-            <button className={styles.button} disabled={busy || !!draft || !!deletingId} onClick={() => setDeletingId(job.id)}>מחיקה</button>
+            <button className={styles.button} disabled={!!draft || !!deletingId} onClick={() => edit(job)}>עריכה</button>
+            <button className={styles.button} disabled={!!draft || !!deletingId} onClick={() => setDeletingId(job.id)}>מחיקה</button>
           </div>}
         </article>)}
       </div>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { COMPANIES } from "@/companies/registry";
-import { INK, BG, AMBER, GREEN, RUST, MUTED, LINE, cardStyle } from "@/lib/theme";
+import { INK, BG, AMBER, GREEN, RUST, MUTED, LINE, cardStyle, RADIUS, RADIUS_SM, SHADOW, TRANSITION } from "@/lib/theme";
 import { Sec, Row, EditableNum } from "@/lib/ui";
 import { load, useStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
@@ -46,7 +46,7 @@ export default function CEO() {
   const latest = items.map(x => ({ c: x.c, u: x.s.latestUpdate })).filter(x => x.u).sort((a, b) => new Date(b.u.date) - new Date(a.u.date))[0];
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 80px" }}>
+    <main style={{ maxWidth: 760, margin: "0 auto", padding: "40px clamp(16px, 4vw, 32px) 80px" }}>
       <div style={{ marginBottom: 36, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div style={{ color: MUTED, fontSize: 14, marginBottom: 4 }}>{todayStr}</div>
@@ -60,7 +60,7 @@ export default function CEO() {
         </button>
       </div>
 
-      <section style={{ background: INK, color: BG, borderRadius: 2, padding: "22px 24px", marginBottom: 28 }}>
+      <section style={{ background: INK, color: BG, borderRadius: RADIUS, padding: "22px 24px", marginBottom: 28, boxShadow: SHADOW }}>
         <div style={{ color: "rgba(246,247,249,.6)", fontSize: 13, marginBottom: 10 }}>הפגישה היומית</div>
         {latest ? (
           <p style={{ margin: "0 0 12px", lineHeight: 1.7, fontSize: 16 }}>העדכון האחרון מ״{latest.c.name}״: {latest.u.text}</p>
@@ -91,8 +91,9 @@ export default function CEO() {
           const inner = (
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
-              border: `1px solid ${c.active ? INK : LINE}`, borderRadius: 2, padding: "16px 18px",
+              border: `1px solid ${c.active ? INK : LINE}`, borderRadius: RADIUS_SM, padding: "16px 18px",
               background: c.active ? INK : "transparent", color: c.active ? BG : MUTED, opacity: c.active ? 1 : 0.55, fontSize: 16,
+              boxShadow: c.active ? SHADOW : "none", transition: `box-shadow ${TRANSITION}, opacity ${TRANSITION}`,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}><Icon size={18} /><span>{c.name}</span></div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
