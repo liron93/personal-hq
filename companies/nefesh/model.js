@@ -14,7 +14,7 @@ export const weekKey = () => {
 
 export const INIT = {
   today: { date: "", step: "", status: "open", load: "", reliefPlan: "", reliefNote: "" },
-  history: [], supports: [], tasks: [],
+  history: [], supports: [], tasks: [], waiting: [], decisionLog: [],
   weekly: { weekOf: "", focus: "", defer: "", ask: "", reviewNote: "" },
   decisions: [], conversations: [], weekReview: "", shareStatus: "private",
 };
@@ -24,6 +24,8 @@ export function normalize(data) {
   next.today = { ...INIT.today, ...(data?.today || {}) };
   next.history = Array.isArray(data?.history) ? data.history : [];
   next.supports = Array.isArray(data?.supports) ? data.supports : [];
+  next.waiting = Array.isArray(data?.waiting) ? data.waiting : [];
+  next.decisionLog = Array.isArray(data?.decisionLog) ? data.decisionLog : [];
   next.tasks = Array.isArray(data?.tasks) ? data.tasks.map(task => ({ ...task, bucket: task?.bucket || task?.priority || "inbox", done: Boolean(task?.done), due: typeof task?.due === "string" ? task.due : "" })) : [];
   next.weekly = { ...INIT.weekly, ...(data?.weekly || {}) };
   next.decisions = Array.isArray(data?.decisions) ? data.decisions : [];
