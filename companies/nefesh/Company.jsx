@@ -1,7 +1,7 @@
 "use client";
 
-import WellbeingApp from "./v2/WellbeingApp";
+import WellbeingAppV4 from "./v2/WellbeingAppV4";
 
 export default function Company() {
-  return <WellbeingApp />;
+  return <WellbeingAppV4 />;
 }
