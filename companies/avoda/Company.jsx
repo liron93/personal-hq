@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import styles from "./career.module.css";
-import { PracticeHub, HistoryHub, InterviewHub, LearningHub } from "./CareerExpansion";
+import { PracticeHub, HistoryHub, InterviewHub, LearningHub, CommunicationsHub } from "./CareerExpansion";
 
 const STATUS = {
   considering: "לבדיקה",
@@ -16,6 +16,7 @@ const STATUS = {
 const NAV = [
   ["today", "היום"],
   ["jobs", "משרות"],
+  ["updates", "עדכונים"],
   ["profile", "פרופיל"],
   ["cv", "קורות חיים"],
   ["practice", "תרגול"],
@@ -214,6 +215,7 @@ export default function Company() {
     <main className={styles.main}><nav className={styles.mobileNav} aria-label="ניווט קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav>
       {view === "today" && <Today jobs={data.jobs} onOpen={setSelected} onNavigate={setView}/>}
       {view === "jobs" && <Jobs jobs={data.jobs} onOpen={setSelected} onSave={data.saveJob}/>}
+      {view === "updates" && <CommunicationsHub user={data.user}/>}
       {view === "profile" && <Profile profile={data.profile} onSave={data.saveProfile}/>}
       {view === "cv" && <CvCenter cvs={data.cvs} onUpload={data.uploadCv} onActive={data.makeActive}/>} 
       {view === "practice" && <PracticeHub user={data.user} jobs={data.jobs}/>} 

@@ -7,6 +7,7 @@ import concepts from "./data/concepts.json";
 import styles from "./career.module.css";
 
 const difficultyLabels = { easy: "קל", medium: "בינוני", hard: "מתקדם" };
+const communicationTypeLabels = { daily_briefing: "תדריך יומי", alert: "התראה", mentor_feedback: "משוב מנטור", weekly_report: "דוח שבועי", lesson: "שיעור" };
 
 export function PracticeHub({ user, jobs }) {
   const [category, setCategory] = useState("all");
@@ -65,4 +66,36 @@ export function LearningHub({ user }) {
   return <div className={styles.stack}><section className={styles.panel}><div className={styles.sectionTitle}><div><p>מילון מקצועי שהועבר מ־Job-guide</p><h2>מושגים ולמידה</h2></div><span className={styles.active}>{concepts.length} מושגים</span></div><input className={styles.search} value={query} onChange={event=>setQuery(event.target.value)} placeholder="חיפוש מושג או מסגרת עבודה"/><div className={styles.concepts}>{shown.slice(0,24).map(item=><article className={styles.concept} key={item.term}><span>{item.category}</span><h3>{item.term}</h3><p>{item.explanation}</p></article>)}</div></section>
     <section className={styles.panel}><div className={styles.sectionTitle}><div><p>מאמרים שברצונך לחזור אליהם</p><h2>ספריית מאמרים</h2></div></div><form className={styles.form} onSubmit={save}><div className={styles.formGrid}><label className={styles.field}><span>קישור HTTPS</span><input type="url" value={draft.url} onChange={event=>setDraft({...draft,url:event.target.value})}/></label><label className={styles.field}><span>כותרת</span><input value={draft.title} onChange={event=>setDraft({...draft,title:event.target.value})}/></label></div><label className={styles.field}><span>סיכום אישי</span><textarea rows="3" value={draft.summary} onChange={event=>setDraft({...draft,summary:event.target.value})}/></label>{message&&<p className={styles.notice}>{message}</p>}<button className={styles.primary}>שמירת מאמר</button></form><div className={styles.historyList}>{articles.map(item=><article key={item.id} className={styles.historyItem}><div><a href={item.url} target="_blank" rel="noreferrer"><strong>{item.title||item.url}</strong></a><small>{new Date(item.created_at).toLocaleDateString("he-IL")}</small></div>{item.summary&&<p>{item.summary}</p>}</article>)}</div></section>
   </div>;
+}
+
+export function CommunicationsHub({ user }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [open, setOpen] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("career_communications").select("id, title, type, content, delivered, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
+    setItems(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, [user.id]);
+
+  const markRead = async item => {
+    setOpen(item.id);
+    if (item.delivered) return;
+    const result = await supabase.from("career_communications").update({ delivered: true }).eq("id", item.id).eq("user_id", user.id).select().single();
+    if (!result.error) setItems(list => list.map(entry => (entry.id === item.id ? { ...entry, delivered: true } : entry)));
+  };
+
+  const types = [...new Set(items.map(item => item.type))];
+  const visible = items.filter(item => typeFilter === "all" || item.type === typeFilter);
+  const unread = items.filter(item => !item.delivered).length;
+  return <section className={styles.panel}>
+    <div className={styles.sectionTitle}><div><p>תדריכים, התראות ומשוב שהתקבלו עבורך</p><h2>עדכונים ותובנות</h2></div><span className={styles.active}>{unread ? unread + " לא נקראו" : "הכל נקרא"}</span></div>
+    {types.length > 1 && <div className={styles.listTools}><select aria-label="סינון לפי סוג עדכון" value={typeFilter} onChange={event => setTypeFilter(event.target.value)}><option value="all">כל הסוגים</option>{types.map(type => <option key={type} value={type}>{communicationTypeLabels[type] || type}</option>)}</select></div>}
+    {loading ? <p className={styles.muted}>טוען עדכונים…</p> : <div className={styles.historyList}>{visible.map(item => <article className={styles.historyItem} key={item.id}><div><strong>{item.title || communicationTypeLabels[item.type] || item.type}</strong><small>{communicationTypeLabels[item.type] || item.type} · {new Date(item.created_at).toLocaleDateString("he-IL")}{!item.delivered && " · חדש"}</small></div>{open === item.id ? <p>{item.content}</p> : <button className={styles.textButton} onClick={() => markRead(item)}>הצגת התוכן המלא</button>}</article>)}</div>}
+    {!loading && !visible.length && <div className={styles.empty}><p>אין עדכונים להצגה.</p></div>}
+  </section>;
 }
