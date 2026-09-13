@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 import { INIT, STORE_KEY, localISO, normalize, uid } from "../model";
 import css from "./wellbeing-v6.module.css";
 
-const tabs=[["today","היום"],["plan","סדר היום"],["oria","עבודה עם אוריה"]];
+const tabs=[["today","היום"],["plan","סדר היום"]];
 const priorities=[["now","היום"],["soon","השבוע"],["later","בהמשך"]];
 
 export default function WellbeingAppV6(){
@@ -30,6 +30,6 @@ export default function WellbeingAppV6(){
    <article className={css.card}><div className={css.head}><h2>המשימות שלי להיום</h2><span>{today.filter(t=>!t.done).length} פתוחות</span></div>{!today.length?<p className={css.empty}>עדיין אין משימות להיום. כתוב את הראשונה למעלה.</p>:today.map(renderTask)}</article>
   </section>}
   {tab==="plan"&&<section className={css.stack}><div className={css.hero+" "+css.light}><p>תמונה רחבה</p><h2>סדר היום שלך</h2><span>כאן רואים הכול בלי להפוך את זה לעוד מקום עמוס.</span></div><article className={css.card}><div className={css.head}><h2>כל המשימות הפתוחות</h2><span>{open.length} פתוחות</span></div>{!open.length?<p className={css.empty}>אין כרגע משימות פתוחות.</p>:open.map(renderTask)}</article></section>}
-  {tab==="oria"&&<section className={css.stack}><div className={css.hero+" "+css.light}><p>עובדים יחד</p><h2>איפה אני נכנס לתמונה?</h2><span>לא עוד כפתור דמה. את העבודה המשותפת עושים כאן בשיחה איתי.</span></div><article className={css.card}><h2>מתי לכתוב לי?</h2><ul><li>כשיש יותר מדי משימות ואתה לא יודע מאיפה להתחיל.</li><li>כשאתה צריך לפרק משימה גדולה לצעד הבא.</li><li>כשצריך החלטה, ניסוח הודעה, או תכנון של יום/שבוע.</li></ul><p className={css.prompt}>פשוט כתוב: “אוריה, בוא נסדר את היום שלי” — ואני אעבור איתך על היומן, אאתגר סדרי עדיפויות, ואחזיר תוכנית ברורה.</p></article></section>}
+
  </main>;
 }
