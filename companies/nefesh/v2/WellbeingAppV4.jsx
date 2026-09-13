@@ -1,35 +1,27 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, Plus, Trash2, CalendarDays } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { INIT, STORE_KEY, localISO, normalize, uid } from "../model";
+import { INIT, STORE_KEY, normalize, uid } from "../model";
 import css from "./wellbeing-v6.module.css";
 
-const tabs=[["today","היום"],["plan","סדר היום"]];
-const priorities=[["now","היום"],["soon","השבוע"],["later","בהמשך"]];
-
-export default function WellbeingAppV6(){
+const TABS=[["inbox","Inbox"],["today","היום"],["week","השבוע"]];
+const labels={inbox:"למיין",today:"היום",week:"השבוע",later:"בהמשך"};
+export default function OriaDailyCommand(){
  const {data,setData,ready}=useStore(STORE_KEY,INIT);
- const [tab,setTab]=useState("today"),[title,setTitle]=useState(""),[priority,setPriority]=useState("now"),[notice,setNotice]=useState("");
- const state=normalize(data),tasks=Array.isArray(state.tasks)?state.tasks:[];
- const notify=(text)=>{setNotice(text);window.setTimeout(()=>setNotice(""),2600)};
- const add=()=>{const value=title.trim();if(!value)return;setData(prev=>({...normalize(prev),tasks:[{id:uid(),title:value,priority,done:false,createdAt:new Date().toISOString()},...(normalize(prev).tasks||[])]}));setTitle("");notify("המשימה נוספה ליומן.");};
- const update=(id,patch)=>setData(prev=>({...normalize(prev),tasks:(normalize(prev).tasks||[]).map(task=>task.id===id?{...task,...patch}:task)}));
- const remove=(id)=>{if(!window.confirm("למחוק את המשימה?"))return;setData(prev=>({...normalize(prev),tasks:(normalize(prev).tasks||[]).filter(task=>task.id!==id)}));notify("המשימה נמחקה.");};
- const today=tasks.filter(t=>t.priority==="now"),open=tasks.filter(t=>!t.done);
- const renderTask=(task)=><article className={css.task} key={task.id}><button className={task.done?css.done:css.check} aria-label={task.done?"סמן כפתוח":"סמן שבוצע"} onClick={()=>update(task.id,{done:!task.done})}>{task.done&&<Check size={15}/>}</button><div className={css.taskText}><strong className={task.done?css.struck:""}>{task.title}</strong><select value={task.priority} onChange={e=>update(task.id,{priority:e.target.value})}>{priorities.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></div><button className={css.delete} onClick={()=>remove(task.id)} aria-label="מחיקת משימה"><Trash2 size={17}/></button></article>;
- if(!ready)return <main className={css.loading}>טוען את היומן שלך…</main>;
- return <main className={css.shell} dir="rtl">
-  <header><Link href="/" className={css.back}><ChevronLeft size={17}/>חזרה למנכ״ל</Link><p>היד הימנית שלך</p><h1>אוריה · סדר החיים</h1></header>
-  {notice&&<div className={css.toast} role="status" aria-live="polite">{notice}</div>}
-  <nav className={css.tabs}>{tabs.map(([id,label])=><button key={id} onClick={()=>setTab(id)} className={tab===id?css.active:""}>{label}</button>)}</nav>
-  {tab==="today"&&<section className={css.stack}>
-   <div className={css.hero}><p>{new Date().toLocaleDateString("he-IL",{weekday:"long",day:"numeric",month:"long"})}</p><h2>בוא נסדר את היום.</h2><span>תכתוב כל דבר שמסתובב לך בראש. אחר כך נחליט יחד מה באמת צריך לקרות היום.</span></div>
-   <article className={css.card}><h2>הוספת משימה</h2><textarea className={css.field} value={title} onChange={e=>setTitle(e.target.value)} placeholder="למשל: לדבר עם הבנק, לבחור מיטה, לקבוע אימון…" /><div className={css.addRow}><select className={css.select} value={priority} onChange={e=>setPriority(e.target.value)}>{priorities.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select><button className={css.primary} onClick={add}><Plus size={18}/>הוספה ליומן</button></div></article>
-   <article className={css.card}><div className={css.head}><h2>המשימות שלי להיום</h2><span>{today.filter(t=>!t.done).length} פתוחות</span></div>{!today.length?<p className={css.empty}>עדיין אין משימות להיום. כתוב את הראשונה למעלה.</p>:today.map(renderTask)}</article>
-  </section>}
-  {tab==="plan"&&<section className={css.stack}><div className={css.hero+" "+css.light}><p>תמונה רחבה</p><h2>סדר היום שלך</h2><span>כאן רואים הכול בלי להפוך את זה לעוד מקום עמוס.</span></div><article className={css.card}><div className={css.head}><h2>כל המשימות הפתוחות</h2><span>{open.length} פתוחות</span></div>{!open.length?<p className={css.empty}>אין כרגע משימות פתוחות.</p>:open.map(renderTask)}</article></section>}
-
+ const [tab,setTab]=useState("inbox"),[title,setTitle]=useState(""),[bucket,setBucket]=useState("inbox"),[due,setDue]=useState(""),[review,setReview]=useState("");
+ const d=normalize(data),tasks=Array.isArray(d.tasks)?d.tasks:[],today=tasks.filter(x=>x.bucket==="today"),inbox=tasks.filter(x=>x.bucket==="inbox"),week=tasks.filter(x=>x.bucket==="week");
+ const saveTasks=(fn)=>setData(prev=>({...normalize(prev),tasks:fn(normalize(prev).tasks||[])}));
+ const add=()=>{if(!title.trim())return;saveTasks(xs=>[{id:uid(),title:title.trim(),bucket,due,done:false,createdAt:new Date().toISOString()},...xs]);setTitle("");setDue("");};
+ const move=(task,b)=>{if(b==="today"&&task.bucket!=="today"&&today.filter(x=>!x.done).length>=3){window.alert("כדי לשמור על יום אפשרי, בחר עד 3 פעולות פתוחות להיום.");return;}saveTasks(xs=>xs.map(x=>x.id===task.id?{...x,bucket:b}:x));};
+ const remove=(id)=>{if(!window.confirm("למחוק את הפעולה?"))return;saveTasks(xs=>xs.filter(x=>x.id!==id));};
+ const item=(task)=><article className={css.task} key={task.id}><button className={task.done?css.done:css.check} onClick={()=>saveTasks(xs=>xs.map(x=>x.id===task.id?{...x,done:!x.done}:x))} aria-label="סימון ביצוע">{task.done&&<Check size={15}/>}</button><div className={css.taskText}><strong className={task.done?css.struck:""}>{task.title}</strong><div className={css.meta}>{task.due&&<span><CalendarDays size={14}/>{new Date(task.due+"T12:00").toLocaleDateString("he-IL",{day:"numeric",month:"short"})}</span>}<select value={task.bucket||"inbox"} onChange={e=>move(task,e.target.value)}>{Object.entries(labels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div></div><button className={css.delete} onClick={()=>remove(task.id)} aria-label="מחיקה"><Trash2 size={17}/></button></article>;
+ if(!ready)return <main className={css.loading}>טוען…</main>;
+ return <main className={css.shell} dir="rtl"><header><Link href="/" className={css.back}><ChevronLeft size={17}/>חזרה למנכ״ל</Link><p>היד הימנית שלך</p><h1>אוריה · סדר החיים</h1></header>
+ <nav className={css.tabs}>{TABS.map(([id,label])=><button key={id} className={tab===id?css.active:""} onClick={()=>setTab(id)}>{label}{id==="today"&&<small>{today.filter(x=>!x.done).length}/3</small>}</button>)}</nav>
+ {tab==="inbox"&&<section className={css.stack}><div className={css.hero}><p>לזרוק מהראש</p><h2>מה צריך לזכור או לטפל בו?</h2><span>בלי תעדוף ובלי לחץ. קודם מכניסים, אחר כך ממיינים יחד.</span></div><article className={css.card}><textarea className={css.field} value={title} onChange={e=>setTitle(e.target.value)} placeholder="למשל: לתאם עם המוביל, לבדוק מסלול משכנתא, לקבוע תור…" /><div className={css.addRow}><label className={css.dateLabel}>תאריך, אם יש<input type="date" value={due} onChange={e=>setDue(e.target.value)}/></label><button className={css.primary} onClick={add}><Plus size={18}/>הכנסה ל־Inbox</button></div></article><article className={css.card}><div className={css.head}><h2>ממתין למיון</h2><span>{inbox.length}</span></div>{!inbox.length?<p className={css.empty}>ריק — זה מצוין.</p>:inbox.map(item)}</article></section>}
+ {tab==="today"&&<section className={css.stack}><div className={css.hero}><p>רק מה שאפשר היום</p><h2>שלוש הפעולות החשובות שלך.</h2><span>בחר עד שלוש. כל השאר יכול לחכות, והוא לא הולך לאיבוד.</span></div><article className={css.card}><div className={css.head}><h2>היום</h2><span>{today.filter(x=>!x.done).length}/3 פתוחות</span></div>{!today.length?<p className={css.empty}>העבר לכאן עד שלוש פעולות מה־Inbox או מהשבוע.</p>:today.map(item)}</article><article className={css.card}><h2>תיאום עם יומן המשפחה</h2><p className={css.empty}>משימה עם תאריך היא מועמדת לתיאום. כתוב לי כאן בצ׳אט מה צריך להיכנס ליומן; אני אבדוק זמינות ביומן המשפחה ואבקש את אישורך לפני יצירה.</p></article></section>}
+ {tab==="week"&&<section className={css.stack}><div className={css.hero+" "+css.light}><p>מבט קדימה</p><h2>מה צריך לקבל מקום השבוע?</h2><span>מעבירים לכאן דברים חשובים, בלי להפוך אותם לדחופים בכוח.</span></div><article className={css.card}><div className={css.head}><h2>השבוע</h2><span>{week.filter(x=>!x.done).length} פתוחות</span></div>{!week.length?<p className={css.empty}>אין פעולות לשבוע כרגע.</p>:week.map(item)}</article><article className={css.card}><h2>סקירת שבוע קצרה</h2><textarea className={css.field} value={review||d.weekReview||""} onChange={e=>setReview(e.target.value)} placeholder="מה התקדם, מה נתקע, ומה חייב לעבור לשבוע הבא?" /><button className={css.primary} onClick={()=>setData(prev=>({...normalize(prev),weekReview:review}))}>שמירת סקירה</button></article></section>}
  </main>;
 }
