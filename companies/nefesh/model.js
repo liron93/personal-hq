@@ -9,17 +9,14 @@ export const weekKey = () => {
   const date = new Date();
   const day = (date.getDay() + 6) % 7;
   date.setDate(date.getDate() - day);
-  return date.toISOString().slice(0, 10);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
 export const INIT = {
-  today: { date: "", step: "", status: "open", feeling: "" },
-  history: [],
-  supports: [],
+  today: { date: "", step: "", status: "open", load: "", reliefPlan: "", reliefNote: "" },
+  history: [], supports: [],
   weekly: { weekOf: "", focus: "", defer: "", ask: "", reviewNote: "" },
-  decisions: [],
-  conversations: [],
-  shareStatus: "private",
+  decisions: [], conversations: [], shareStatus: "private",
 };
 
 export function normalize(data) {
