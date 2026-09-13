@@ -33,7 +33,9 @@ function Onboarding({ d, setD }) {
     ["מתחיל/ה מאפס", "חוזר/ת אחרי הפסקה", "מתאמן/ת לסירוגין", "כבר מתאמן/ת", "עדיין לא בטוח/ה"],
     ["פעם בשבוע", "פעמיים בשבוע", "3 פעמים בשבוע", "4 פעמים או יותר", "נלמד תוך כדי"],
   ];
-  const keys = ["goal", "focus", "experience", "availability"];\n  const multipleSteps = [0, 1, 2];\n  const [attempted, setAttempted] = useState(false);
+  const keys = ["goal", "focus", "experience", "availability"];
+  const multipleSteps = [0, 1, 2];
+  const [attempted, setAttempted] = useState(false);
   const titles = [
     "מה המטרה המרכזית שלך?",
     "מה הכי חשוב לך לשפר בדרך?",
@@ -50,7 +52,11 @@ function Onboarding({ d, setD }) {
     setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: nextStep } }));
     setStep(nextStep);
   };
-  const hasSelection = () => { const value = draft[keys[step]]; return Array.isArray(value) ? value.length > 0 : Boolean(value); };\n  const next = () => { if (!hasSelection()) { setAttempted(true); return; } setAttempted(false); step < 3 ? saveStep(step + 1) : setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: 4, complete: true } })); };\n  const previous = () => { if (step > 0) { setAttempted(false); saveStep(step - 1); } };\n  const select = value => setDraft(current => { const key = keys[step]; if (!multipleSteps.includes(step)) return { ...current, [key]: value }; const currentValues = Array.isArray(current[key]) ? current[key] : current[key] ? [current[key]] : []; return { ...current, [key]: currentValues.includes(value) ? currentValues.filter(item => item !== value) : [...currentValues, value] }; });\n  const isSelected = value => { const selected = draft[keys[step]]; return Array.isArray(selected) ? selected.includes(value) : selected === value; };
+  const hasSelection = () => { const value = draft[keys[step]]; return Array.isArray(value) ? value.length > 0 : Boolean(value); };
+  const next = () => { if (!hasSelection()) { setAttempted(true); return; } setAttempted(false); step < 3 ? saveStep(step + 1) : setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: 4, complete: true } })); };
+  const previous = () => { if (step > 0) { setAttempted(false); saveStep(step - 1); } };
+  const select = value => setDraft(current => { const key = keys[step]; if (!multipleSteps.includes(step)) return { ...current, [key]: value }; const currentValues = Array.isArray(current[key]) ? current[key] : current[key] ? [current[key]] : []; return { ...current, [key]: currentValues.includes(value) ? currentValues.filter(item => item !== value) : [...currentValues, value] }; });
+  const isSelected = value => { const selected = draft[keys[step]]; return Array.isArray(selected) ? selected.includes(value) : selected === value; };
   return <main className={css.onboard}>
     <Link href="/" className={css.back}>חזרה למנכ״ל</Link>
     <p className={css.eyebrow}>כמה שאלות קצרות · {step + 1} מתוך 4</p>
@@ -58,7 +64,9 @@ function Onboarding({ d, setD }) {
     <section className={css.card+" "+css.stack}>
       <h2 className={css.title}>{titles[step]}</h2>
       <p className={css.subtle}>{helper[step]}</p>
-      <div className={css.choiceGrid}>{choicesByStep[step].map(value => <button key={value} aria-pressed={isSelected(value)} onClick={() => { setAttempted(false); select(value); }} className={css.choice+" "+(isSelected(value) ? css.selected : "")}>{value}</button>)}</div>\n      {attempted && <p className={css.validation} role="alert">כדי להמשיך, צריך לבחור לפחות אפשרות אחת.</p>}\n      <div className={css.onboardingActions}>
+      <div className={css.choiceGrid}>{choicesByStep[step].map(value => <button key={value} aria-pressed={isSelected(value)} onClick={() => { setAttempted(false); select(value); }} className={css.choice+" "+(isSelected(value) ? css.selected : "")}>{value}</button>)}</div>
+      {attempted && <p className={css.validation} role="alert">כדי להמשיך, צריך לבחור לפחות אפשרות אחת.</p>}
+      <div className={css.onboardingActions}>
         {step > 0 && <button className={css.secondary} onClick={previous}>חזרה</button>}
         <button className={css.primary+" "+(step > 0 ? "" : css.wide)} onClick={next}>{step === 3 ? "למסך היום" : "המשך"}<ChevronLeft size={18}/></button>
       </div>
@@ -107,7 +115,8 @@ function Progress({ d, setD }) {
 function SettingsView({ d,setD }) {const [confirm,setConfirm]=useState(false);const exp=()=>{const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="personal-hq-health.json";a.click();URL.revokeObjectURL(a.href)};return <div className={css.stack}><section className={css.card}><h2>פרטיות ומידע</h2><p className={css.subtle}>המידע נשמר בחשבון המאובטח שלך. מידע על מגבלות אינו משמש להצעה אוטומטית.</p><button className={css.secondary} onClick={exp}>ייצוא הנתונים</button></section><section className={css.card}><h2>גבולות המערכת</h2><p className={css.subtle}>כלי לתיעוד והרגלים, לא תחליף לייעוץ רפואי או תזונתי. אם משהו כואב, מחמיר או מרגיש חריג — עוצרים ופונים לאיש מקצוע.</p></section><section className={css.card}><h2>מחיקת הנתונים</h2><p className={css.subtle}>הפעולה מוחקת את כל נתוני חברת האימון והתזונה.</p><button className={css.status+" "+css.skipped} onClick={()=>confirm?(setD(INIT),setConfirm(false)):setConfirm(true)}>{confirm?"לחיצה נוספת למחיקה":"מחיקת כל הנתונים"}</button></section></div>}
 
 export default function HealthApp() {
- const {data:d,setData:setD,ready}=useStore(STORE_KEY,INIT);const [tab,setTab]=useState("today"),[composer,setComposer]=useState(null),[more,setMore]=useState(false),[deleted,setDeleted]=useState(null),[toast,setToast]=useState("");\n const navigate = nextTab => { setComposer(null); setMore(false); setTab(nextTab); };
+ const {data:d,setData:setD,ready}=useStore(STORE_KEY,INIT);const [tab,setTab]=useState("today"),[composer,setComposer]=useState(null),[more,setMore]=useState(false),[deleted,setDeleted]=useState(null),[toast,setToast]=useState("");
+ const navigate = nextTab => { setComposer(null); setMore(false); setTab(nextTab); };
  const notify=(message)=>{setComposer(null);setToast(message+" יפה שפינית לזה רגע.");setTimeout(()=>setToast(""),5000)};
  const remove=item=>{setD(p=>item.type==="food"?{...p,meals:p.meals.filter(x=>x.id!==item.id)}:{...p,workouts:p.workouts.filter(x=>x.id!==item.id)});setDeleted(item);setToast("הפריט נמחק.");setTimeout(()=>setDeleted(null),7000)};
  const undo=()=>{if(!deleted)return;setD(p=>deleted.type==="food"?{...p,meals:[deleted,...p.meals]}:{...p,workouts:[deleted,...p.workouts]});setDeleted(null);setToast("הפריט הוחזר.");};
