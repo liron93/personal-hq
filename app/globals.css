@@ -1,15 +1,43 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #F6F7F9; color: #171A21; font-family: 'IBM Plex Sans Hebrew', system-ui, sans-serif; }
-h1, h2 { font-family: 'IBM Plex Sans Hebrew', system-ui, sans-serif; font-weight: 600; }
-input, select, button { font-family: inherit; }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html, body {
+  margin: 0; padding: 0;
+  background: #F6F7F9; color: #171A21;
+  font-family: 'IBM Plex Sans Hebrew', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  direction: rtl;
+}
+h1, h2, h3 { font-family: 'IBM Plex Sans Hebrew', system-ui, sans-serif; font-weight: 600; line-height: 1.25; }
+p { line-height: 1.6; }
+input, select, button, textarea { font-family: inherit; }
 input[type=checkbox] { width: 16px; height: 16px; accent-color: #1F8A5F; cursor: pointer; }
 a { color: inherit; }
 ::-webkit-scrollbar { display: none; }
 
-/* שדה עריכה בסגנון טבלת נתונים: קו תחתון בלבד, מסגרת מלאה רק בפוקוס. הצבע כאן חוזר על ACCENT מ-lib/theme.js. */
-.hq-field { border: none; border-bottom: 1px solid #E2E5EA; border-radius: 0; outline: none; }
-.hq-field:focus { border: 1px solid #1B3A5C; border-radius: 2px; }
+/* שדה עריכה בסגנון טבלת נתונים: קו תחתון בלבד, מסגרת מלאה + זוהר עדין רק בפוקוס.
+   הצבע כאן חוזר על ACCENT מ-lib/theme.js. */
+.hq-field { border: none; border-bottom: 1px solid #E2E5EA; border-radius: 0; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.hq-field:hover { border-bottom-color: #C6CBD3; }
+.hq-field:focus { border: 1px solid #1B3A5C; border-radius: 8px; box-shadow: 0 0 0 3px rgba(27,58,92,.12); }
+
+/* מצבי hover/focus אחידים לכל כפתור באתר — בלי לגעת בפריסה או בתוכן של אף תת-חברה */
+button { cursor: pointer; transition: filter 150ms ease, box-shadow 150ms ease, transform 100ms ease, background 150ms ease, border-color 150ms ease, opacity 150ms ease; }
+button:hover:not(:disabled) { filter: brightness(0.96); }
+button:active:not(:disabled) { transform: scale(0.98); }
+button:disabled { cursor: not-allowed; opacity: .55; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #1B3A5C; outline-offset: 2px; border-radius: 4px;
+}
 
 /* קישור חזרה למנכ״ל — קו תחתון רק בהובר, לא כפתור מלא */
-.hq-back-link { border-bottom: 1px solid transparent; }
+.hq-back-link { border-bottom: 1px solid transparent; transition: border-color 150ms ease, opacity 150ms ease; }
 .hq-back-link:hover { border-bottom-color: currentColor; }
+
+/* בסיס responsive: מסך מלא במובייל, גוף מרכזי קריא בדסקטופ - נאכף דרך lib/ui.jsx / app/page.jsx / CompanyShell */
+@media (max-width: 480px) {
+  html, body { font-size: 15px; }
+}

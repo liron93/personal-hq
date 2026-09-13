@@ -33,3 +33,44 @@ test("career search, pagination and overdue summary are deterministic", () => {
   assert.equal(model.selectJobs(state.jobs, "חברה 12").total, 1);
   assert.equal(model.summarize(state, "2026-09-13").overdue, 1);
 });
+
+test("old v1 career data (no cv/practiced/rich fields) upgrades cleanly to v2", () => {
+  const legacy = {
+    version: 1,
+    jobs: [{ ...input, id: "job-1", createdAt: "2026-09-01T00:00:00.000Z", updatedAt: "2026-09-01T00:00:00.000Z" }],
+  };
+  const safe = model.validateState(legacy);
+  assert.equal(safe.version, 2);
+  assert.equal(safe.jobs[0].company, "OpenAI");
+  assert.equal(safe.jobs[0].fitScore, null);
+  assert.deepEqual(safe.jobs[0].fitPros, []);
+  assert.deepEqual(safe.cv, { filename: "", text: "", uploadedAt: "" });
+  assert.deepEqual(safe.practiced, {});
+});
+
+test("rich AI-ready fields round-trip through saveJob/validateState", () => {
+  const rich = {
+    ...input, company: "Anthropic", role: "PM",
+    fitScore: 8, fitSummary: "התאמה טובה", fitPros: ["ניסיון רלוונטי"], fitCons: ["חוסר ניסיון ב-X"],
+    shouldApply: true, companySummary: "חברת AI", productSummary: "Claude",
+    tailoredQuestions: [{ question: "ספר על עצמך", answer: "תשובה מוצעת", category: "HR" }],
+  };
+  const state = model.saveJob(model.INIT, rich, undefined, "2026-09-11T10:00:00.000Z");
+  const safe = model.validateState(state);
+  assert.equal(safe.jobs[0].fitScore, 8);
+  assert.equal(safe.jobs[0].shouldApply, true);
+  assert.equal(safe.jobs[0].tailoredQuestions[0].question, "ספר על עצמך");
+});
+
+test("cv text is stored, validated and can be cleared without touching jobs", () => {
+  let state = model.saveJob(model.INIT, input, undefined, "2026-09-11T10:00:00.000Z");
+  state = model.saveCv(state, { filename: "cv.pdf", text: "טקסט קורות חיים" }, "2026-09-12T00:00:00.000Z");
+  let safe = model.validateState(state);
+  assert.equal(safe.cv.filename, "cv.pdf");
+  assert.equal(safe.cv.text, "טקסט קורות חיים");
+  assert.ok(safe.cv.uploadedAt);
+  assert.equal(safe.jobs.length, 1);
+  state = model.clearCv(state);
+  safe = model.validateState(state);
+  assert.equal(safe.cv.text, "");
+});
