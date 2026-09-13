@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 import { INIT, STORE_KEY, localISO, normalize, uid } from "../model";
 import css from "./wellbeing-v6.module.css";
 
-const tabs=[["today","היום"],["plan","סדר היום"],["oria","עבודה עם אוריה"]];
+const tabs=[["today","היום"],["plan","סדר היום"]];
 const priorities=[["now","היום"],["soon","השבוע"],["later","בהמשך"]];
 
 export default function WellbeingAppV6(){
