@@ -24,7 +24,7 @@ export function normalize(data) {
   next.today = { ...INIT.today, ...(data?.today || {}) };
   next.history = Array.isArray(data?.history) ? data.history : [];
   next.supports = Array.isArray(data?.supports) ? data.supports : [];
-  next.tasks = Array.isArray(data?.tasks) ? data.tasks : [];
+  next.tasks = Array.isArray(data?.tasks) ? data.tasks.map(task => ({ ...task, bucket: task?.bucket || task?.priority || "inbox", done: Boolean(task?.done), due: typeof task?.due === "string" ? task.due : "" })) : [];
   next.weekly = { ...INIT.weekly, ...(data?.weekly || {}) };
   next.decisions = Array.isArray(data?.decisions) ? data.decisions : [];
   next.conversations = Array.isArray(data?.conversations) ? data.conversations : [];
