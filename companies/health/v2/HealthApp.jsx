@@ -18,58 +18,44 @@ const addDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); retur
 
 function Empty({ children }) { return <div className={css.empty}>{children}</div>; }
 function IconButton({ label, children, ...props }) { return <button aria-label={label} className={css.iconButton} {...props}>{children}</button>; }
-function Header({ tab, setTab, more, setMore }) {
-  return <><header className={css.header}><div><Link href="/" className={css.back}>חזרה למנכ״ל</Link><p className={css.eyebrow}>מרחב האימון והתזונה שלך</p><h1 className={css.title}>אימון ותזונה</h1></div><button onClick={()=>setMore(!more)} className={css.avatar} aria-label="עוד אפשרויות"><MoreHorizontal /></button></header>
-  {more && <aside className={css.card+" "+css.settings}><details open><summary>המידע שלך</summary><p>המידע נשמר בחשבון המאובטח שלך. זהו כלי לתיעוד והרגלים, לא אבחון, טיפול או תוכנית רפואית.</p><button className={css.secondary} onClick={()=>setTab("settings")}>פרטיות והגדרות</button></details></aside>}</>;
-}
+function Header({ setTab }) { return <header className={css.header}><div><Link href="/" className={css.back}>חזרה למנכ״ל</Link><p className={css.eyebrow}>מרחב האימון והתזונה שלך</p><h1 className={css.title}>אימון ותזונה</h1></div><button onClick={()=>setTab("settings")} className={css.profileButton}>הפרופיל שלי</button></header>; }
 function Nav({ tab, onNavigate }) { return <><aside className={css.desktopAside}>{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>onNavigate(id)} className={tab===id?css.active:""}><Icon size={18}/> {label}</button>)}</aside><nav className={css.bottomNav} aria-label="ניווט חברת אימון ותזונה">{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>onNavigate(id)} className={css.navItem+" "+(tab===id?css.active:"")} aria-current={tab===id?"page":undefined}><Icon/><span>{label}</span></button>)}</nav></>; }
 
 function Onboarding({ d, setD }) {
-  const [step, setStep] = useState(d.profile.onboardingStep || 0);
+  const steps = [
+    { key:"goal", title:"מה חשוב לך להשיג?", help:"אפשר לבחור יותר ממטרה אחת.", multi:true, options:["להיכנס לכושר לקראת החתונה","לבנות כוח ומסת שריר","לרדת במשקל","לחזור לכושר","להרגיש יותר אנרגיה","לשפר ביטחון עצמי","לשפר סיבולת"] },
+    { key:"focus", title:"מה תרצה/י לכלול בתוכנית?", help:"אפשר לבחור כמה כיוונים.", multi:true, options:["אימוני כוח","כושר אירובי","ניידות וגמישות","תזונה והרגלים","שילוב מאוזן","רק להתחיל בעדינות"] },
+    { key:"experience", title:"מה נקודת הפתיחה שלך?", help:"בחירה אחת שתעזור לקבוע קצב התחלתי.", options:["מתחיל/ה מאפס","חוזר/ת אחרי הפסקה","מתאמן/ת לסירוגין","מתאמן/ת קבוע"] },
+    { key:"place", title:"איפה נוח לך להתאמן?", help:"אפשר לבחור יותר מאפשרות אחת.", multi:true, options:["חדר כושר","בבית עם ציוד","בבית בלי ציוד","בחוץ","סטודיו או קבוצה"] },
+    { key:"availability", title:"כמה אימונים ריאליים בשבוע?", help:"נבנה סביב מה שאפשר לשמור עליו.", options:["1","2","3","4","5 או יותר","עדיין לא יודע/ת"] },
+    { key:"sessionLength", title:"כמה זמן יש לך לאימון?", help:"נעדיף זמן אמיתי על תוכנית מושלמת.", options:["10–15 דקות","20–30 דקות","40–45 דקות","שעה או יותר","משתנה"] },
+    { key:"trainingDays", title:"באילו ימים בדרך כלל אפשר?", help:"אפשר לבחור כמה ימים; אפשר לשנות בכל שבוע.", multi:true, options:["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","שבת","משתנה"] },
+    { key:"trainingTime", title:"מתי הכי נוח לך להתאמן?", help:"אפשר לבחור יותר מחלון זמן אחד.", multi:true, options:["בוקר","צהריים","ערב","לילה","משתנה"] },
+    { key:"comfort", title:"איזה סגנון מרגיש לך נכון?", help:"המערכת תעדיף פעולות שמתאימות לך.", options:["קצר ופשוט","מובנה ומסודר","גמיש לפי היום","עם תזכורות","לנסות ולגלות"] },
+    { key:"safety", title:"יש משהו שחשוב לקחת בחשבון?", help:"אם יש כאב, פציעה או מגבלה — לא בונים כאן תוכנית מותאמת. כדאי להתייעץ עם איש/ת מקצוע.", options:["לא ידוע לי על מגבלה","יש מגבלה ואני מתייעץ/ת עם איש מקצוע","לא בטוח/ה"] },
+  ];
+  const [step, setStep] = useState(Math.min(d.profile.onboardingStep || 0, steps.length - 1));
   const [draft, setDraft] = useState(d.profile);
-  const choicesByStep = [
-    ["להיכנס לכושר לקראת החתונה", "לבנות גוף חזק וחטוב", "לחזור לכושר", "להרגיש יותר אנרגיה", "לסדר את התזונה", "לשפר ביטחון עצמי", "לישון טוב יותר"],
-    ["אימונים קבועים", "תזונה מאוזנת", "שילוב של שניהם", "לבנות הרגלים", "להרגיש טוב ביומיום", "רק להתחיל ולראות"],
-    ["מתחיל/ה מאפס", "חוזר/ת אחרי הפסקה", "מתאמן/ת לסירוגין", "כבר מתאמן/ת", "עדיין לא בטוח/ה"],
-    ["פעם בשבוע", "פעמיים בשבוע", "3 פעמים בשבוע", "4 פעמים או יותר", "נלמד תוך כדי"],
-  ];
-  const keys = ["goal", "focus", "experience", "availability"];
-  const multipleSteps = [0, 1, 2];
   const [attempted, setAttempted] = useState(false);
-  const titles = [
-    "מה המטרה המרכזית שלך?",
-    "מה הכי חשוב לך לשפר בדרך?",
-    "מאיפה מתחילים?",
-    "מה ריאלי בשבוע הקרוב?",
-  ];
-  const helper = [
-    "אפשר לבחור יותר מדבר אחד. הכול ניתן לשינוי בהמשך.",
-    "אפשר לבחור כמה כיוונים. זה יעזור לשמור על הדרך ממוקדת.",
-    "אפשר לבחור את מה שמתאים כרגע — אין כאן מבחן.",
-    "בוחרים תשובה אחת ריאלית לשבוע הקרוב.",
-  ];
-  const saveStep = (nextStep) => {
-    setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: nextStep } }));
-    setStep(nextStep);
-  };
-  const hasSelection = () => { const value = draft[keys[step]]; return Array.isArray(value) ? value.length > 0 : Boolean(value); };
-  const next = () => { if (!hasSelection()) { setAttempted(true); return; } setAttempted(false); step < 3 ? saveStep(step + 1) : setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: 4, complete: true } })); };
-  const previous = () => { if (step > 0) { setAttempted(false); saveStep(step - 1); } };
-  const select = value => setDraft(current => { const key = keys[step]; if (!multipleSteps.includes(step)) return { ...current, [key]: value }; const currentValues = Array.isArray(current[key]) ? current[key] : current[key] ? [current[key]] : []; return { ...current, [key]: currentValues.includes(value) ? currentValues.filter(item => item !== value) : [...currentValues, value] }; });
-  const isSelected = value => { const selected = draft[keys[step]]; return Array.isArray(selected) ? selected.includes(value) : selected === value; };
+  const current = steps[step];
+  const selectedValues = Array.isArray(draft[current.key]) ? draft[current.key] : draft[current.key] ? [draft[current.key]] : [];
+  const hasSelection = selectedValues.length > 0;
+  const select = value => setDraft(profile => {
+    const old = Array.isArray(profile[current.key]) ? profile[current.key] : profile[current.key] ? [profile[current.key]] : [];
+    return { ...profile, [current.key]: current.multi ? (old.includes(value) ? old.filter(item => item !== value) : [...old, value]) : value };
+  });
+  const persist = nextStep => { setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:nextStep } })); setStep(nextStep); };
+  const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:steps.length, complete:true } })); };
+  const previous = () => { if (step > 0) { setAttempted(false); persist(step - 1); } };
   return <main className={css.onboard}>
     <Link href="/" className={css.back}>חזרה למנכ״ל</Link>
-    <p className={css.eyebrow}>כמה שאלות קצרות · {step + 1} מתוך 4</p>
-    <div className={css.progressLine}>{[0,1,2,3].map(i => <i key={i} className={i <= step ? css.done : ""} />)}</div>
+    <p className={css.eyebrow}>פרופיל האימונים שלך · {step + 1} מתוך {steps.length}</p>
+    <div className={css.progressLine}>{steps.map((_,i) => <i key={i} className={i <= step ? css.done : ""} />)}</div>
     <section className={css.card+" "+css.stack}>
-      <h2 className={css.title}>{titles[step]}</h2>
-      <p className={css.subtle}>{helper[step]}</p>
-      <div className={css.choiceGrid}>{choicesByStep[step].map(value => <button key={value} aria-pressed={isSelected(value)} onClick={() => { setAttempted(false); select(value); }} className={css.choice+" "+(isSelected(value) ? css.selected : "")}>{value}</button>)}</div>
+      <h2 className={css.title}>{current.title}</h2><p className={css.subtle}>{current.help}</p>
+      <div className={css.choiceGrid}>{current.options.map(value => <button key={value} aria-pressed={selectedValues.includes(value)} onClick={() => {setAttempted(false);select(value)}} className={css.choice+" "+(selectedValues.includes(value) ? css.selected : "")}>{value}</button>)}</div>
       {attempted && <p className={css.validation} role="alert">כדי להמשיך, צריך לבחור לפחות אפשרות אחת.</p>}
-      <div className={css.onboardingActions}>
-        {step > 0 && <button className={css.secondary} onClick={previous}>חזרה</button>}
-        <button className={css.primary+" "+(step > 0 ? "" : css.wide)} onClick={next}>{step === 3 ? "למסך היום" : "המשך"}<ChevronLeft size={18}/></button>
-      </div>
+      <div className={css.onboardingActions}>{step > 0 && <button className={css.secondary} onClick={previous}>חזרה</button>}<button className={css.primary} onClick={next}>{step === steps.length - 1 ? "בניית התוכנית" : "המשך"}<ChevronLeft size={18}/></button></div>
     </section>
   </main>;
 }
@@ -112,16 +98,17 @@ function Progress({ d, setD }) {
  const weekChoice = d.weekChoice || ""; const chooseWeek = value => setD(p => ({ ...p, weekChoice: value }));
  return <><div className={css.sectionHead}><h2>התמונה של השבוע</h2></div><p className={css.subtle}>אין כאן ציון. רק תמונה שתעזור להבין מה עובד עבורך.</p><div className={css.metricGrid}><div className={css.card+" "+css.metric}><span>ימים עם תיעוד</span><strong>{logged}</strong></div><div className={css.card+" "+css.metric}><span>רגעי תנועה</span><strong>{move}</strong></div></div><section className={css.card}><div className={css.barGrid}>{days.map((day,i)=><div className={css.barWrap} key={day}><i className={css.bar} style={{height:(total[i]?Math.min(100,18+total[i]*30):6)+"%"}}/><span>{new Date(day+"T12:00").toLocaleDateString("he-IL",{weekday:"narrow"})}</span></div>)}</div></section><section className={css.card}><strong>{logged?"יש לך "+logged+" ימים עם תיעוד השבוע.":"כשתתעד/י כמה ימים, יתחילו להופיע כאן דפוסים."}</strong><p className={css.subtle}>{done?"נסגרו גם "+done+" פעולות מהתוכנית.":"אפשר להשאיר את זה פשוט גם מחר."}</p></section><section className={css.card+" "+css.stack}><div><strong>מה כדאי לשמור לשבוע הבא?</strong><p className={css.subtle}>בחירה קטנה, בלי להתחייב לתוכנית חדשה.</p></div><div className={css.weekChoices}>{["פחות עומס", "יותר תיעוד", "להשאיר כמו שזה"].map(value => <button key={value} className={weekChoice === value ? css.selected : ""} onClick={() => chooseWeek(value)}>{value}</button>)}</div>{weekChoice && <p className={css.subtle}>נשמור על הכיוון: {weekChoice}.</p>}</section></>;
 }
-function SettingsView({ d,setD }) {const [confirm,setConfirm]=useState(false);const exp=()=>{const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="personal-hq-health.json";a.click();URL.revokeObjectURL(a.href)};return <div className={css.stack}><section className={css.card}><h2>פרטיות ומידע</h2><p className={css.subtle}>המידע נשמר בחשבון המאובטח שלך. מידע על מגבלות אינו משמש להצעה אוטומטית.</p><button className={css.secondary} onClick={exp}>ייצוא הנתונים</button></section><section className={css.card}><h2>גבולות המערכת</h2><p className={css.subtle}>כלי לתיעוד והרגלים, לא תחליף לייעוץ רפואי או תזונתי. אם משהו כואב, מחמיר או מרגיש חריג — עוצרים ופונים לאיש מקצוע.</p></section><section className={css.card}><h2>מחיקת הנתונים</h2><p className={css.subtle}>הפעולה מוחקת את כל נתוני חברת האימון והתזונה.</p><button className={css.status+" "+css.skipped} onClick={()=>confirm?(setD(INIT),setConfirm(false)):setConfirm(true)}>{confirm?"לחיצה נוספת למחיקה":"מחיקת כל הנתונים"}</button></section></div>}
+function SettingsView({ d,setD,editProfile }) {const [confirm,setConfirm]=useState(false);const exp=()=>{const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="personal-hq-health.json";a.click();URL.revokeObjectURL(a.href)};return <div className={css.stack}><section className={css.card}><h2>הפרופיל והתוכנית שלי</h2><p className={css.subtle}>אפשר לעדכן מטרות, מקום אימון, ימים, שעות וזמן אימון. התוכנית נבנית מחדש לפי הבחירות.</p><button className={css.secondary} onClick={editProfile}>עדכון פרופיל האימונים</button></section><section className={css.card}><h2>פרטיות ומידע</h2><p className={css.subtle}>המידע נשמר בחשבון המאובטח שלך. מידע על מגבלות אינו משמש להצעה אוטומטית.</p><button className={css.secondary} onClick={exp}>ייצוא הנתונים</button></section><section className={css.card}><h2>גבולות המערכת</h2><p className={css.subtle}>כלי לתיעוד והרגלים, לא תחליף לייעוץ רפואי או תזונתי. אם משהו כואב, מחמיר או מרגיש חריג — עוצרים ופונים לאיש מקצוע.</p></section><section className={css.card}><h2>מחיקת הנתונים</h2><p className={css.subtle}>הפעולה מוחקת את כל נתוני חברת האימון והתזונה.</p><button className={css.status+" "+css.skipped} onClick={()=>confirm?(setD(INIT),setConfirm(false)):setConfirm(true)}>{confirm?"לחיצה נוספת למחיקה":"מחיקת כל הנתונים"}</button></section></div>}
 
 export default function HealthApp() {
  const {data:d,setData:setD,ready}=useStore(STORE_KEY,INIT);const [tab,setTab]=useState("today"),[composer,setComposer]=useState(null),[more,setMore]=useState(false),[deleted,setDeleted]=useState(null),[toast,setToast]=useState("");
  const navigate = nextTab => { setComposer(null); setMore(false); setTab(nextTab); };
+ const editProfile = () => setD(data => ({ ...data, profile:{ ...data.profile, onboardingStep:0, complete:false } }));
  const notify=(message)=>{setComposer(null);setToast(message+" יפה שפינית לזה רגע.");setTimeout(()=>setToast(""),5000)};
  const remove=item=>{setD(p=>item.type==="food"?{...p,meals:p.meals.filter(x=>x.id!==item.id)}:{...p,workouts:p.workouts.filter(x=>x.id!==item.id)});setDeleted(item);setToast("הפריט נמחק.");setTimeout(()=>setDeleted(null),7000)};
  const undo=()=>{if(!deleted)return;setD(p=>deleted.type==="food"?{...p,meals:[deleted,...p.meals]}:{...p,workouts:[deleted,...p.workouts]});setDeleted(null);setToast("הפריט הוחזר.");};
  if(!ready)return <div className={css.empty}>טוען את היומן…</div>;
  if(!d.profile.complete)return <div className={css.shell}><Onboarding d={d} setD={setD}/></div>;
- const content=composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:tab==="today"?<Today d={d} setD={setD} setTab={setTab} setComposer={setComposer}/>:tab==="journal"?<Journal d={d} setD={setD} setComposer={setComposer} remove={remove}/>:tab==="plan"?<Plan d={d} setD={setD}/>:tab==="progress"?<Progress d={d} setD={setD}/>:<SettingsView d={d} setD={setD}/>;
- return <div className={css.shell}><Header tab={tab} setTab={setTab} more={more} setMore={setMore}/><Nav tab={tab} onNavigate={navigate}/><main className={css.content}>{content}</main>{toast&&<div className={css.toast} role="status"><span>{toast}</span>{deleted&&<button onClick={undo}>ביטול</button>}</div>}</div>;
+ const content=composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:tab==="today"?<Today d={d} setD={setD} setTab={setTab} setComposer={setComposer}/>:tab==="journal"?<Journal d={d} setD={setD} setComposer={setComposer} remove={remove}/>:tab==="plan"?<Plan d={d} setD={setD}/>:tab==="progress"?<Progress d={d} setD={setD}/>:<SettingsView d={d} setD={setD} editProfile={editProfile}/>;
+ return <div className={css.shell}><Header setTab={navigate}/><Nav tab={tab} onNavigate={navigate}/><main className={css.content}>{content}</main>{toast&&<div className={css.toast} role="status"><span>{toast}</span>{deleted&&<button onClick={undo}>ביטול</button>}</div>}</div>;
 }
