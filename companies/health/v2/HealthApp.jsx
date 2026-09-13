@@ -102,7 +102,8 @@ function SettingsView({ d,setD,editProfile }) {const [confirm,setConfirm]=useSta
 
 export default function HealthApp() {
  const {data:d,setData:setD,ready}=useStore(STORE_KEY,INIT);const [tab,setTab]=useState("today"),[composer,setComposer]=useState(null),[more,setMore]=useState(false),[deleted,setDeleted]=useState(null),[toast,setToast]=useState("");
- const navigate = nextTab => { setComposer(null); setMore(false); setTab(nextTab); };\n const editProfile = () => setD(data => ({ ...data, profile:{ ...data.profile, onboardingStep:0, complete:false } }));
+ const navigate = nextTab => { setComposer(null); setMore(false); setTab(nextTab); };
+ const editProfile = () => setD(data => ({ ...data, profile:{ ...data.profile, onboardingStep:0, complete:false } }));
  const notify=(message)=>{setComposer(null);setToast(message+" יפה שפינית לזה רגע.");setTimeout(()=>setToast(""),5000)};
  const remove=item=>{setD(p=>item.type==="food"?{...p,meals:p.meals.filter(x=>x.id!==item.id)}:{...p,workouts:p.workouts.filter(x=>x.id!==item.id)});setDeleted(item);setToast("הפריט נמחק.");setTimeout(()=>setDeleted(null),7000)};
  const undo=()=>{if(!deleted)return;setD(p=>deleted.type==="food"?{...p,meals:[deleted,...p.meals]}:{...p,workouts:[deleted,...p.workouts]});setDeleted(null);setToast("הפריט הוחזר.");};
