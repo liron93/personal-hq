@@ -16,7 +16,7 @@ export const INIT = {
   today: { date: "", step: "", status: "open", load: "", reliefPlan: "", reliefNote: "" },
   history: [], supports: [], tasks: [],
   weekly: { weekOf: "", focus: "", defer: "", ask: "", reviewNote: "" },
-  decisions: [], conversations: [], shareStatus: "private",
+  decisions: [], conversations: [], weekReview: "", shareStatus: "private",
 };
 
 export function normalize(data) {
