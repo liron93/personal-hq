@@ -22,18 +22,20 @@ function Header({ tab, setTab, more, setMore }) {
   return <><header className={css.header}><div><Link href="/" className={css.back}>חזרה למנכ״ל</Link><p className={css.eyebrow}>מרחב האימון והתזונה שלך</p><h1 className={css.title}>אימון ותזונה</h1></div><button onClick={()=>setMore(!more)} className={css.avatar} aria-label="עוד אפשרויות"><MoreHorizontal /></button></header>
   {more && <aside className={css.card+" "+css.settings}><details open><summary>המידע שלך</summary><p>המידע נשמר בחשבון המאובטח שלך. זהו כלי לתיעוד והרגלים, לא אבחון, טיפול או תוכנית רפואית.</p><button className={css.secondary} onClick={()=>setTab("settings")}>פרטיות והגדרות</button></details></aside>}</>;
 }
-function Nav({ tab, setTab }) { return <><aside className={css.desktopAside}>{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={tab===id?css.active:""}><Icon size={18}/> {label}</button>)}</aside><nav className={css.bottomNav} aria-label="ניווט חברת אימון ותזונה">{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>setTab(id)} className={css.navItem+" "+(tab===id?css.active:"")} aria-current={tab===id?"page":undefined}><Icon/><span>{label}</span></button>)}</nav></>; }
+function Nav({ tab, onNavigate }) { return <><aside className={css.desktopAside}>{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>onNavigate(id)} className={tab===id?css.active:""}><Icon size={18}/> {label}</button>)}</aside><nav className={css.bottomNav} aria-label="ניווט חברת אימון ותזונה">{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>onNavigate(id)} className={css.navItem+" "+(tab===id?css.active:"")} aria-current={tab===id?"page":undefined}><Icon/><span>{label}</span></button>)}</nav></>; }
 
 function Onboarding({ d, setD }) {
   const [step, setStep] = useState(d.profile.onboardingStep || 0);
   const [draft, setDraft] = useState(d.profile);
   const choicesByStep = [
-    ["להיכנס לכושר לקראת החתונה", "לבנות גוף חזק וחטוב", "לחזור לכושר", "להרגיש יותר אנרגיה", "לסדר את התזונה"],
-    ["אימונים קבועים", "תזונה מאוזנת", "שילוב של שניהם", "רק להתחיל ולראות"],
-    ["מתחיל/ה מאפס", "חוזר/ת אחרי הפסקה", "כבר מתאמן/ת", "עדיין לא בטוח/ה"],
-    ["פעם בשבוע", "פעמיים בשבוע", "3 פעמים בשבוע", "נלמד תוך כדי"],
+    ["להיכנס לכושר לקראת החתונה", "לבנות גוף חזק וחטוב", "לחזור לכושר", "להרגיש יותר אנרגיה", "לסדר את התזונה", "לשפר ביטחון עצמי", "לישון טוב יותר"],
+    ["אימונים קבועים", "תזונה מאוזנת", "שילוב של שניהם", "לבנות הרגלים", "להרגיש טוב ביומיום", "רק להתחיל ולראות"],
+    ["מתחיל/ה מאפס", "חוזר/ת אחרי הפסקה", "מתאמן/ת לסירוגין", "כבר מתאמן/ת", "עדיין לא בטוח/ה"],
+    ["פעם בשבוע", "פעמיים בשבוע", "3 פעמים בשבוע", "4 פעמים או יותר", "נלמד תוך כדי"],
   ];
   const keys = ["goal", "focus", "experience", "availability"];
+  const multipleSteps = [0, 1, 2];
+  const [attempted, setAttempted] = useState(false);
   const titles = [
     "מה המטרה המרכזית שלך?",
     "מה הכי חשוב לך לשפר בדרך?",
@@ -41,18 +43,20 @@ function Onboarding({ d, setD }) {
     "מה ריאלי בשבוע הקרוב?",
   ];
   const helper = [
-    "בוחרים את הכיוון העיקרי. אפשר לשנות אותו בהמשך.",
-    "הבחירה עוזרת לשמור את התיעוד והתוכנית ממוקדים.",
-    "אין כאן מבחן — רק נקודת פתיחה שנוחה לך.",
-    "עדיף קצב שאפשר לשמור עליו, לא תוכנית מושלמת.",
+    "אפשר לבחור יותר מדבר אחד. הכול ניתן לשינוי בהמשך.",
+    "אפשר לבחור כמה כיוונים. זה יעזור לשמור על הדרך ממוקדת.",
+    "אפשר לבחור את מה שמתאים כרגע — אין כאן מבחן.",
+    "בוחרים תשובה אחת ריאלית לשבוע הקרוב.",
   ];
   const saveStep = (nextStep) => {
     setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: nextStep } }));
     setStep(nextStep);
   };
-  const next = () => step < 3 ? saveStep(step + 1) : setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: 4, complete: true } }));
-  const previous = () => { if (step > 0) saveStep(step - 1); };
-  const select = value => setDraft(current => ({ ...current, [keys[step]]: value }));
+  const hasSelection = () => { const value = draft[keys[step]]; return Array.isArray(value) ? value.length > 0 : Boolean(value); };
+  const next = () => { if (!hasSelection()) { setAttempted(true); return; } setAttempted(false); step < 3 ? saveStep(step + 1) : setD(p => ({ ...p, profile: { ...p.profile, ...draft, onboardingStep: 4, complete: true } })); };
+  const previous = () => { if (step > 0) { setAttempted(false); saveStep(step - 1); } };
+  const select = value => setDraft(current => { const key = keys[step]; if (!multipleSteps.includes(step)) return { ...current, [key]: value }; const currentValues = Array.isArray(current[key]) ? current[key] : current[key] ? [current[key]] : []; return { ...current, [key]: currentValues.includes(value) ? currentValues.filter(item => item !== value) : [...currentValues, value] }; });
+  const isSelected = value => { const selected = draft[keys[step]]; return Array.isArray(selected) ? selected.includes(value) : selected === value; };
   return <main className={css.onboard}>
     <Link href="/" className={css.back}>חזרה למנכ״ל</Link>
     <p className={css.eyebrow}>כמה שאלות קצרות · {step + 1} מתוך 4</p>
@@ -60,7 +64,8 @@ function Onboarding({ d, setD }) {
     <section className={css.card+" "+css.stack}>
       <h2 className={css.title}>{titles[step]}</h2>
       <p className={css.subtle}>{helper[step]}</p>
-      <div className={css.choiceGrid}>{choicesByStep[step].map(value => <button key={value} onClick={() => select(value)} className={css.choice+" "+(draft[keys[step]] === value ? css.selected : "")}>{value}</button>)}</div>
+      <div className={css.choiceGrid}>{choicesByStep[step].map(value => <button key={value} aria-pressed={isSelected(value)} onClick={() => { setAttempted(false); select(value); }} className={css.choice+" "+(isSelected(value) ? css.selected : "")}>{value}</button>)}</div>
+      {attempted && <p className={css.validation} role="alert">כדי להמשיך, צריך לבחור לפחות אפשרות אחת.</p>}
       <div className={css.onboardingActions}>
         {step > 0 && <button className={css.secondary} onClick={previous}>חזרה</button>}
         <button className={css.primary+" "+(step > 0 ? "" : css.wide)} onClick={next}>{step === 3 ? "למסך היום" : "המשך"}<ChevronLeft size={18}/></button>
@@ -111,11 +116,12 @@ function SettingsView({ d,setD }) {const [confirm,setConfirm]=useState(false);co
 
 export default function HealthApp() {
  const {data:d,setData:setD,ready}=useStore(STORE_KEY,INIT);const [tab,setTab]=useState("today"),[composer,setComposer]=useState(null),[more,setMore]=useState(false),[deleted,setDeleted]=useState(null),[toast,setToast]=useState("");
+ const navigate = nextTab => { setComposer(null); setMore(false); setTab(nextTab); };
  const notify=(message)=>{setComposer(null);setToast(message+" יפה שפינית לזה רגע.");setTimeout(()=>setToast(""),5000)};
  const remove=item=>{setD(p=>item.type==="food"?{...p,meals:p.meals.filter(x=>x.id!==item.id)}:{...p,workouts:p.workouts.filter(x=>x.id!==item.id)});setDeleted(item);setToast("הפריט נמחק.");setTimeout(()=>setDeleted(null),7000)};
  const undo=()=>{if(!deleted)return;setD(p=>deleted.type==="food"?{...p,meals:[deleted,...p.meals]}:{...p,workouts:[deleted,...p.workouts]});setDeleted(null);setToast("הפריט הוחזר.");};
  if(!ready)return <div className={css.empty}>טוען את היומן…</div>;
  if(!d.profile.complete)return <div className={css.shell}><Onboarding d={d} setD={setD}/></div>;
  const content=composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:tab==="today"?<Today d={d} setD={setD} setTab={setTab} setComposer={setComposer}/>:tab==="journal"?<Journal d={d} setD={setD} setComposer={setComposer} remove={remove}/>:tab==="plan"?<Plan d={d} setD={setD}/>:tab==="progress"?<Progress d={d} setD={setD}/>:<SettingsView d={d} setD={setD}/>;
- return <div className={css.shell}><Header tab={tab} setTab={setTab} more={more} setMore={setMore}/><Nav tab={tab} setTab={setTab}/><main className={css.content}>{content}</main>{toast&&<div className={css.toast} role="status"><span>{toast}</span>{deleted&&<button onClick={undo}>ביטול</button>}</div>}</div>;
+ return <div className={css.shell}><Header tab={tab} setTab={setTab} more={more} setMore={setMore}/><Nav tab={tab} onNavigate={navigate}/><main className={css.content}>{content}</main>{toast&&<div className={css.toast} role="status"><span>{toast}</span>{deleted&&<button onClick={undo}>ביטול</button>}</div>}</div>;
 }
