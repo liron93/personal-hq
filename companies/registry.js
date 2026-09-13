@@ -3,11 +3,12 @@ import * as beit from "./beit-hadash/model";
 import * as kesef from "./kesef/model";
 import * as career from "./avoda/model";
 import * as health from "./health/model";
+import * as wellbeing from "./nefesh/model";
 
 /*
   כל תת-חברה מרשמת את עצמה כאן:
   - slug: הנתיב (/companies/<slug>)
-  - storeKey + init + summarize: כדי שהמנכ"ל יוכל לקרוא את מצבה בלי לפתוח אותה
+  - storeKey + init + summarize: כדי שהמנכ״ל יוכל לקרוא את מצבה בלי לפתוח אותה
   להוספת חברה: תיקייה חדשה ב-companies/, דף ב-app/companies/<slug>/, ושורה כאן.
 
   כלל קבוע לגבי נתונים: נתון שיותר מתת-חברה אחת צריכה (הכנסות, תאריכים משמעותיים
@@ -21,5 +22,5 @@ export const COMPANIES = [
   { slug: "kesef", name: "כלכלה והשקעות", icon: Wallet, active: true, storeKey: kesef.STORE_KEY, init: kesef.INIT, summarize: kesef.summarize },
   { slug: "health", name: "אימון ותזונה", icon: Dumbbell, active: true, storeKey: health.STORE_KEY, init: health.INIT, summarize: health.summarize },
   { slug: "avoda", name: "קריירה", icon: Briefcase, active: true, storeKey: career.STORE_KEY, init: career.INIT, summarize: career.summarize },
-  { slug: "nefesh", name: "רווחה נפשית", icon: Brain, active: false },
+  { slug: "nefesh", name: "רווחה נפשית", icon: Brain, active: true, storeKey: wellbeing.STORE_KEY, init: wellbeing.INIT, summarize: wellbeing.summarize },
 ];
