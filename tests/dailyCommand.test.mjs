@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDailyCommand, horizon } from "../lib/dailyCommand.js";
+import { buildDailyCommand, horizon } from "../lib/dailyCommand.mjs";
 
 const now = new Date("2026-09-14T10:00:00+03:00");
 const [today, tomorrow, dayAfter] = horizon(now);
