@@ -11,6 +11,8 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   direction: rtl;
 }
+@media (min-width: 761px) { body { padding-inline-end: 68px; } }
+@media (max-width: 760px) { body { padding-block-end: 72px; } }
 h1, h2, h3 { font-family: 'IBM Plex Sans Hebrew', system-ui, sans-serif; font-weight: 600; line-height: 1.25; }
 p { line-height: 1.6; }
 input, select, button, textarea { font-family: inherit; }
