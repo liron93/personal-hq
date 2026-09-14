@@ -19,22 +19,35 @@ export const INIT = {
   decisions: [], conversations: [], weekReview: "", shareStatus: "private",
 };
 
+const records = (value) => Array.isArray(value)
+  ? value.filter(item => item && typeof item === "object")
+  : [];
+
 export function normalize(data) {
-  const next = { ...INIT, ...(data || {}) };
-  next.today = { ...INIT.today, ...(data?.today || {}) };
-  next.history = Array.isArray(data?.history) ? data.history : [];
-  next.supports = Array.isArray(data?.supports) ? data.supports : [];
-  next.waiting = Array.isArray(data?.waiting) ? data.waiting : [];
-  next.decisionLog = Array.isArray(data?.decisionLog) ? data.decisionLog : [];
-  next.tasks = Array.isArray(data?.tasks) ? data.tasks.map(task => ({ ...task, bucket: task?.bucket || task?.priority || "inbox", done: Boolean(task?.done), due: typeof task?.due === "string" ? task.due : "" })) : [];
-  next.weekly = { ...INIT.weekly, ...(data?.weekly || {}) };
-  next.decisions = Array.isArray(data?.decisions) ? data.decisions : [];
-  next.conversations = Array.isArray(data?.conversations) ? data.conversations : [];
+  const next = { ...INIT, ...(data && typeof data === "object" ? data : {}) };
+  next.today = { ...INIT.today, ...(data?.today && typeof data.today === "object" ? data.today : {}) };
+  next.history = records(data?.history);
+  next.supports = records(data?.supports);
+  next.waiting = records(data?.waiting);
+  next.decisionLog = records(data?.decisionLog);
+  next.tasks = records(data?.tasks).map(task => ({
+    ...task,
+    id: typeof task.id === "string" && task.id ? task.id : uid(),
+    title: typeof task.title === "string" ? task.title : "",
+    bucket: task.bucket || task.priority || "inbox",
+    done: Boolean(task.done),
+    due: typeof task.due === "string" ? task.due : "",
+    source: typeof task.source === "string" ? task.source : "",
+    owner: typeof task.owner === "string" ? task.owner : "",
+  }));
+  next.weekly = { ...INIT.weekly, ...(data?.weekly && typeof data.weekly === "object" ? data.weekly : {}) };
+  next.decisions = records(data?.decisions);
+  next.conversations = records(data?.conversations);
   return next;
 }
 
 export function summarize(data) {
   const d = normalize(data);
   const flag = d.shareStatus === "need-help" ? "amber" : d.shareStatus === "steady" ? "green" : null;
-  return { openTasks: d.decisions.filter(item => item.status === "open").length, nextPayment: null, daysToPay: null, latestUpdate: null, flag };
+  return { openTasks: d.decisions.filter(item => item?.status === "open").length, nextPayment: null, daysToPay: null, latestUpdate: null, flag };
 }
