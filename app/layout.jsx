@@ -1,5 +1,6 @@
 import "./globals.css";
 import AuthGate from "./AuthGate";
+import CompanyNavigator from "./CompanyNavigator";
 
 export const metadata = { title: "המנכ״ל — personal-hq", description: "ניהול החיים כחברת אחזקות" };
 
@@ -11,7 +12,7 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <AuthGate>{children}</AuthGate>
+        <AuthGate>{children}<CompanyNavigator /></AuthGate>
       </body>
     </html>
   );
