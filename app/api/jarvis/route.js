@@ -82,17 +82,12 @@ export async function POST(request) {
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       generationConfig: { maxOutputTokens: 300, responseMimeType: "application/json" },
     });
-  } catch (e) {
-    // DEBUG זמני: מפרט את סיבת הכשל בפועל כדי לאבחן 502 שחוזר בפרודקשן. יוסר.
-    return err(`שגיאה בפנייה ל-JARVIS (fetch threw): ${e?.message || e}`, 502);
+  } catch {
+    return err("שגיאה בפנייה ל-JARVIS.", 502);
   }
 
   if (res.status === 429) return err("JARVIS עמוס כרגע. נסה שוב בעוד רגע.", 429);
-  if (!res.ok) {
-    const upstreamBody = await res.text().catch(() => "");
-    // DEBUG זמני: כולל status+body מ-Gemini כדי לאבחן. יוסר אחרי שנמצא הסיבה.
-    return err(`שגיאה בפנייה ל-JARVIS (upstream ${res.status}): ${upstreamBody.slice(0, 300)}`, 502);
-  }
+  if (!res.ok) return err("שגיאה בפנייה ל-JARVIS.", 502);
 
   let data;
   try {
