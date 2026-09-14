@@ -17,6 +17,27 @@ function err(message, status) {
   return Response.json({ error: message }, { status });
 }
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Gemini מחזיר לפעמים 503/UNAVAILABLE זמני ("high demand") — Google עצמם ממליצים
+// לנסות שוב. ניסיון חוזר אחד קצר עוזר לרוב המקרים בלי להוסיף השהיה מורגשת.
+async function callGemini(apiKey, requestBody, attempt = 0) {
+  let res;
+  try {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify(requestBody),
+      cache: "no-store",
+    });
+  } catch (e) {
+    if (attempt < 1) { await sleep(500); return callGemini(apiKey, requestBody, attempt + 1); }
+    throw e;
+  }
+  if (res.status === 503 && attempt < 1) { await sleep(700); return callGemini(apiKey, requestBody, attempt + 1); }
+  return res;
+}
+
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return err("JARVIS לא מוגדר בשרת.", 503);
@@ -42,18 +63,10 @@ export async function POST(request) {
 
   let res;
   try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents,
-        generationConfig: { maxOutputTokens: 400 },
-      }),
-      cache: "no-store",
+    res = await callGemini(apiKey, {
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents,
+      generationConfig: { maxOutputTokens: 400 },
     });
   } catch {
     return err("שגיאה בפנייה ל-JARVIS.", 502);
