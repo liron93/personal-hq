@@ -20,12 +20,12 @@ npm run dev
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 FINNHUB_API_KEY=
-ANTHROPIC_API_KEY=
+GEMINI_API_KEY=
 ```
 
 `FINNHUB_API_KEY` — מפתח ל-[Finnhub](https://finnhub.io) (מחירי מניות, P/E, דיבידנד) עבור טאב "מעקב מניות" ב-kesef. **בלי קידומת `NEXT_PUBLIC`** בכוונה: משתנה כזה נצרב ל-bundle של הדפדפן וכל מי שפותח את האתר רואה אותו. המפתח נקרא רק בצד השרת ב-`app/api/quote/route.js` (Route Handler), שהוא זה שפונה ל-Finnhub ומחזיר ל-frontend JSON נקי בלבד. בפרודקשן מגדירים אותו ב-Vercel → Environment Variables כמו השאר.
 
-`ANTHROPIC_API_KEY` — מפתח ל-[Claude API](https://console.anthropic.com) (Settings → API Keys), עבור תדריך ה-JARVIS במסך המנכ״ל. גם הוא בלי `NEXT_PUBLIC`, נקרא רק בצד השרת ב-`app/api/jarvis/route.js`. אופציונלי: בלי מפתח מוגדר, ה-JARVIS פשוט מציג טקסט קבוע במקום תדריך שנוצר על ידי AI — האתר ממשיך לעבוד כרגיל.
+`GEMINI_API_KEY` — מפתח ל-[Gemini API](https://aistudio.google.com/apikey) (Google AI Studio), עבור תדריך ה-JARVIS במסך המנכ״ל. גם הוא בלי `NEXT_PUBLIC`, נקרא רק בצד השרת ב-`app/api/jarvis/route.js`. אופציונלי: בלי מפתח מוגדר, ה-JARVIS פשוט מציג טקסט קבוע במקום תדריך שנוצר על ידי AI — האתר ממשיך לעבוד כרגיל.
 
 יש דוגמה ב-`.env.example`. בפרודקשן (Vercel) אותם משתנים מוגדרים דרך Environment Variables בהגדרות הפרויקט, לא בגיט.
 

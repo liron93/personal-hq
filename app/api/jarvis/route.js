@@ -1,10 +1,11 @@
 // Route Handler בצד שרת: מקבל תקציר מצב (כבר מחושב בלקוח מתוך summarize() של
-// כל תת-חברה), שולח ל-Claude עם המפתח הסודי, ומחזיר משפט תדריך קצר בעברית.
-// המפתח (ANTHROPIC_API_KEY) לעולם לא מגיע ללקוח. בלי מפתח מוגדר — 503, והלקוח
+// כל תת-חברה), שולח ל-Gemini עם המפתח הסודי, ומחזיר משפט תדריך קצר בעברית.
+// המפתח (GEMINI_API_KEY) לעולם לא מגיע ללקוח. בלי מפתח מוגדר — 503, והלקוח
 // נופל בחזרה לטקסט הסטטי שלו (ראה app/page.jsx).
 export const dynamic = "force-dynamic";
 
-const MODEL = "claude-haiku-4-5-20251001";
+// alias שמצביע תמיד על הגרסה העדכנית של Gemini Flash, כדי לא להיתקע על גרסה מיושנת.
+const MODEL = "gemini-flash-latest";
 
 const SYSTEM_PROMPT = `אתה JARVIS — עוזר ה-AI השקט של Personal HQ, מערכת ניהול חיים אישית בהשראת ג'ארוויס מאיירון מן.
 תפקידך: לקרוא תקציר מצב של תתי-החברות (בית, כלכלה, קריירה, בריאות, רווחה נפשית) ולנסח תדריך קצר, רגוע ומדויק בעברית.
@@ -17,7 +18,7 @@ function err(message, status) {
 }
 
 export async function POST(request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return err("JARVIS לא מוגדר בשרת.", 503);
 
   let body;
@@ -37,18 +38,16 @@ export async function POST(request) {
 
   let res;
   try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 200,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: { maxOutputTokens: 200, responseMimeType: "application/json" },
       }),
       cache: "no-store",
     });
@@ -66,7 +65,7 @@ export async function POST(request) {
     return err("תשובה לא תקינה מ-JARVIS.", 502);
   }
 
-  const text = data?.content?.[0]?.text || "";
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
   let parsed;
   try {
     parsed = JSON.parse(text);
