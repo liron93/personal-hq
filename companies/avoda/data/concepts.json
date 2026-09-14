@@ -1,0 +1,332 @@
+[
+  {
+    "term": "North Star Metric",
+    "category": "Metrics",
+    "explanation": "מדד יחיד שמייצג את הערך האמיתי שהמוצר מספק למשתמשים ומחובר לצמיחה עסקית. לדוגמה: Spotify — זמן האזנה, Airbnb — לילות הזמנה, Slack — מסרים שנשלחו בצוות. שונה מהכנסות כי הוא מה שהמשתמש מרגיש."
+  },
+  {
+    "term": "DAU / MAU",
+    "category": "Metrics",
+    "explanation": "Daily Active Users / Monthly Active Users. היחס ביניהם נקרא Stickiness — כמה משתמשים חוזרים ביום מתוך החודשיים. ערך של 50%+ נחשב מצוין. WhatsApp ו-Messenger מעל 60%."
+  },
+  {
+    "term": "CAC",
+    "category": "Metrics",
+    "explanation": "Customer Acquisition Cost — עלות רכישת לקוח חדש. מחושב: סך הוצאות Marketing + Sales ÷ לקוחות חדשים. הרציו החשוב הוא LTV:CAC — יחס בריא הוא לפחות 3:1."
+  },
+  {
+    "term": "LTV",
+    "category": "Metrics",
+    "explanation": "Lifetime Value — סך ההכנסות הצפויות מלקוח לאורך כל חייו כלקוח. מחושב: ARPU × Retention Rate ÷ Churn Rate. אם LTV < CAC, המוצר מפסיד כסף על כל לקוח."
+  },
+  {
+    "term": "Churn Rate",
+    "category": "Metrics",
+    "explanation": "שיעור העזיבה — אחוז המשתמשים שהפסיקו להשתמש במוצר בפרק זמן נתון. Churn גבוה מסמן בעיה ב-Retention. SaaS B2B טוב שואף ל-5% churn שנתי ומטה."
+  },
+  {
+    "term": "NPS",
+    "category": "Metrics",
+    "explanation": "Net Promoter Score — מדד נאמנות לקוחות. שואלים 'כמה תמליץ על המוצר מ-0 עד 10?'. Promoters (9-10) פחות Detractors (0-6). ציון מעל 50 נחשב מצוין. מדד פשוט אבל לא מספיק לבדו."
+  },
+  {
+    "term": "Retention",
+    "category": "Metrics",
+    "explanation": "שיעור המשתמשים שחוזרים למוצר לאחר שימוש ראשון. מנוגד ל-Churn. Retention Curve מראה כמה משתמשים נשארים לאחר שבוע, חודש, שנה. Flattening curve — המוצר מצא את Product-Market Fit."
+  },
+  {
+    "term": "Conversion Rate",
+    "category": "Metrics",
+    "explanation": "אחוז המשתמשים שביצעו פעולה רצויה (רכישה, הרשמה, שדרוג). מחושב: conversions ÷ total visitors. מדד קריטי בכל funnel. שיפור Conversion Rate הוא לרוב יותר זול מהגדלת Traffic."
+  },
+  {
+    "term": "AARRR (Pirate Metrics)",
+    "category": "Metrics",
+    "explanation": "Framework של Dave McClure לניתוח funnel: Acquisition (איך מגיעים), Activation (חוויה ראשונה טובה), Retention (חוזרים), Referral (ממליצים), Revenue (מייצרים הכנסה). שימושי לאבחון איפה ה-funnel 'דולף'."
+  },
+  {
+    "term": "HEART Framework",
+    "category": "Metrics",
+    "explanation": "Framework של Google למדידת UX: Happiness (שביעות רצון), Engagement (מעורבות), Adoption (אימוץ תכונות חדשות), Retention (שמירה), Task Success (הצלחת משימות). מאפשר לתרגם איכות חוויה למדדים כמותיים."
+  },
+  {
+    "term": "Cohort Analysis",
+    "category": "Metrics",
+    "explanation": "ניתוח קבוצות משתמשים שהצטרפו באותה תקופה. מאפשר לראות האם שיפורים במוצר משפיעים על Retention של קבוצות חדשות לעומת ישנות. כלי קריטי לזיהוי Product-Market Fit."
+  },
+  {
+    "term": "RICE",
+    "category": "Prioritization",
+    "explanation": "Framework לתעדוף פיצ'רים: Reach (כמה משתמשים יושפעו), Impact (מה ההשפעה לכל משתמש, 0.25-3x), Confidence (כמה בטוחים בהערכות, 0-100%), Effort (עבודה בשבועות-אדם). ציון: (Reach × Impact × Confidence) ÷ Effort."
+  },
+  {
+    "term": "MoSCoW",
+    "category": "Prioritization",
+    "explanation": "שיטת תעדוף: Must Have (חייב להיות), Should Have (צריך להיות), Could Have (נחמד שיהיה), Won't Have (לא עכשיו). מקל על שיחות עם stakeholders ומניעת scope creep."
+  },
+  {
+    "term": "Kano Model",
+    "category": "Prioritization",
+    "explanation": "מודל לסיווג פיצ'רים: Basic (מצפים וכועסים אם חסר), Performance (ככל שיש יותר, שביעות רצון עולה), Delighter (הפתעה נעימה שאף אחד לא ביקש). עוזר להבין מה יוצר satisfaction אמיתי."
+  },
+  {
+    "term": "Opportunity Scoring",
+    "category": "Prioritization",
+    "explanation": "טכניקה של Tony Ulwick: סקר משתמשים על חשיבות (Importance) ורמת שביעות הרצון הנוכחית (Satisfaction). opportunity = importance + max(importance - satisfaction, 0). גבוה = כאב גדול שלא נפתר."
+  },
+  {
+    "term": "ICE Score",
+    "category": "Prioritization",
+    "explanation": "שיטת תעדוף פשוטה: Impact (השפעה), Confidence (ביטחון), Ease (קלות ביצוע). כל קריטריון מדורג 1-10. ציון = ממוצע שלושתם. פשוט יותר מ-RICE, פחות מדויק."
+  },
+  {
+    "term": "JTBD (Jobs To Be Done)",
+    "category": "Research",
+    "explanation": "תיאוריה של Clayton Christensen: משתמשים 'שוכרים' מוצרים לבצע עבודה מסוימת בחייהם. דוגמה: אנשים לא קונים מקדח, הם קונים חור בקיר. עוזר להגדיר value proposition אמיתי."
+  },
+  {
+    "term": "User Story",
+    "category": "Research",
+    "explanation": "פורמט לתיאור דרישות: 'As a [user type], I want to [action] so that [benefit]'. מפוצל ל-Epics (סיפורים גדולים) ו-Stories (יחידות עבודה). מדד איכות: INVEST — Independent, Negotiable, Valuable, Estimable, Small, Testable."
+  },
+  {
+    "term": "Product-Market Fit",
+    "category": "Strategy",
+    "explanation": "המצב שבו המוצר עונה על צורך אמיתי בשוק. סימנים: Retention Curve שמתיישרת, משתמשים מאוכזבים אם המוצר ייסגר (>40% לפי Sean Ellis), growth אורגני, NPS גבוה. לפני PMF — לא להתרחב."
+  },
+  {
+    "term": "MVP",
+    "category": "Strategy",
+    "explanation": "Minimum Viable Product — הגרסה הפשוטה ביותר של מוצר שמאפשרת לאמת הנחות מרכזיות. לא המינימום מבחינת קוד, אלא המינימום לצורך למידה. יכול להיות landing page, Wizard of Oz, Concierge MVP."
+  },
+  {
+    "term": "GTM Strategy",
+    "category": "Strategy",
+    "explanation": "Go-To-Market — תכנית איך להשיק מוצר לשוק: הגדרת target audience, ערוצי הפצה, מחיר, מסרים שיווקיים, ואיך לרכוש לקוחות ראשונים. שלבים: launch, growth, scale."
+  },
+  {
+    "term": "TAM / SAM / SOM",
+    "category": "Strategy",
+    "explanation": "Total Addressable Market (השוק הכולל), Serviceable Addressable Market (החלק שניתן להגיע אליו), Serviceable Obtainable Market (מה שניתן ריאלית לתפוס). כלי להצגה למשקיעים ולקבלת החלטות אסטרטגיות."
+  },
+  {
+    "term": "Flywheel",
+    "category": "Strategy",
+    "explanation": "מודל גדילה עצמי-מחזק: כל צמיחה מניעה צמיחה נוספת. דוגמה קלאסית: Amazon — יותר sellers → מחירים טובים יותר → יותר buyers → יותר sellers. שונה מ-funnel כי אין התחלה וסוף."
+  },
+  {
+    "term": "Network Effects",
+    "category": "Strategy",
+    "explanation": "מוצר הופך לשימושי יותר ככל שיש יותר משתמשים. Direct: WhatsApp שווה יותר כי כולם שם. Indirect: iOS ← developers ← users. הגנה חזקה מפני תחרות (moat)."
+  },
+  {
+    "term": "Moat",
+    "category": "Strategy",
+    "explanation": "יתרון תחרותי בר-קיימא: Network Effects, Switching Costs גבוהים, Brand חזק, Data Advantage, Economies of Scale. כ-PM, חשוב לבנות פיצ'רים שמחזקים את ה-moat ולא רק מוסיפים ערך זמני."
+  },
+  {
+    "term": "OKR",
+    "category": "Execution",
+    "explanation": "Objectives & Key Results — שיטת ניהול יעדים: Objective (מטרה איכותית ומעוררת השראה) + Key Results (מדדים כמותיים שמוכיחים שהושגה). יעדים נקבעים ל-quarter. 70% השגה נחשב הצלחה."
+  },
+  {
+    "term": "PRD",
+    "category": "Execution",
+    "explanation": "Product Requirements Document — מסמך שמגדיר מה בונים ולמה, לא איך. כולל: בעיה, personas, user stories, success metrics, scope, edge cases. הבסיס לתקשורת בין PM לבין Engineering ו-Design."
+  },
+  {
+    "term": "Roadmap",
+    "category": "Execution",
+    "explanation": "תכנית ויזואלית של מה המוצר יפתח ומתי. סוגים: Now/Next/Later (flexible), Timeline-based (commits), Theme-based (ללא תאריכים). Roadmap טוב מאזן בין vision לבין adaptability."
+  },
+  {
+    "term": "Sprint",
+    "category": "Execution",
+    "explanation": "מחזור פיתוח קצר (1-4 שבועות) ב-Agile/Scrum. בסוף כל Sprint — deliverable שניתן לשלוח. מאפשר לקבל feedback מהר ולשנות כיוון. Sprint Planning, Daily Standup, Retrospective — הטקסים המרכזיים."
+  },
+  {
+    "term": "Agile",
+    "category": "Execution",
+    "explanation": "מתודולוגיית פיתוח איטרטיבית: מפסיקים לתכנן הכל מראש, עובדים בפרקי זמן קצרים, מסתגלים לפי feedback. Manifesto: individuals over processes, working software over documentation, customer collaboration over contracts."
+  },
+  {
+    "term": "Scrum",
+    "category": "Execution",
+    "explanation": "מסגרת עבודה Agile: Product Owner (מגדיר priorities), Scrum Master (מסיר חסמים), Development Team. Artifacts: Product Backlog, Sprint Backlog, Increment. Events: Sprint Planning, Daily Scrum, Review, Retrospective."
+  },
+  {
+    "term": "Kanban",
+    "category": "Execution",
+    "explanation": "שיטת ניהול עבודה ויזואלית: לוח עם עמודות (To Do, In Progress, Done), מגבלת WIP (Work In Progress) לכל עמודה. מתאים לתמיכה ו-bug fixes. פחות מובנה מ-Scrum, יותר זורם."
+  },
+  {
+    "term": "Technical Debt",
+    "category": "Execution",
+    "explanation": "קוד שנכתב מהר לצורך ship מהיר, על חשבון איכות. מצטבר ומאט פיתוח עתידי. ה-PM צריך לאזן בין feature work לבין הקצאת זמן לתשלום חוב טכני. לא להשאיר להצטבר ללא שליטה."
+  },
+  {
+    "term": "A/B Testing",
+    "category": "Experimentation",
+    "explanation": "ניסוי מבוקר: מפצלים משתמשים לשתי קבוצות (control/treatment), משנים משתנה אחד, מודדים האם יש הבדל מובהק סטטיסטית. Statistical significance נדרשת לפני הסקת מסקנות. מאפשר החלטות מבוססות data."
+  },
+  {
+    "term": "Statistical Significance",
+    "category": "Experimentation",
+    "explanation": "רמת הביטחון שתוצאת הניסוי אינה מקרית. P-value < 0.05 פירושו 95% confidence. בפועל, צריך sample size מספיק גדול וזמן ניסוי מספיק. בלי זה — תוצאות A/B Test חסרות משמעות."
+  },
+  {
+    "term": "Feature Flags",
+    "category": "Experimentation",
+    "explanation": "מנגנון ל-release פיצ'רים לקבוצות ספציפיות מבלי לשנות קוד. מאפשר: Canary Release (5% ראשון), Beta Testing עם משתמשים ספציפיים, Kill Switch מהיר בעת בעיה, Gradual Rollout."
+  },
+  {
+    "term": "Hypothesis-Driven Development",
+    "category": "Experimentation",
+    "explanation": "גישת פיתוח: לפני כל פיצ'ר מגדירים hypothesis ברורה ('אנו מאמינים ש... ינהל ל...'), מגדירים מדד הצלחה מראש, ורק אז מפתחים ומודדים. מונע פיתוח מבוסס feelings."
+  },
+  {
+    "term": "Design Sprint",
+    "category": "Research",
+    "explanation": "תהליך של 5 ימים (Google Ventures) לאימות רעיונות: Day 1: Map, Day 2: Sketch, Day 3: Decide, Day 4: Prototype, Day 5: Test. מאפשר ללמוד תוך שבוע מה לקח לפני כן חודשים."
+  },
+  {
+    "term": "User Interview",
+    "category": "Research",
+    "explanation": "שיחה עומק עם משתמשים לגילוי צרכים, כאבים ומניעים. כלל אצבע: לשאול על עבר ולא על עתיד ('ספרו על פעם שהייתם צריכים...' ולא 'האם הייתם משתמשים ב...'). 5 ראיונות מספיקים לזיהוי 80% מהדפוסים."
+  },
+  {
+    "term": "Persona",
+    "category": "Research",
+    "explanation": "פרסונה — ייצוג בדיוני של משתמש טיפוסי, מבוסס על מחקר אמיתי. כולל: שם, גיל, תפקיד, מטרות, frustrations, ציטוט ייצוגי. מאפשר לצוות לקבל החלטות מנקודת מבט המשתמש."
+  },
+  {
+    "term": "Customer Journey Map",
+    "category": "Research",
+    "explanation": "מיפוי ויזואלי של כל הצעדים שמשתמש עובר עם המוצר — מהגילוי הראשון ועד השימוש המתמשך. מדגיש: touchpoints, emotions, pain points, opportunities. מאפשר לזהות 'רגעי האמת'."
+  },
+  {
+    "term": "Empathy Map",
+    "category": "Research",
+    "explanation": "כלי להבנת משתמש דרך 4 ממדים: Think & Feel, See, Hear, Say & Do. עוזר לצוות לצאת מהנחות ולהכניס את המשתמש לחדר. לרוב נבנה בסיום User Interviews."
+  },
+  {
+    "term": "Wireframe",
+    "category": "Design",
+    "explanation": "שרטוט גס של ממשק — מתמקד בפריסה ותכולה בלי design. כלי תקשורת בין PM לבין Design. מאפשר iteration מהירה לפני ה-investment ב-visual design. כלים: Balsamiq, Figma (low fidelity)."
+  },
+  {
+    "term": "Prototype",
+    "category": "Design",
+    "explanation": "גרסה ניתנת לבדיקה של המוצר — יכול להיות ב-Figma (high fidelity), דף HTML פשוט, או אפילו נייר (paper prototype). מאפשר user testing לפני שורת קוד אחת נכתבת."
+  },
+  {
+    "term": "Usability Testing",
+    "category": "Design",
+    "explanation": "בדיקת ממשק עם משתמשים אמיתיים: נותנים משימה, צופים בלי לעזור, מתעדים היכן נתקעים. Think Aloud Protocol — מבקשים לחשוב בקול. 5 משתמשים מספיקים לגילוי 85% מהבעיות."
+  },
+  {
+    "term": "SWOT",
+    "category": "Strategy",
+    "explanation": "ניתוח אסטרטגי: Strengths (חוזקות פנימיות), Weaknesses (חולשות פנימיות), Opportunities (הזדמנויות חיצוניות), Threats (איומים חיצוניים). כלי לניתוח מוצר, מתחרים, או החלטה אסטרטגית."
+  },
+  {
+    "term": "Porter's 5 Forces",
+    "category": "Strategy",
+    "explanation": "מסגרת לניתוח תחרותי: Competitive Rivalry, Threat of New Entrants, Threat of Substitutes, Bargaining Power of Buyers, Bargaining Power of Suppliers. עוזר להבין כוחות בשוק ולמצוא positioning."
+  },
+  {
+    "term": "Market Sizing",
+    "category": "Strategy",
+    "explanation": "הערכת גודל שוק: Top-Down (מהשוק הכולל למטה) vs Bottom-Up (מהמקרים הספציפיים למעלה). ב-interviews: Fermi Estimation — לפרק לנחות מפשוטות. מראה חשיבה מסודרת, לא מספר מדויק."
+  },
+  {
+    "term": "Freemium",
+    "category": "Business Model",
+    "explanation": "מודל עסקי: גרסה בסיסית חינמית, פיצ'רים מתקדמים בתשלום. מאפשר acquisition בקנה מידה. האתגר: לפצל Value Proposition כך שה-free שימושי מספיק למשוך ולא מספיק כדי שלא ישלמו."
+  },
+  {
+    "term": "PLG — Product-Led Growth",
+    "category": "Business Model",
+    "explanation": "אסטרטגיית גדילה שבה המוצר עצמו הוא מנוע הצמיחה, לא Sales. משתמשים מגלים, אוהבים, ומביאים אחרים (Viral Loop). דוגמאות: Slack, Figma, Dropbox. Activation מהיר קריטי."
+  },
+  {
+    "term": "SLG — Sales-Led Growth",
+    "category": "Business Model",
+    "explanation": "אסטרטגיית גדילה שבה Sales הם מנוע הצמיחה. מתאים ל-Enterprise עם deals גדולים ומחזורי מכירה ארוכים. PM צריך לשתף פעולה עם Sales לבנות פיצ'רים שמאפשרים deal-closing."
+  },
+  {
+    "term": "Activation",
+    "category": "Growth",
+    "explanation": "הרגע שבו משתמש חדש מרגיש לראשונה את הערך האמיתי של המוצר — ה-'Aha Moment'. Facebook: להוסיף 7 חברים תוך 10 ימים. Twitter: לעקוב אחרי 30 חשבונות. Optimizing activation = הגדלת Retention."
+  },
+  {
+    "term": "Viral Loop",
+    "category": "Growth",
+    "explanation": "מנגנון שבו כל משתמש מביא משתמשים נוספים. K-factor = invitations per user × conversion rate. K > 1 פירושו גדילה אקספוננציאלית. דוגמה: Dropbox — 'תן לחבר ושניכם מקבלים storage נוסף'."
+  },
+  {
+    "term": "Onboarding",
+    "category": "Growth",
+    "explanation": "תהליך קליטת משתמש חדש: מה-Registration עד ה-Aha Moment. כולל: tooltips, walkthroughs, empty states, progress indicators. Onboarding טוב מקצר זמן להגיע לערך ומוריד Churn מוקדם."
+  },
+  {
+    "term": "Paywall",
+    "category": "Growth",
+    "explanation": "נקודת מנגנון המרה מ-free ל-paid. תזמון: לאחר שהמשתמש חווה ערך, לא לפני. Hard Paywall (חסום לגמרי), Soft Paywall (מגבלות על שימוש). Conversion rates: 2-5% ב-B2C, 10-20%+ ב-B2B."
+  },
+  {
+    "term": "Power Users",
+    "category": "Growth",
+    "explanation": "המשתמשים הפעילים ביותר — לרוב 20% שמייצרים 80% מה-engagement. חשוב לזהות ולהבין אותם. הם מקור לתובנות על ה-North Star ולרוב Early Adopters של פיצ'רים חדשים."
+  },
+  {
+    "term": "Switching Costs",
+    "category": "Strategy",
+    "explanation": "עלויות המעבר של לקוח למתחרה: זמן, כסף, נתונים שנאבדים, learning curve חדש. PM יכול להגדיל Switching Costs בכוונה (integrations, data portability, workflows). זה חלק מבניית moat."
+  },
+  {
+    "term": "Discovery vs Delivery",
+    "category": "Execution",
+    "explanation": "Discovery = להבין מה לבנות (user research, hypothesis, prototyping). Delivery = לבנות את מה שהוחלט (development, QA, launch). PM טוב עושה שניהם במקביל ולא בסדרה. Dual-Track Agile."
+  },
+  {
+    "term": "Stakeholder Management",
+    "category": "Execution",
+    "explanation": "ניהול כל הצדדים עם עניין במוצר: C-suite, Engineering, Design, Marketing, Sales, Legal. PM חייב לאזן בין דרישות סותרות, לתקשר roadmap, ולנהל ציפיות. Trust = transparency + delivery."
+  },
+  {
+    "term": "Scope Creep",
+    "category": "Execution",
+    "explanation": "הרחבה הדרגתית של scope בלי approval רשמי — 'בואו נוסיף עוד דבר קטן'. גורם להשקה מאוחרת, team burnout, ו-quality ירוד. מניעה: PRD ברור, תהליך change request, ואומץ לומר 'לא עכשיו'."
+  },
+  {
+    "term": "Zero to One vs One to N",
+    "category": "Strategy",
+    "explanation": "Zero to One (Peter Thiel): בניית משהו חדש לגמרי, ללא מתחרים. One to N: סקיילינג ומיטוב של מה שעובד. דורשים מיינדסט שונה — PM ב-Zero to One עושה הרבה Discovery; ב-One to N מתמקד ב-Optimization."
+  },
+  {
+    "term": "Dogfooding",
+    "category": "Execution",
+    "explanation": "שימוש פנימי במוצר לפני ה-launch. 'Eating your own dog food' — הצוות הוא המשתמש הראשון. מאפשר גילוי bugs ובעיות UX בסביבה בטוחה. Slack, Google, Spotify — כולן עושות זאת."
+  },
+  {
+    "term": "Build-Measure-Learn",
+    "category": "Execution",
+    "explanation": "הלולאה המרכזית של Lean Startup: Build (בנה MVP מהיר), Measure (מדוד תוצאות אמיתיות), Learn (למד מה עובד ומה לא). מטרה: לקצר את הלולאה כמה שאפשר ולהוציא כמה hypotheses שאפשר."
+  },
+  {
+    "term": "Pivot",
+    "category": "Strategy",
+    "explanation": "שינוי אסטרטגי מהותי בכיוון המוצר/עסק מבוסס על למידה. סוגים: Customer Segment Pivot, Value Proposition Pivot, Platform Pivot. פיבוט לא כשל — הוא שימוש חכם ב-learning. YouTube התחיל כ-dating site."
+  },
+  {
+    "term": "WoW / MoM / YoY",
+    "category": "Metrics",
+    "explanation": "Week over Week / Month over Month / Year over Year — שיעורי גדילה תקופתיים. WoW טוב ל-early stage (גדילה מהירה). MoM לצמיחה בינונית. YoY לחברות בשלות. Compound monthly growth rate (CMGR) הוא הסטנדרט להשוואה."
+  },
+  {
+    "term": "Funnel",
+    "category": "Metrics",
+    "explanation": "ייצוג ויזואלי של שלבי המסע של משתמש, מ-Awareness לרכישה. בכל שלב יש נשירה. מטרת ה-PM: לזהות את השלב עם הנשירה הגדולה ביותר ולשפרו קודם. Top-of-funnel ≠ Bottom-of-funnel."
+  }
+]
