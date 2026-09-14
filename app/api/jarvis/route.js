@@ -1,5 +1,7 @@
-// Route Handler בצד שרת: מקבל תקציר מצב (כבר מחושב בלקוח מתוך summarize() של
-// כל תת-חברה), שולח ל-Gemini עם המפתח הסודי, ומחזיר משפט תדריך קצר בעברית.
+// Route Handler בצד שרת: מקבל תמונת מצב גולמית מכל תתי-החברות (כבר מחושבת
+// בלקוח מתוך summarize()+data), שולח ל-Gemini עם המפתח הסודי, ומחזיר תדריך
+// קצר בעברית. המטרה: לא רק לנסח מחדש רשימת פעולות — לזהות קשרים אמיתיים בין
+// תחומים (תאריכים חופפים, עומס מול דדליין וכד') שקוד דטרמיניסטי לא רואה.
 // המפתח (GEMINI_API_KEY) לעולם לא מגיע ללקוח. בלי מפתח מוגדר — 503, והלקוח
 // נופל בחזרה לטקסט הסטטי שלו (ראה app/page.jsx).
 export const dynamic = "force-dynamic";
@@ -8,10 +10,18 @@ export const dynamic = "force-dynamic";
 const MODEL = "gemini-flash-latest";
 
 const SYSTEM_PROMPT = `אתה JARVIS — עוזר ה-AI השקט של Personal HQ, מערכת ניהול חיים אישית בהשראת ג'ארוויס מאיירון מן.
-תפקידך: לקרוא תקציר מצב של תתי-החברות (בית, כלכלה, קריירה, בריאות, רווחה נפשית) ולנסח תדריך קצר, רגוע ומדויק בעברית.
+תקבל תמונת מצב גולמית (JSON) מכל תתי-החברות: בית חדש (שיפוץ), כלכלה, קריירה, בריאות, רווחה נפשית.
+
+המשימה שלך היא סינתזה, לא סיכום: אל תפרט מחדש כל תחום בנפרד. חפש קשר אמיתי בין
+תחומים — תאריכים שחופפים, עומס נפשי (wellbeing.load) שפוגש דדליין בתחום אחר,
+הוצאה כספית גדולה שמתנגשת עם תקציב, קריירה שדורשת זמן פנוי באותו שבוע שיש
+פעולה דחופה בבית. אם יש קשר כזה — הוא הדבר הכי חשוב לומר. אם אין קשר אמיתי בין
+תחומים, תעדיף פשוט את הפריט הכי דחוף (לפי תאריך, אם יש).
+אם הנתונים לא מספיקים לזהות קשר אמיתי — אל תמציא אחד. עדיף פשוט וברור מאשר תובנה מזויפת.
+
 טון: בטוח, ענייני, לא נלהב מדי, בלי אימוג'ים. שתי משפטים לכל היותר.
 החזר אך ורק JSON תקין בצורה: {"headline": "...", "subtext": "..."}
-headline — משפט מנחה אחד (עד 12 מילים). subtext — פירוט קצר של מה שדורש תשומת לב, או עידוד קצר אם הכל בסדר.`;
+headline — משפט מנחה אחד (עד 12 מילים). subtext — ההסבר/הקשר הקצר, או עידוד קצר אם הכל בסדר.`;
 
 function err(message, status) {
   return Response.json({ error: message }, { status });
@@ -28,13 +38,21 @@ export async function POST(request) {
     return err("בקשה לא תקינה.", 400);
   }
 
-  const { urgentActions, openTasks, greeting } = body || {};
+  const { urgentActions, openTasks, greeting, money, home, finance, career, health, wellbeing } = body || {};
   if (!Array.isArray(urgentActions)) return err("בקשה לא תקינה.", 400);
 
-  const summary = urgentActions.length
-    ? urgentActions.slice(0, 6).map(a => `- [${a.company}] ${a.text} (${a.detail})`).join("\n")
-    : "אין פעולות דחופות פתוחות כרגע.";
-  const userPrompt = `${greeting || ""}\nסה"כ פעולות פתוחות בכל החברות: ${openTasks ?? 0}\nפעולות שדורשות תשומת לב:\n${summary}`;
+  const context = {
+    greeting: greeting || null,
+    totalOpenTasks: openTasks ?? 0,
+    urgentActions: urgentActions.slice(0, 6),
+    money: money || null,
+    home: home || null,
+    finance: finance || null,
+    career: career || null,
+    health: health || null,
+    wellbeing: wellbeing || null,
+  };
+  const userPrompt = `תמונת המצב היום:\n${JSON.stringify(context, null, 2)}`;
 
   let res;
   try {

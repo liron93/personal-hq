@@ -67,16 +67,32 @@ export default function CEO() {
   useEffect(() => {
     if (!Object.keys(summaries).length) return;
     let alive = true;
+    const homeItems = (summaries["beit-hadash"]?.data?.items || [])
+      .filter(item => item.beforeMove && item.status !== "הושלם")
+      .map(item => ({ name: item.name, status: item.status, dueDate: item.dueDate || null, estimate: item.estimate || null }));
+    const wellbeingToday = summaries.nefesh?.data?.today;
+    const openDecisions = (summaries.nefesh?.data?.decisions || [])
+      .filter(item => item?.status === "open")
+      .map(item => item.title || item.text)
+      .filter(Boolean);
     fetch("/api/jarvis", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ urgentActions, openTasks, greeting }),
+      body: JSON.stringify({
+        greeting, openTasks, urgentActions,
+        money: { income, mortgageMonthly: core?.mortgageMonthly ?? null },
+        home: { items: homeItems, paid: home?.paid ?? null, planned: home?.planned ?? null },
+        finance: { netWorth: finance?.netWorth ?? null, overBudget: finance?.overBudget ?? null },
+        career: { activeJobs: career?.activeJobs ?? null, nextStep: career?.nextStep ?? null },
+        health: { weekWorkouts: health?.weekWorkouts ?? null, weekMeals: health?.weekMeals ?? null, goal: health?.profile?.goal ?? null },
+        wellbeing: { load: wellbeingToday?.load || null, status: wellbeingToday?.status || null, openDecisions },
+      }),
     })
       .then(res => (res.ok ? res.json() : null))
       .then(result => { if (alive && result?.headline) setJarvisBriefing(result); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [summaries, urgentActions, openTasks, greeting]);
+  }, [summaries, urgentActions, openTasks, greeting, income, core, home, finance, career, health]);
 
   return <main className={styles.page}>
     <div className={styles.aurora} aria-hidden="true" />
