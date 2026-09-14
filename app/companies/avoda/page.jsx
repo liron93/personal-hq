@@ -3,7 +3,7 @@ import Company from "@/companies/avoda/Company";
 
 export default function Page() {
   return (
-    <CompanyShell title="קריירה">
+    <CompanyShell title="קריירה" fullWidth>
       <Company />
     </CompanyShell>
   );
