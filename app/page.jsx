@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowUpLeft, BellRing, Bot, BriefcaseBusiness, Building2, ChevronLeft, CircleAlert, CircleCheck, Dumbbell, HeartPulse, Home, Landmark, MoreHorizontal, Plus, Sparkles, WalletCards, X } from "lucide-react";
+import { ArrowLeft, ArrowUpLeft, BellRing, Bot, BriefcaseBusiness, Building2, ChevronLeft, CircleAlert, CircleCheck, Dumbbell, HeartPulse, Home, Landmark, MessageCircle, MoreHorizontal, Plus, Send, Sparkles, WalletCards, X } from "lucide-react";
 import { COMPANIES } from "@/companies/registry";
 import { load, useStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
@@ -43,6 +43,11 @@ export default function CEO() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [jarvisBriefing, setJarvisBriefing] = useState(null);
+  const [jarvisChatOpen, setJarvisChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState("");
   const today = new Date();
   const greeting = today.getHours() < 12 ? "בוקר טוב, לירון" : today.getHours() < 18 ? "צהריים טובים, לירון" : "ערב טוב, לירון";
   const companies = useMemo(() => COMPANIES.map(c => ({ ...c, summary: summaries[c.slug]?.summary, data: summaries[c.slug]?.data, ...meta[c.slug] })), [summaries]);
@@ -64,9 +69,8 @@ export default function CEO() {
     return actions.slice(0, 6);
   }, [summaries, career]);
 
-  useEffect(() => {
-    if (!Object.keys(summaries).length) return;
-    let alive = true;
+  const jarvisContext = useMemo(() => {
+    if (!Object.keys(summaries).length) return null;
     const homeItems = (summaries["beit-hadash"]?.data?.items || [])
       .filter(item => item.beforeMove && item.status !== "הושלם")
       .map(item => ({ name: item.name, status: item.status, dueDate: item.dueDate || null, estimate: item.estimate || null }));
@@ -75,24 +79,55 @@ export default function CEO() {
       .filter(item => item?.status === "open")
       .map(item => item.title || item.text)
       .filter(Boolean);
+    return {
+      greeting, openTasks, urgentActions,
+      money: { income, mortgageMonthly: core?.mortgageMonthly ?? null },
+      home: { items: homeItems, paid: home?.paid ?? null, planned: home?.planned ?? null },
+      finance: { netWorth: finance?.netWorth ?? null, overBudget: finance?.overBudget ?? null },
+      career: { activeJobs: career?.activeJobs ?? null, nextStep: career?.nextStep ?? null },
+      health: { weekWorkouts: health?.weekWorkouts ?? null, weekMeals: health?.weekMeals ?? null, goal: health?.profile?.goal ?? null },
+      wellbeing: { load: wellbeingToday?.load || null, status: wellbeingToday?.status || null, openDecisions },
+    };
+  }, [summaries, urgentActions, openTasks, greeting, income, core, home, finance, career, health]);
+
+  useEffect(() => {
+    if (!jarvisContext) return;
+    let alive = true;
     fetch("/api/jarvis", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        greeting, openTasks, urgentActions,
-        money: { income, mortgageMonthly: core?.mortgageMonthly ?? null },
-        home: { items: homeItems, paid: home?.paid ?? null, planned: home?.planned ?? null },
-        finance: { netWorth: finance?.netWorth ?? null, overBudget: finance?.overBudget ?? null },
-        career: { activeJobs: career?.activeJobs ?? null, nextStep: career?.nextStep ?? null },
-        health: { weekWorkouts: health?.weekWorkouts ?? null, weekMeals: health?.weekMeals ?? null, goal: health?.profile?.goal ?? null },
-        wellbeing: { load: wellbeingToday?.load || null, status: wellbeingToday?.status || null, openDecisions },
-      }),
+      body: JSON.stringify(jarvisContext),
     })
       .then(res => (res.ok ? res.json() : null))
       .then(result => { if (alive && result?.headline) setJarvisBriefing(result); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [summaries, urgentActions, openTasks, greeting, income, core, home, finance, career, health]);
+  }, [jarvisContext]);
+
+  const sendChatMessage = async event => {
+    event.preventDefault();
+    const text = chatInput.trim();
+    if (!text || chatSending) return;
+    setChatError("");
+    setChatInput("");
+    const nextMessages = [...chatMessages, { role: "user", text }];
+    setChatMessages(nextMessages);
+    setChatSending(true);
+    try {
+      const res = await fetch("/api/jarvis/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messages: nextMessages, context: jarvisContext }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.reply) { setChatError(data?.error || "JARVIS לא הצליח לענות."); return; }
+      setChatMessages(list => [...list, { role: "model", text: data.reply }]);
+    } catch {
+      setChatError("שגיאה בפנייה ל-JARVIS.");
+    } finally {
+      setChatSending(false);
+    }
+  };
 
   return <main className={styles.page}>
     <div className={styles.aurora} aria-hidden="true" />
@@ -102,7 +137,7 @@ export default function CEO() {
     </header>
     <section className={styles.hero}><div><p className={styles.date}>{dateLabel}</p><h1>{greeting}<span className={styles.wave}>✦</span></h1><p className={styles.heroCopy}>הכול במקום אחד. בוא נסדר את הדבר הבא שיקדם אותך היום.</p></div><div className={styles.heroActions}><button onClick={() => setQuickOpen(true)} className={styles.primaryAction}><Plus size={18} /> פעולה חדשה</button><a href="#companies" className={styles.secondaryAction}>לכל החברות <ArrowLeft size={17} /></a></div></section>
     <section className={styles.command}><div className={styles.commandIntro}><span className={styles.commandIcon}><Sparkles size={20} /></span><div><p>מרכז השליטה</p><strong>{urgentActions.length ? `${urgentActions.length} נושאים מחכים לתשומת לב` : "המערכת בשליטה. ממשיכים בתנופה."}</strong></div></div><div className={styles.commandStats}><div><b>{openTasks}</b><span>פעולות פתוחות</span></div><div><b>{career?.activeJobs || 0}</b><span>משרות פעילות</span></div><div><b>{home?.urgent || 0}</b><span>נושאי בית דחופים</span></div></div></section>
-    <section className={styles.jarvisPanel} aria-label="מרכז הבינה של Personal HQ"><div className={styles.jarvisCore} aria-hidden="true"><i /><i /><i /></div><div className={styles.jarvisCopy}><p><Bot size={15} /> JARVIS // PERSONAL HQ</p><h2>{jarvisBriefing?.headline || "אני מרכז עבורך את מה שדורש החלטה — בלי להעמיס."}</h2><span>{jarvisBriefing?.subtext || (urgentActions.length ? `זיהיתי ${urgentActions.length} פעולות שמומלץ לסגור קודם.` : "כרגע אין חסימה בולטת. נמשיך לעקוב.")}</span></div><button className={styles.jarvisAction} onClick={() => setAlertsOpen(true)}>פתח תדריך <ArrowLeft size={16} /></button></section>
+    <section className={styles.jarvisPanel} aria-label="מרכז הבינה של Personal HQ"><div className={styles.jarvisCore} aria-hidden="true"><i /><i /><i /></div><div className={styles.jarvisCopy}><p><Bot size={15} /> JARVIS // PERSONAL HQ</p><h2>{jarvisBriefing?.headline || "אני מרכז עבורך את מה שדורש החלטה — בלי להעמיס."}</h2><span>{jarvisBriefing?.subtext || (urgentActions.length ? `זיהיתי ${urgentActions.length} פעולות שמומלץ לסגור קודם.` : "כרגע אין חסימה בולטת. נמשיך לעקוב.")}</span></div><div className={styles.jarvisActions}><button className={styles.jarvisAction} onClick={() => setAlertsOpen(true)}>פתח תדריך <ArrowLeft size={16} /></button><button className={styles.jarvisAction} onClick={() => setJarvisChatOpen(true)}><MessageCircle size={16} /> שאל את JARVIS</button></div></section>
     {urgentActions.length > 0 && <section className={overlay.urgentPanel} aria-label="פעולות דחופות"><div className={overlay.urgentTitle}><div><p className={styles.eyebrow}>דורש פעולה</p><h2>אלה הדברים שמחכים לך עכשיו</h2></div><button onClick={() => setAlertsOpen(true)}>לכל ההתראות <ArrowLeft size={16} /></button></div><div className={overlay.urgentList}>{urgentActions.slice(0, 3).map((action, index) => <Link href={action.href} key={`${action.company}-${index}`} className={overlay.urgentItem}><span className={`${overlay.urgentNumber} ${overlay[action.tone]}`}>{index + 1}</span><span className={overlay.urgentContent}><b>{action.text}</b><small>{action.company} · {action.detail}</small></span><ChevronLeft size={18} /></Link>)}</div></section>}
     <section className={styles.gridTop}><article className={`${styles.card} ${styles.nextCard}`}><div className={styles.cardTop}><div><p className={styles.eyebrow}>הדבר הבא</p><h2>{attention[0] ? `בדיקה מול ${attention[0].name}` : "סקירה יומית קצרה"}</h2></div><span className={styles.pulse}><span /></span></div>{career?.nextStep ? <p className={styles.nextDescription}>{career.nextStep.company}: {career.nextStep.text}</p> : <p className={styles.nextDescription}>פתח את החברה שהכי חשובה היום ובחר פעולה אחת קטנה לקידום.</p>}<Link href={attention[0] ? `/companies/${attention[0].slug}` : "/companies/beit-hadash"} className={styles.inlineLink}>לטיפול עכשיו <ArrowLeft size={16} /></Link></article><article className={`${styles.card} ${styles.moneyCard}`}><div className={styles.cardTop}><div><p className={styles.eyebrow}>תמונת כסף</p><h2>החודש שלך</h2></div><Landmark size={21} /></div><div className={styles.moneyRow}><span>הכנסה חודשית</span><strong>{money(income)}</strong></div><div className={styles.moneyRow}><span>משכנתא</span><strong>{money(core?.mortgageMonthly)}</strong></div><Link href="/companies/kesef" className={styles.inlineLink}>למרכז הכספים <ArrowLeft size={16} /></Link></article></section>
     <section className={styles.sectionHeader} id="companies"><div><p className={styles.eyebrow}>החברות שלי</p><h2>מה קורה בכל תחום</h2></div><span>{companies.length} פעילות</span></section>
@@ -111,5 +146,17 @@ export default function CEO() {
     {coreReady && <section className={styles.coreStrip}><div><CircleAlert size={18} /><span>נתוני ליבה ניתנים לעריכה מהירה כאן</span></div><label>הכנסה שלך<input value={core.mySalary || ""} inputMode="numeric" onChange={e => coreUpd("mySalary", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} /></label><label>הכנסת בת הזוג<input value={core.wifeSalary || ""} inputMode="numeric" onChange={e => coreUpd("wifeSalary", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} /></label></section>}
     <footer className={styles.footer}>Personal HQ <span /> שליטה שקטה בחיים שלך <ArrowUpLeft size={14} /></footer>
     {(alertsOpen || quickOpen) && <div className={overlay.overlay} onClick={() => { setAlertsOpen(false); setQuickOpen(false); }}><section className={overlay.modal} onClick={event => event.stopPropagation()}><div className={overlay.modalTop}><div><p className={styles.eyebrow}>{alertsOpen ? "מרכז התראות" : "פעולה חדשה"}</p><h2>{alertsOpen ? "מה דורש ממך תשומת לב" : "איפה נתחיל?"}</h2></div><button aria-label="סגירה" onClick={() => { setAlertsOpen(false); setQuickOpen(false); }}><X size={21} /></button></div>{alertsOpen ? <div className={overlay.modalList}>{urgentActions.length ? urgentActions.map((action, index) => <Link href={action.href} key={`${action.company}-${index}`} className={overlay.modalItem} onClick={() => setAlertsOpen(false)}><Flag flag="amber" /><span><b>{action.text}</b><small>{action.company} · {action.detail}</small></span><ChevronLeft size={17} /></Link>) : <p className={overlay.empty}>אין כרגע התראות שממתינות לפעולה.</p>}</div> : <div className={overlay.quickGrid}>{companies.map(company => { const Icon = company.icon; return <Link href={`/companies/${company.slug}`} key={company.slug} className={overlay.quickItem} onClick={() => setQuickOpen(false)}><span className={`${overlay.quickIcon} ${overlay[company.tone]}`}><Icon size={19} /></span><span><b>{company.name}</b><small>הוספה או עדכון</small></span><ChevronLeft size={16} /></Link>; })}</div>}</section></div>}
+    {jarvisChatOpen && <div className={overlay.overlay} onClick={() => setJarvisChatOpen(false)}><section className={`${overlay.modal} ${overlay.chatModal}`} onClick={event => event.stopPropagation()}><div className={overlay.modalTop}><div><p className={styles.eyebrow}>JARVIS</p><h2>שאל אותי משהו</h2></div><button aria-label="סגירה" onClick={() => setJarvisChatOpen(false)}><X size={21} /></button></div>
+      <div className={overlay.chatLog}>
+        {!chatMessages.length && <p className={overlay.empty}>שאל אותי על מה שקורה בחברות שלך — אני עונה על סמך הנתונים שיש לי כרגע.</p>}
+        {chatMessages.map((message, index) => <p key={index} className={message.role === "user" ? overlay.chatBubbleUser : overlay.chatBubbleAi}>{message.text}</p>)}
+        {chatSending && <p className={overlay.chatBubbleAi}>חושב…</p>}
+      </div>
+      {chatError && <p className={overlay.chatErrorText}>{chatError}</p>}
+      <form className={overlay.chatForm} onSubmit={sendChatMessage}>
+        <input className={overlay.chatInput} value={chatInput} onChange={event => setChatInput(event.target.value)} placeholder="מה שלום התקציב שלי החודש?" disabled={chatSending} />
+        <button className={overlay.chatSend} type="submit" aria-label="שליחה" disabled={chatSending || !chatInput.trim()}><Send size={17} /></button>
+      </form>
+    </section></div>}
   </main>;
 }
