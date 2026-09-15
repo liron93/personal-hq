@@ -34,6 +34,7 @@ function useSummaries() {
 }
 
 const meta = {
+  investments: { icon: Landmark, tone: "purple", manager: "אופק" },
   "beit-hadash": { icon: Home, tone: "orange", manager: "שקד" }, kesef: { icon: WalletCards, tone: "purple", manager: "שבתאי ואופק" },
   health: { icon: Dumbbell, tone: "green", manager: "גל" }, avoda: { icon: BriefcaseBusiness, tone: "blue", manager: "רועי" }, nefesh: { icon: HeartPulse, tone: "pink", manager: "אוריה" },
 };
