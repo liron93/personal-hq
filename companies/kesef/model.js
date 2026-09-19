@@ -17,6 +17,16 @@ export const BUDGET_CATS_DEFAULT = ["מזון", "ביטוחים", "מנויים"
 // קטגוריית תקציב — אותו דפוס כמו פריט exp/reno בבית חדש: est=מתוכנן, act=בפועל החודש
 export const bEff = b => ((b.act || 0) > 0 ? b.act : b.est) || 0;
 export const bOver = b => (b.act || 0) > 0 && (b.act || 0) > (b.est || 0);
+export const bPercent = b => {
+  const planned = Number(b?.est || 0), actual = Number(b?.act || 0);
+  return planned > 0 ? Math.round((actual / planned) * 100) : 0;
+};
+export const budgetAlerts = budget => (budget || []).flatMap(item => {
+  const pct = bPercent(item);
+  if (pct > 100) return [{ id: `over-${item.id}`, level: "critical", item, pct, message: `חרגת ב-${item.n}` }];
+  if (pct >= 80) return [{ id: `near-${item.id}`, level: "warning", item, pct, message: `מתקרבים לתקציב ב-${item.n}` }];
+  return [];
+});
 export const assetsTotal = a => ASSET_KEYS.reduce((s, { k }) => s + (a?.[k] || 0), 0);
 
 // "YYYY-MM" של חודש קלנדרי (ברירת מחדל: עכשיו)
@@ -109,6 +119,8 @@ export const INIT = {
     cat(5, "חיסכון", 0),
     cat(6, "אחר", 0),
   ],
+  // התחייבויות שהמשתמש מזין ידנית. אין חיבור בנקאי ואין הנחות על תשלומים בפועל.
+  commitments: [], // {id, name, amount, dueDate, kind:"בית"|"משכנתה"|"קבועה"|"אחר", status:"מתוכנן"|"שולם"}
   tasks: [],
   updates: [],
   history: [], // צילומי שווי נקי חודשיים: { id, month:"YYYY-MM", assets:{...}, total }

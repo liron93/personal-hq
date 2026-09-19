@@ -4,12 +4,13 @@ import { INK, BG, GREEN, RUST, MUTED, LINE, cardStyle, inputStyle } from "@/lib/
 import { ils, toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
 import { cp } from "@/lib/store";
-import { bOver } from "./model";
+import { bOver, bPercent, budgetAlerts } from "./model";
 
 function CatRow({ item, onUpdate, onDelete }) {
   const [open, setOpen] = useState(false);
   const est = item.est || 0, act = item.act || 0;
   const over = bOver(item);
+  const pct = bPercent(item);
   return (
     <div style={{ borderBottom: `1px solid ${LINE}`, padding: "8px 0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -19,8 +20,9 @@ function CatRow({ item, onUpdate, onDelete }) {
             <div style={{ fontSize: 14, textDecoration: item.done ? "line-through" : "none", opacity: item.done ? 0.5 : 1 }}>{item.n}</div>
             <div style={{ fontSize: 11, color: MUTED }}>
               מתוכנן: {ils(est)}
-              {act > 0 && <span style={{ color: over ? RUST : GREEN }}> · בפועל: {ils(act)}</span>}
+              {act > 0 && <span style={{ color: over ? RUST : GREEN }}> · בפועל: {ils(act)} · {pct}%</span>}
             </div>
+            <div className={`budget-progress ${over ? "is-over" : pct >= 80 ? "is-near" : ""}`}><span style={{ width: `${Math.min(pct, 100)}%` }} /></div>
           </div>
         </div>
         <div style={{ fontSize: 13, whiteSpace: "nowrap", color: over ? RUST : INK }}>{ils(act > 0 ? act : est)}</div>
@@ -47,6 +49,7 @@ export default function Budget({ d, setD }) {
   const planned = items.reduce((s, b) => s + (b.est || 0), 0);
   const actual = items.reduce((s, b) => s + (b.act || 0), 0);
   const diff = planned - actual;
+  const alerts = budgetAlerts(items);
 
   const updateItem = (id, ni) => setD(p => { const n = cp(p); const idx = n.budget.findIndex(x => x.id === id); if (idx >= 0) n.budget[idx] = ni; return n; });
   const deleteItem = id => setD(p => { const n = cp(p); n.budget = n.budget.filter(x => x.id !== id); return n; });
@@ -58,6 +61,7 @@ export default function Budget({ d, setD }) {
 
   return (
     <div>
+      {alerts.length > 0 && <div className="budget-alert"><strong>{alerts.length} חריגות או התראות תקציב</strong><span>{alerts.map(x => x.message).join(" · ")}</span></div>}
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
         <Metric label="מתוכנן" value={ils(planned)} />
         <Metric label="בפועל" value={ils(actual)} color={actual > planned ? RUST : GREEN} />

@@ -10,6 +10,8 @@ import Dash from "./Dash";
 import Budget from "./Budget";
 import Assets from "./Assets";
 import Watchlist from "./Watchlist";
+import Flow from "./Flow";
+import "@/app/finance-control-room.css";
 
 // recharts כבד — נטען רק כשנכנסים לטאב ההיסטוריה
 const History = dynamic(() => import("./History"), {
@@ -18,7 +20,7 @@ const History = dynamic(() => import("./History"), {
 });
 
 const TABS = [
-  { id: "dash", l: "דשבורד" }, { id: "history", l: "היסטוריה" }, { id: "budget", l: "תקציב" },
+  { id: "dash", l: "תמונת מצב" }, { id: "flow", l: "תזרים" }, { id: "budget", l: "תקציב" }, { id: "history", l: "היסטוריה" },
   { id: "assets", l: "נכסים" }, { id: "watchlist", l: "מעקב מניות" }, { id: "tasks", l: "משימות ועדכון" },
 ];
 
@@ -37,16 +39,21 @@ export default function Company() {
 
   if (!ready || !coreReady) return <div style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>טוען...</div>;
   return (
-    <div>
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}>
-        {TABS.map(t => <button key={t.id} onClick={() => setTab(t.id)} style={tabBtn(tab === t.id)}>{t.l}</button>)}
+    <div className="finance-console-layout">
+      <aside className="finance-console-nav" aria-label="מחלקות בחברת הכספים">
+        <span className="finance-console-brand">FINANCE / 02</span>
+        {TABS.map(t => <button className={`finance-nav-item ${tab === t.id ? "is-active" : ""}`} key={t.id} onClick={() => setTab(t.id)} style={tabBtn(tab === t.id)}>{t.l}</button>)}
+        <div className="finance-nav-status"><i />מערכת מקומית · Demo</div>
+      </aside>
+      <div className="finance-console-content">
+        {tab === "dash" && <Dash d={d} core={core} onOpenBudget={() => setTab("budget")} />}
+        {tab === "flow" && <Flow d={d} setD={setD} core={core} />}
+        {tab === "history" && <History d={d} setD={setD} />}
+        {tab === "budget" && <Budget d={d} setD={setD} />}
+        {tab === "assets" && <Assets d={d} upd={upd} />}
+        {tab === "watchlist" && <Watchlist d={d} setD={setD} totalNetWorth={assetsTotal(d.assets)} />}
+        {tab === "tasks" && <CompanyTasks d={d} setD={setD} />}
       </div>
-      {tab === "dash" && <Dash d={d} core={core} />}
-      {tab === "history" && <History d={d} setD={setD} />}
-      {tab === "budget" && <Budget d={d} setD={setD} />}
-      {tab === "assets" && <Assets d={d} upd={upd} />}
-      {tab === "watchlist" && <Watchlist d={d} setD={setD} totalNetWorth={assetsTotal(d.assets)} />}
-      {tab === "tasks" && <CompanyTasks d={d} setD={setD} />}
     </div>
   );
 }
