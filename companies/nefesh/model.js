@@ -39,6 +39,7 @@ export function normalize(data) {
     due: typeof task.due === "string" ? task.due : "",
     source: typeof task.source === "string" ? task.source : "",
     owner: typeof task.owner === "string" ? task.owner : "",
+    link: typeof task.link === "string" ? task.link : "",
   }));
   next.weekly = { ...INIT.weekly, ...(data?.weekly && typeof data.weekly === "object" ? data.weekly : {}) };
   next.decisions = records(data?.decisions);
