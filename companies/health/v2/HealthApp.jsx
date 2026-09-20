@@ -21,7 +21,7 @@ function IconButton({ label, children, ...props }) { return <button aria-label={
 function Header({ setTab }) { return <header className={css.header}><div><Link href="/" className={css.back}>חזרה למנכ״ל</Link><p className={css.eyebrow}>מרחב האימון והתזונה שלך</p><h1 className={css.title}>אימון ותזונה</h1></div><button onClick={()=>setTab("settings")} className={css.profileButton}>הפרופיל שלי</button></header>; }
 function Nav({ tab, onNavigate }) { return <><aside className={css.desktopAside}>{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>onNavigate(id)} className={tab===id?css.active:""}><Icon size={18}/> {label}</button>)}</aside><nav className={css.bottomNav} aria-label="ניווט חברת אימון ותזונה">{NAV.map(([id,label,Icon])=><button key={id} onClick={()=>onNavigate(id)} className={css.navItem+" "+(tab===id?css.active:"")} aria-current={tab===id?"page":undefined}><Icon/><span>{label}</span></button>)}</nav></>; }
 
-function Onboarding({ d, setD }) {
+function Onboarding({ d, setD, onExit }) {
   const steps = [
     { key:"goal", title:"מה חשוב לך להשיג?", help:"אפשר לבחור יותר ממטרה אחת.", multi:true, options:["להיכנס לכושר לקראת החתונה","לבנות כוח ומסת שריר","לרדת במשקל","לחזור לכושר","להרגיש יותר אנרגיה","לשפר ביטחון עצמי","לשפר סיבולת"] },
     { key:"focus", title:"מה תרצה/י לכלול בתוכנית?", help:"אפשר לבחור כמה כיוונים.", multi:true, options:["אימוני כוח","כושר אירובי","ניידות וגמישות","תזונה והרגלים","שילוב מאוזן","רק להתחיל בעדינות"] },
@@ -41,6 +41,7 @@ function Onboarding({ d, setD }) {
   const [draft, setDraft] = useState(d.profile);
   const [attempted, setAttempted] = useState(false);
   const current = steps[step];
+  const editingProfile = Boolean(d.profile.editingProfile);
   const selectedValues = Array.isArray(draft[current.key]) ? draft[current.key] : draft[current.key] ? [draft[current.key]] : [];
   const hasSelection = selectedValues.length > 0;
   const select = value => setDraft(profile => {
@@ -48,10 +49,10 @@ function Onboarding({ d, setD }) {
     return { ...profile, [current.key]: current.multi ? (old.includes(value) ? old.filter(item => item !== value) : [...old, value]) : value };
   });
   const persist = nextStep => { setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:nextStep } })); setStep(nextStep); };
-  const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:steps.length, complete:true } })); };
+  const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:steps.length, complete:true, editingProfile:false } })); };
   const previous = () => { if (step > 0) { setAttempted(false); persist(step - 1); } };
   return <main className={css.onboard}>
-    <Link href="/" className={css.back}>חזרה למנכ״ל</Link>
+    {editingProfile ? <button className={css.back} onClick={onExit}>חזרה לדשבורד</button> : <Link href="/" className={css.back}>חזרה למנכ״ל</Link>}
     <p className={css.eyebrow}>פרופיל האימונים שלך · {step + 1} מתוך {steps.length}</p>
     <div className={css.progressLine}>{steps.map((_,i) => <i key={i} className={i <= step ? css.done : ""} />)}</div>
     <section className={css.card+" "+css.stack}>
@@ -117,12 +118,13 @@ function SettingsView({ d,setD,editProfile }) {const [confirm,setConfirm]=useSta
 export default function HealthApp() {
  const {data:d,setData:setD,ready}=useStore(STORE_KEY,INIT);const [tab,setTab]=useState("today"),[composer,setComposer]=useState(null),[more,setMore]=useState(false),[deleted,setDeleted]=useState(null),[toast,setToast]=useState("");
  const navigate = nextTab => { setComposer(null); setMore(false); setTab(nextTab); };
- const editProfile = () => setD(data => ({ ...data, profile:{ ...data.profile, onboardingStep:0, complete:false } }));
+ const editProfile = () => setD(data => ({ ...data, profile:{ ...data.profile, onboardingStep:0, complete:false, editingProfile:true } }));
+ const exitProfileEdit = () => setD(data => ({ ...data, profile:{ ...data.profile, complete:true, editingProfile:false } }));
  const notify=(message)=>{setComposer(null);setToast(message+" יפה שפינית לזה רגע.");setTimeout(()=>setToast(""),5000)};
  const remove=item=>{setD(p=>item.type==="food"?{...p,meals:p.meals.filter(x=>x.id!==item.id)}:{...p,workouts:p.workouts.filter(x=>x.id!==item.id)});setDeleted(item);setToast("הפריט נמחק.");setTimeout(()=>setDeleted(null),7000)};
  const undo=()=>{if(!deleted)return;setD(p=>deleted.type==="food"?{...p,meals:[deleted,...p.meals]}:{...p,workouts:[deleted,...p.workouts]});setDeleted(null);setToast("הפריט הוחזר.");};
  if(!ready)return <div className={css.empty}>טוען את היומן…</div>;
- if(!d.profile.complete)return <div className={css.shell}><Onboarding d={d} setD={setD}/></div>;
+ if(!d.profile.complete)return <div className={css.shell}><Onboarding d={d} setD={setD} onExit={exitProfileEdit}/></div>;
  const content=composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:tab==="today"?<Today d={d} setD={setD} setTab={setTab} setComposer={setComposer}/>:tab==="journal"?<Journal d={d} setD={setD} setComposer={setComposer} remove={remove}/>:tab==="plan"?<Plan d={d} setD={setD}/>:tab==="progress"?<Progress d={d} setD={setD}/>:<SettingsView d={d} setD={setD} editProfile={editProfile}/>;
  return <div className={css.shell}><Header setTab={navigate}/><Nav tab={tab} onNavigate={navigate}/><main className={css.content}>{content}</main>{toast&&<div className={css.toast} role="status"><span>{toast}</span>{deleted&&<button onClick={undo}>ביטול</button>}</div>}</div>;
 }
