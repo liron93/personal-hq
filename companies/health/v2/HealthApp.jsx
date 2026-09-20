@@ -41,7 +41,6 @@ function Onboarding({ d, setD, onExit }) {
   const [draft, setDraft] = useState(d.profile);
   const [attempted, setAttempted] = useState(false);
   const current = steps[step];
-  const editingProfile = Boolean(d.profile.editingProfile);
   const selectedValues = Array.isArray(draft[current.key]) ? draft[current.key] : draft[current.key] ? [draft[current.key]] : [];
   const hasSelection = selectedValues.length > 0;
   const select = value => setDraft(profile => {
@@ -52,7 +51,7 @@ function Onboarding({ d, setD, onExit }) {
   const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:steps.length, complete:true, editingProfile:false } })); };
   const previous = () => { if (step > 0) { setAttempted(false); persist(step - 1); } };
   return <main className={css.onboard}>
-    {editingProfile ? <button className={css.back} onClick={onExit}>חזרה לדשבורד</button> : <Link href="/" className={css.back}>חזרה למנכ״ל</Link>}
+    <div className={css.onboardingActions}><button className={css.back} onClick={onExit}>חזרה לדשבורד</button><Link href="/" className={css.back}>חזרה למנכ״ל</Link></div>
     <p className={css.eyebrow}>פרופיל האימונים שלך · {step + 1} מתוך {steps.length}</p>
     <div className={css.progressLine}>{steps.map((_,i) => <i key={i} className={i <= step ? css.done : ""} />)}</div>
     <section className={css.card+" "+css.stack}>
