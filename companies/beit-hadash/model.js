@@ -1,5 +1,15 @@
 export const STORE_KEY = "hq:beit-hadash:v2";
 
+// קטגוריות ברירת מחדל של הצ'ק ליסט (אחרי זה המשתמש מנהל אותן בעצמו).
+export const CHECKLIST_GROUPS = ["בקבלת המפתח", "לפני הכניסה", "אחרי הכניסה"];
+
+// רשימת התחלה כללית למעבר לדירה חדשה — מזהים קבועים (לא אקראיים), כדי שלא ישתנו בין רינדורים לפני השמירה הראשונה. אפשר למחוק ולהוסיף חופשי.
+export const DEFAULT_CHECKLIST = [
+  ["בדק בית מקצועי ורישום ליקויים", 0], ["קריאת מונים (מים, חשמל, גז) וצילום", 0], ["קבלת כל המפתחות, השלטים והשלט־רחוק", 0],
+  ["העברת חשבונות (חשמל, מים, גז, ארנונה) על שמי", 1], ["ביטוח דירה (מבנה ותכולה)", 1], ["התקנת אינטרנט וטלוויזיה", 1], ["ניקיון אחרי שיפוץ", 1], ["הזמנת הובלה", 1],
+  ["עדכון כתובת (משרד הפנים, בנק, ביטוח, עבודה)", 2], ["הכרות עם ועד הבית וקבלת פרטי קשר", 2],
+].map(([text, g], i) => ({ id: `cl-${i + 1}`, text, group: CHECKLIST_GROUPS[g], done: false }));
+
 export const INIT = {
   renovationV2: true,
   items: [
@@ -14,6 +24,9 @@ export const INIT = {
     { id: "move", name: "כניסה לדירה", date: "", status: "דורש אימות", blocker: "יש לאמת שנה ומועד" },
   ],
   documents: [],
+  checklist: DEFAULT_CHECKLIST,
+  checklistCategories: CHECKLIST_GROUPS, // קטגוריות הצ'ק ליסט; המשתמש מוסיף/מוחק (רק ריקות)
+  inspirations: [], // { id, title, description, link }
 };
 
 export function summarize(data) {
