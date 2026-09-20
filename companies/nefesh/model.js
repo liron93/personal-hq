@@ -42,6 +42,9 @@ export function normalize(data) {
     link: typeof task.link === "string" ? task.link : "",
     priority: ["urgent", "high", "normal", "low"].includes(task.priority) ? task.priority : "normal",
     pomodoros: Number.isInteger(task.pomodoros) && task.pomodoros >= 1 && task.pomodoros <= 8 ? task.pomodoros : 1,
+    description: typeof task.description === "string" ? task.description : "",
+    time: typeof task.time === "string" ? task.time : "",
+    status: task.status === "done" || task.done ? "done" : "open",
   }));
   next.focusTimer = data?.focusTimer && typeof data.focusTimer === "object" ? data.focusTimer : {};
   next.morningPlan = data?.morningPlan && typeof data.morningPlan === "object" ? data.morningPlan : {};
