@@ -40,7 +40,10 @@ export function normalize(data) {
     source: typeof task.source === "string" ? task.source : "",
     owner: typeof task.owner === "string" ? task.owner : "",
     link: typeof task.link === "string" ? task.link : "",
+    priority: ["urgent", "high", "normal", "low"].includes(task.priority) ? task.priority : "normal",
   }));
+  next.focusTimer = data?.focusTimer && typeof data.focusTimer === "object" ? data.focusTimer : {};
+  next.morningPlan = data?.morningPlan && typeof data.morningPlan === "object" ? data.morningPlan : {};
   next.weekly = { ...INIT.weekly, ...(data?.weekly && typeof data.weekly === "object" ? data.weekly : {}) };
   next.decisions = records(data?.decisions);
   next.conversations = records(data?.conversations);
