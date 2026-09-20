@@ -37,22 +37,27 @@ test("personal companies are never part of the shared workspace", () => {
   for (const caps of Object.values(authz.ROLE_TEMPLATES)) for (const c of caps) assert.equal(/health|wellbeing|career|nefesh|avoda/.test(c), false, c);
 });
 
-test("option A (default) gives budget without raw transactions; option B adds them; the designer sees Beit Hadash only", () => {
-  const a = authz.capabilitiesForTemplate(authz.DEFAULT_PARTNER_TEMPLATE);
-  assert.equal(authz.DEFAULT_PARTNER_TEMPLATE, "partner_budget_view");
-  assert.equal(authz.financeLevel(a), "dashboard_budget");
-  assert.equal(authz.canAccessStateKey(a, "hq:kesef:v1"), true);
-  assert.equal(authz.canAccessStateKey(a, "hq:kesef:v1", { write: true }), false);
-  assert.equal(authz.canAccessStateKey(a, "hq:kesef-transactions:v1"), false);
-  const b = authz.capabilitiesForTemplate("partner_full_finance");
+test("option B is the default for the partner: sees all finance incl. transactions, read only; A and B+ differ as designed", () => {
+  assert.equal(authz.DEFAULT_PARTNER_TEMPLATE, "partner_full_finance");
+  const b = authz.capabilitiesForTemplate(authz.DEFAULT_PARTNER_TEMPLATE);
   assert.equal(authz.financeLevel(b), "full");
-  assert.equal(authz.canAccessStateKey(b, "hq:kesef-transactions:v1", { write: true }), true);
+  assert.equal(authz.canAccessStateKey(b, "hq:kesef:v1"), true);
+  assert.equal(authz.canAccessStateKey(b, "hq:kesef-transactions:v1"), true);
+  assert.equal(authz.canAccessStateKey(b, "hq:kesef:v1", { write: true }), false); // "רואה" = קריאה בלבד
+  assert.equal(authz.canAccessStateKey(b, "hq:kesef-transactions:v1", { write: true }), false);
+  assert.equal(authz.canAccessStateKey(b, "hq:beit-hadash:v2", { write: true }), true);
+  const edit = authz.capabilitiesForTemplate("partner_full_finance_edit");
+  assert.equal(authz.canAccessStateKey(edit, "hq:kesef-transactions:v1", { write: true }), true);
+  assert.equal(authz.canAccessStateKey(edit, "hq:kesef:v1", { write: true }), true);
+  const a = authz.capabilitiesForTemplate("partner_budget_view");
+  assert.equal(authz.financeLevel(a), "dashboard_budget");
+  assert.equal(authz.canAccessStateKey(a, "hq:kesef-transactions:v1"), false);
   const d = authz.capabilitiesForTemplate("designer_beit_hadash");
   assert.deepEqual(authz.visibleSharedCompanies(d), ["beit-hadash"]);
   assert.equal(authz.canViewHq(d), false);
   assert.equal(authz.financeLevel(d), "none");
-  assert.deepEqual(authz.visibleSharedCompanies(a).sort(), ["beit-hadash", "kesef"]);
-  assert.equal(authz.canViewHq(a), true);
+  assert.deepEqual(authz.visibleSharedCompanies(b).sort(), ["beit-hadash", "kesef"]);
+  assert.equal(authz.canViewHq(b), true);
 });
 
 test("owner gets everything, unknown keys are owner-only, and unknown templates throw", () => {

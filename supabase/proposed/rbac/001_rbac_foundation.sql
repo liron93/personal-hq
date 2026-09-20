@@ -305,7 +305,7 @@ insert into public.company_capability_map (company_key, read_capability, write_c
 
 -- BEGIN SEED role_templates
 insert into public.role_templates (role, capability) values
-  -- אפשרות A (ברירת המחדל לליאור): דשבורד ותקציב בלבד, בלי תנועות גולמיות. קריאה בלבד בכספים.
+  -- אפשרות A: דשבורד ותקציב בלבד, בלי תנועות גולמיות. קריאה בלבד בכספים.
   ('partner_budget_view', 'hq.view'),
   ('partner_budget_view', 'company.beit-hadash.read'),
   ('partner_budget_view', 'company.beit-hadash.write'),
@@ -318,15 +318,23 @@ insert into public.role_templates (role, capability) values
   ('partner_budget_edit', 'finance.dashboard_budget.read'),
   ('partner_budget_edit', 'finance.dashboard_budget.write'),
   ('partner_budget_edit', 'core.read'),
-  -- אפשרות B: גישה מלאה כולל תנועות וייבואי כספים.
+  -- אפשרות B (ההחלטה של לירון, 21.9.2026, וברירת המחדל לליאור): רואה את כל הכספים כולל תנועות וייבואי כספים.
+  -- קריאה בלבד בכספים. עריכה בכספים היא חבילה נפרדת (B+), כדי שההרשאה תתאים למה שאושר: "רואה".
   ('partner_full_finance', 'hq.view'),
   ('partner_full_finance', 'company.beit-hadash.read'),
   ('partner_full_finance', 'company.beit-hadash.write'),
   ('partner_full_finance', 'finance.dashboard_budget.read'),
-  ('partner_full_finance', 'finance.dashboard_budget.write'),
   ('partner_full_finance', 'finance.transactions.read'),
-  ('partner_full_finance', 'finance.transactions.write'),
   ('partner_full_finance', 'core.read'),
+  -- אפשרות B+: כמו B, וגם עריכת התקציב והתנועות/ייבואים.
+  ('partner_full_finance_edit', 'hq.view'),
+  ('partner_full_finance_edit', 'company.beit-hadash.read'),
+  ('partner_full_finance_edit', 'company.beit-hadash.write'),
+  ('partner_full_finance_edit', 'finance.dashboard_budget.read'),
+  ('partner_full_finance_edit', 'finance.dashboard_budget.write'),
+  ('partner_full_finance_edit', 'finance.transactions.read'),
+  ('partner_full_finance_edit', 'finance.transactions.write'),
+  ('partner_full_finance_edit', 'core.read'),
   -- מעצבת: בית חדש בלבד, בלי HQ ובלי כספים.
   ('designer_beit_hadash', 'company.beit-hadash.read'),
   ('designer_beit_hadash', 'company.beit-hadash.write');

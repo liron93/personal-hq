@@ -113,11 +113,21 @@ truncate spec;
 insert into spec values ('partner hq', 'hq:kesef:v1', 'siu'), ('partner hq', 'hq:kesef-transactions:v1', ''), ('partner hq', 'hq:core:v1', 's');
 select pg_temp.run_matrix('P2 budget edit (A+)');
 
--- שלב 3: אפשרות B (גישה מלאה כולל תנועות): הבחירה היא הרשאה, לא קוד.
+-- שלב 3: אפשרות B (ההחלטה של לירון והברירת מחדל): רואה את כל הכספים כולל תנועות, בקריאה בלבד. הבחירה היא הרשאה, לא קוד.
+-- approve מוסיף יכולות ולא מסיר, ולכן עוברים קודם דרך remove כדי לקבל בדיוק את החבילה.
+select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_remove_member(%L, %L)$q$, pg_temp.home_ws(), pg_temp.partner_id()));
 select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'partner_full_finance')$q$, pg_temp.home_ws(), pg_temp.partner_id()));
 truncate spec;
+insert into spec values
+  ('partner hq', 'hq:beit-hadash:v2', 'siu'), ('partner hq', 'hq:kesef:v1', 's'), ('partner hq', 'hq:kesef-transactions:v1', 's'), ('partner hq', 'hq:core:v1', 's'),
+  ('partner hq', 'hq:unmapped:v1', ''), ('partner hq', 'hq:wellbeing:v3', ''), ('designer hq', 'hq:kesef-transactions:v1', ''), ('designer hq', 'hq:kesef:v1', '');
+select pg_temp.run_matrix('P3 B: full finance, read only (default)');
+
+-- שלב 3ב: אפשרות B+ = B וגם עריכת תקציב ותנועות.
+select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'partner_full_finance_edit')$q$, pg_temp.home_ws(), pg_temp.partner_id()));
+truncate spec;
 insert into spec values ('partner hq', 'hq:kesef:v1', 'siu'), ('partner hq', 'hq:kesef-transactions:v1', 'siu'), ('partner hq', 'hq:core:v1', 's'), ('partner hq', 'hq:unmapped:v1', ''), ('partner hq', 'hq:wellbeing:v3', ''), ('designer hq', 'hq:kesef-transactions:v1', '');
-select pg_temp.run_matrix('P3 full finance (B)');
+select pg_temp.run_matrix('P3b B+: full finance with edit');
 
 -- שלב 4: ביטול יכולת בודדת מחזיר את התנועות לסגורות מיד.
 select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_revoke(%L, %L, 'finance.transactions.read')$q$, pg_temp.home_ws(), pg_temp.partner_id()));
@@ -207,7 +217,7 @@ select pg_temp.expect('see: audit visible to owner only (' || who || ')', want,
   pg_temp.run_as(pg_temp.who(who), format($q$select (count(*) > 0)::text from public.permission_audit where workspace_id=%L$q$, pg_temp.home_ws()), 'value'))
 from (values ('owner', 'true'), ('partner', 'false'), ('designer', 'false'), ('stranger', 'false')) v(who, want);
 select pg_temp.expect('audit: every owner action left a row', 'true',
-  pg_temp.run_as(pg_temp.owner_id(), format($q$select (count(*) filter (where action='approve_member') = 5 and count(*) filter (where action='revoke') = 2 and count(*) filter (where action='remove_member') = 1)::text from public.permission_audit where workspace_id=%L$q$, pg_temp.home_ws()), 'value'));
+  pg_temp.run_as(pg_temp.owner_id(), format($q$select (count(*) filter (where action='approve_member') = 6 and count(*) filter (where action='revoke') = 2 and count(*) filter (where action='remove_member') = 2)::text from public.permission_audit where workspace_id=%L$q$, pg_temp.home_ws()), 'value'));
 
 -- ---------- שלמות workspace_state: מפתח בלתי משתנה, updated_by לא ניתן לזיוף ----------
 select pg_temp.expect('state: cannot move a row to another key', 'denied',

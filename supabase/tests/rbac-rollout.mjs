@@ -48,10 +48,12 @@ export async function runRolloutChecks(PGlite) {
   check("020 is idempotent and never overwrites edits", await count(`select count(*)::int n from public.workspace_state where workspace_id='${ws}' and data='{"edited":true}'`) === 1
     && await count(`select count(*)::int n from public.workspace_state where workspace_id='${ws}'`) === 3);
 
-  const approve = sub(await sqlOf("030_approve_member"), { "<OWNER_USER_UUID>": OWNER, "<WORKSPACE_ID>": ws, "<MEMBER_USER_UUID>": MEMBER, "<TEMPLATE>": "partner_budget_view" });
+  const approve = sub(await sqlOf("030_approve_member"), { "<OWNER_USER_UUID>": OWNER, "<WORKSPACE_ID>": ws, "<MEMBER_USER_UUID>": MEMBER, "<TEMPLATE>": "partner_full_finance" });
+  await db.exec(`insert into public.workspace_state (workspace_id, company_key, data) values ('${ws}', 'hq:kesef-transactions:v1', '{"rows":[]}')`);
   await db.exec(approve);
-  check("030 approves a member (option A): sees beit-hadash and kesef", await asUser(MEMBER, `select count(*)::int n from public.workspace_state where company_key in ('hq:beit-hadash:v2','hq:kesef:v1')`) === 2);
-  check("030 option A does not expose a transactions key", await asUser(MEMBER, `select count(*)::int n from public.workspace_state where company_key = 'hq:kesef-transactions:v1'`) === 0);
+  check("030 approves the partner with the default package (option B): sees beit-hadash and kesef", await asUser(MEMBER, `select count(*)::int n from public.workspace_state where company_key in ('hq:beit-hadash:v2','hq:kesef:v1')`) === 2);
+  check("030 option B sees transactions but cannot change finance (read only)", await asUser(MEMBER, `select count(*)::int n from public.workspace_state where company_key = 'hq:kesef-transactions:v1'`) === 1
+    && await asUser(MEMBER, `with u as (update public.workspace_state set data = '{}' where company_key in ('hq:kesef:v1','hq:kesef-transactions:v1') returning 1) select count(*)::int n from u`) === 0);
   check("030 fails closed while placeholders are unreplaced", await db.exec(await sqlOf("030_approve_member")).then(() => false, () => true));
   await db.exec("rollback").catch(() => {});
 
