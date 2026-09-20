@@ -17,3 +17,9 @@ test("fresh INIT carries the checklist and summarize() is unchanged by it", () =
   const after = model.summarize(model.INIT);
   assert.deepEqual(before, after);
 });
+
+test("INIT carries default categories (same as the default checklist groups) and an empty inspirations list", () => {
+  assert.deepEqual(model.INIT.checklistCategories, model.CHECKLIST_GROUPS);
+  assert.deepEqual(model.INIT.inspirations, []);
+  assert.ok(model.DEFAULT_CHECKLIST.every(i => model.INIT.checklistCategories.includes(i.group)));
+});

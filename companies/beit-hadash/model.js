@@ -1,5 +1,6 @@
 export const STORE_KEY = "hq:beit-hadash:v2";
 
+// קטגוריות ברירת מחדל של הצ'ק ליסט (אחרי זה המשתמש מנהל אותן בעצמו).
 export const CHECKLIST_GROUPS = ["בקבלת המפתח", "לפני הכניסה", "אחרי הכניסה"];
 
 // רשימת התחלה כללית למעבר לדירה חדשה — מזהים קבועים (לא אקראיים), כדי שלא ישתנו בין רינדורים לפני השמירה הראשונה. אפשר למחוק ולהוסיף חופשי.
@@ -24,6 +25,8 @@ export const INIT = {
   ],
   documents: [],
   checklist: DEFAULT_CHECKLIST,
+  checklistCategories: CHECKLIST_GROUPS, // קטגוריות הצ'ק ליסט; המשתמש מוסיף/מוחק (רק ריקות)
+  inspirations: [], // { id, title, description, link }
 };
 
 export function summarize(data) {

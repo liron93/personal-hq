@@ -1,13 +1,13 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Plus, Trash2, ExternalLink, AlertTriangle, Upload, X } from "lucide-react";
+import { Plus, Trash2, ExternalLink, AlertTriangle, Upload, X, Pencil } from "lucide-react";
 import { useStore, cp } from "@/lib/store";
 import { STORE_KEY, INIT, DEFAULT_CHECKLIST, CHECKLIST_GROUPS } from "./model";
 import "./renovation-v2.css";
 
 const NAV = [
   ["dash", "חדר מצב"], ["plan", "תוכנית וזמן"], ["items", "תקציב ורכש"],
-  ["suppliers", "ספקים"], ["docs", "מסמכים ובדק"], ["checklist", "צ'ק ליסט"],
+  ["suppliers", "ספקים"], ["docs", "מסמכים ובדק"], ["checklist", "צ'ק ליסט"], ["inspirations", "השראות"],
 ];
 const rooms = ["כניסה", "סלון", "מטבח", "פינת אוכל", "מרפסת", "חדר הורים", "חדר ילדים", "חדר עבודה", "חדר רחצה", "שירותי אורחים", "כביסה / מחסן", "מערכות"];
 const categories = ["מיזוג", "חשמל ותאורה", "נגרות", "ריהוט", "פרקט וריצוף", "מוצרי חשמל", "צביעה וגמרים", "תקשורת", "אחר"];
@@ -15,10 +15,18 @@ const categories = ["מיזוג", "חשמל ותאורה", "נגרות", "ריה
 const money = n => new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(Number(n || 0));
 const emptyItem = () => ({ id: crypto.randomUUID(), name: "", room: rooms[0], category: categories[0], supplierId: "", supplierName: "", isCustomSupplier: false, isCustomCategory: false, estimate: 0, finalCost: 0, status: "לבחירה", dueDate: "", reminderDaysBefore: "", reminderNote: "", reminderDone: false, link: "", note: "", payments: [], files: [], beforeMove: true, updatedAt: new Date().toISOString() });
 const emptySupplier = () => ({ id: crypto.randomUUID(), name: "", trade: "", phone: "", note: "", quoteUrl: "", documentUrl: "" });
+// משלים שדות שנוספו אחרי שהנתונים נשמרו (צ'ק ליסט, קטגוריות, השראות); לא נוגע במה שכבר קיים,
+// כך שמחיקת כל הפריטים נשארת מחוקה. מחזיר את אותו אובייקט כשאין מה להשלים.
+function complete(data) {
+  const checklist = Array.isArray(data.checklist) ? data.checklist : cp(DEFAULT_CHECKLIST);
+  const categories = Array.isArray(data.checklistCategories) ? data.checklistCategories : cp(CHECKLIST_GROUPS);
+  const inspirations = Array.isArray(data.inspirations) ? data.inspirations : [];
+  return checklist === data.checklist && categories === data.checklistCategories && inspirations === data.inspirations ? data : { ...data, checklist, checklistCategories: categories, inspirations };
+}
 function ensure(data) {
-  if (data?.renovationV2) return Array.isArray(data.checklist) ? data : { ...data, checklist: cp(DEFAULT_CHECKLIST) };
+  if (data?.renovationV2) return complete(data);
   const legacy = data?.reno || [];
-  return { renovationV2: true, items: legacy.map(x => ({ ...emptyItem(), id: String(x.id), name: x.n || "", category: x.cat || "אחר", estimate: x.est || 0, finalCost: x.act || 0, note: x.note || "", link: x.link || "", payments: x.advance ? [{ id: crypto.randomUUID(), amount: x.advance, date: "", note: "מקדמה שהועברה מהמערכת הקודמת" }] : [], status: x.done ? "הושלם" : "לבחירה" })), suppliers: [], milestones: [{ id: "handover", name: "קבלת מפתח", date: "", status: "דורש אימות", blocker: "יש לאמת שנה ומועד" }, { id: "move", name: "כניסה לדירה", date: "", status: "דורש אימות", blocker: "יש לאמת שנה ומועד" }], documents: [], checklist: cp(DEFAULT_CHECKLIST) };
+  return complete({ renovationV2: true, items: legacy.map(x => ({ ...emptyItem(), id: String(x.id), name: x.n || "", category: x.cat || "אחר", estimate: x.est || 0, finalCost: x.act || 0, note: x.note || "", link: x.link || "", payments: x.advance ? [{ id: crypto.randomUUID(), amount: x.advance, date: "", note: "מקדמה שהועברה מהמערכת הקודמת" }] : [], status: x.done ? "הושלם" : "לבחירה" })), suppliers: [], milestones: [{ id: "handover", name: "קבלת מפתח", date: "", status: "דורש אימות", blocker: "יש לאמת שנה ומועד" }, { id: "move", name: "כניסה לדירה", date: "", status: "דורש אימות", blocker: "יש לאמת שנה ומועד" }], documents: [] });
 }
 function setState(setData, updater) { setData(prev => ({ ...prev, ...updater(ensure(cp(prev))) })); }
 function Btn({ children, onClick, secondary, disabled }) { return <button className={secondary ? "renovation-btn renovation-btn-secondary" : "renovation-btn"} disabled={disabled} onClick={onClick} style={{ minHeight: 44, border: secondary ? "1px solid #DCE3DE" : "none", borderRadius: 10, padding: "0 14px", background: secondary ? "#fff" : "#256B57", color: secondary ? "#18231E" : "#fff", font: "inherit", cursor: disabled ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>{children}</button>; }
@@ -57,13 +65,26 @@ function Dashboard({ data, select }) {
 function Items({ data, edit, add, remove }) { const [room, setRoom] = useState(""); const [status, setStatus] = useState(""); const visible = data.items.filter(i => (!room || i.room === room) && (!status || i.status === status)); return <div style={{ display: "grid", gap: 12 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><h2 style={{ margin: 0 }}>תקציב ורכש</h2><span style={{ color: "#63716A" }}>כל רכישה נשמרת פעם אחת</span></div><Btn onClick={add}><Plus size={18} />רכישה</Btn></div><div className="renovation-filterbar"><select aria-label="סינון לפי חדר" value={room} onChange={e=>setRoom(e.target.value)}><option value="">כל החדרים</option>{rooms.map(x=><option key={x}>{x}</option>)}</select><select aria-label="סינון לפי מצב" value={status} onChange={e=>setStatus(e.target.value)}><option value="">כל המצבים</option>{["לבחירה","בהצעת מחיר","הוזמן","בהמתנה לאספקה","בהתקנה","הושלם","מעוכב"].map(x=><option key={x}>{x}</option>)}</select><span style={{color:"#65746D",alignSelf:"center"}}>{visible.length} פריטים</span></div>{data.items.length ? visible.map(i => { const total = Number(i.finalCost || i.estimate || 0), paid = i.payments.reduce((s,p)=>s+Number(p.amount||0),0); return <Card key={i.id}><button onClick={() => edit(i)} style={{ width: "100%", textAlign: "start", border: 0, background: "transparent", font: "inherit", cursor: "pointer" }}><div style={{ display:"flex",justifyContent:"space-between",gap:8 }}><b>{i.name}</b><span style={{ color:"#256B57" }}>{i.status}</span></div><div style={{ color:"#63716A",fontSize:14,marginTop:4 }}>{i.room} · {i.category} · יעד: {i.dueDate || "לא נקבע"}</div><div style={{ display:"flex",justifyContent:"space-between",marginTop:10 }}><span>תוכנית {money(total)}</span><span>יתרה {money(Math.max(0,total-paid))}</span></div></button><div style={{ display:"flex",justifyContent:"space-between",marginTop:10 }}><span>{i.link && <a href={i.link} target="_blank" rel="noreferrer" style={{color:"#256B57"}}><ExternalLink size={15} /> קישור</a>}</span><button onClick={() => remove(i.id)} style={{border:0,background:"transparent",color:"#B53A31",font:"inherit"}}>מחיקה</button></div></Card>; }) : <Card><p>עוד אין רכישות. התחילו בפריט שיש לו זמן אספקה ארוך או שחוסם החלטה.</p><Btn onClick={add}><Plus size={18} />הוספת פריט ראשון</Btn></Card>}</div>; }
 function Suppliers({ data, setData }) { const [editing,setEditing]=useState(null); const blank=()=>({...emptySupplier()}); const save=()=>{if(!editing?.name?.trim())return;setState(setData,d=>({suppliers:d.suppliers.some(x=>x.id===editing.id)?d.suppliers.map(x=>x.id===editing.id?editing:x):[...d.suppliers,editing]}));setEditing(null);};return <div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><h2 style={{margin:0}}>ספקים</h2><span style={{color:"#63716A"}}>אנשי קשר, כסף וקבצים קשורים</span></div><Btn onClick={()=>setEditing(blank())}><Plus size={18}/>ספק</Btn></div>{editing&&<Card><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="שם ספק / בעל מקצוע"><input value={editing.name} onChange={e=>setEditing(x=>({...x,name:e.target.value}))} style={input}/></Field><Field label="תחום"><input value={editing.trade} onChange={e=>setEditing(x=>({...x,trade:e.target.value}))} placeholder="לדוגמה: מיזוג" style={input}/></Field></div><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="טלפון"><input dir="ltr" value={editing.phone} onChange={e=>setEditing(x=>({...x,phone:e.target.value}))} style={input}/></Field><Field label="קישור להצעת מחיר"><input dir="ltr" value={editing.quoteUrl||""} onChange={e=>setEditing(x=>({...x,quoteUrl:e.target.value}))} placeholder="https://" style={input}/></Field></div><Field label="קישור למסמך / חוזה"><input dir="ltr" value={editing.documentUrl||""} onChange={e=>setEditing(x=>({...x,documentUrl:e.target.value}))} placeholder="https://" style={input}/></Field><Field label="הערה"><textarea value={editing.note} onChange={e=>setEditing(x=>({...x,note:e.target.value}))} style={{...input,minHeight:68,paddingTop:8}}/></Field><div style={{display:"flex",justifyContent:"end",gap:8,marginTop:10}}><Btn secondary onClick={()=>setEditing(null)}>ביטול</Btn><Btn onClick={save}>שמירת ספק</Btn></div></Card>}{data.suppliers.map(s=>{const linked=data.items.filter(i=>i.supplierId===s.id);const total=linked.reduce((sum,i)=>sum+Number(i.finalCost||i.estimate||0),0);const paid=linked.reduce((sum,i)=>sum+i.payments.reduce((x,p)=>x+Number(p.amount||0),0),0);return <Card key={s.id}><div style={{display:"flex",justifyContent:"space-between",gap:12}}><div><b>{s.name}</b><div style={{color:"#63716A"}}>{s.trade||"תחום טרם הוזן"}{s.phone&&<> · {s.phone}</>}</div><div style={{marginTop:8,fontSize:14}}>פריטים: {linked.length} · סוכם {money(total)} · שולם {money(paid)} · יתרה {money(Math.max(0,total-paid))}</div>{s.note&&<div style={{color:"#63716A",fontSize:14,marginTop:6}}>{s.note}</div>}{(s.quoteUrl||s.documentUrl)&&<div style={{display:"flex",gap:12,marginTop:8,fontSize:14}}>{s.quoteUrl&&<a href={s.quoteUrl} target="_blank" rel="noreferrer">הצעת מחיר</a>}{s.documentUrl&&<a href={s.documentUrl} target="_blank" rel="noreferrer">מסמך / חוזה</a>}</div>}</div><Btn secondary onClick={()=>setEditing({...s})}>עריכה</Btn></div></Card>})}{!data.suppliers.length&&!editing&&<Card>עדיין אין ספקים. אפשר להוסיף בעל מקצוע כאן או מתוך פריט רכש.</Card>}</div>; }function Plan({ data, setData }) { const [editing,setEditing]=useState(null); const today=new Date(); today.setHours(0,0,0,0); const cutoff=new Date(today); cutoff.setDate(cutoff.getDate()+7); const upcoming=[...(data.milestones||[]).filter(x=>x.date).map(x=>({name:x.name,date:x.date,detail:x.status||"אבן דרך"})),...(data.items||[]).filter(x=>x.dueDate&&x.status!=="הושלם").map(x=>({name:x.name,date:x.dueDate,detail:x.status||"רכש"}))].filter(x=>{const d=new Date(x.date+"T12:00:00");return d>=today&&d<=cutoff;}).sort((x,y)=>x.date.localeCompare(y.date)); const timeline=[...(data.milestones||[])].sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")); const nextMilestone=timeline.find(x=>x.status!=="הושלם"); const near=(data.items||[]).filter(i=>i.beforeMove&&i.status!=="הושלם").sort((a,b)=>(a.dueDate||"9999").localeCompare(b.dueDate||"9999")); const save=()=>{if(!editing?.name?.trim())return;setState(setData,d=>({milestones:d.milestones.some(x=>x.id===editing.id)?d.milestones.map(x=>x.id===editing.id?editing:x):[...d.milestones,{...editing,id:crypto.randomUUID()}]}));setEditing(null);};return <div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><h2 style={{margin:0}}>תוכנית ולוח זמנים</h2><span style={{color:"#63716A"}}>אבני דרך, חסמים ומה חייב להיסגר לפני המעבר</span></div><Btn onClick={()=>setEditing({id:"",name:"",date:"",status:"מתוכנן",blocker:""})}><Plus size={18}/>אבן דרך</Btn></div><Card className="renovation-timeline"><div className="renovation-timeline-title"><div><h3 style={{margin:0}}>ציר המעבר</h3><span>{nextMilestone?`התחנה הבאה: ${nextMilestone.name}`:"כל אבני הדרך הושלמו"}</span></div></div><div className="renovation-timeline-track">{timeline.map(m=><button key={m.id} onClick={()=>setEditing({...m})} className={`renovation-timeline-step ${m.status==="הושלם"?"is-done":m.status==="מעוכב"?"is-blocked":""}`}><span className="renovation-timeline-dot" aria-hidden="true"/><span><b>{m.name}</b><small>{m.date?new Date(m.date+"T12:00:00").toLocaleDateString("he-IL"):"תאריך לא נקבע"} · {m.status}</small></span></button>)}</div></Card><Card><h3 style={{marginTop:0}}>השבוע הקרוב</h3>{upcoming.length?upcoming.map(x=><div key={x.name+x.date} style={{padding:"10px 0",borderBottom:"1px solid #E5EAE6"}}><b>{x.name}</b><div style={{color:"#63716A",fontSize:14}}>{x.detail} · {new Date(x.date+"T12:00:00").toLocaleDateString("he-IL")}</div></div>):<p style={{color:"#63716A"}}>אין אירועי בית חדשים בשבעת הימים הקרובים.</p>}</Card><Card><h3 style={{marginTop:0}}>לפני המעבר</h3>{near.length?near.map(i=><button key={i.id} onClick={()=>{}} style={{width:"100%",textAlign:"start",padding:"10px 0",border:0,borderBottom:"1px solid #E5EAE6",background:"transparent",font:"inherit"}}><b>{i.name}</b><div style={{color:"#63716A",fontSize:14}}>{i.status} · יעד: {i.dueDate?new Date(i.dueDate+"T12:00:00").toLocaleDateString("he-IL"):"לא נקבע"}</div></button>):<p style={{color:"#63716A"}}>אין כרגע פריטי רכש פתוחים שחובה לסגור לפני הכניסה.</p>}</Card><Card><h3 style={{marginTop:0}}>אבני דרך</h3><p style={{marginTop:0,color:"#63716A"}}>לחיצה על אבן דרך פותחת עריכה של התאריך, הסטטוס והחסם.</p>{data.milestones.map(m=><button key={m.id} onClick={()=>setEditing({...m})} style={{width:"100%",textAlign:"start",padding:"13px 0",border:0,borderBottom:"1px solid #E5EAE6",background:"transparent",font:"inherit",cursor:"pointer"}}><div style={{display:"flex",justifyContent:"space-between",gap:8}}><b>{m.name}</b><span style={{color:m.status==="מעוכב"?"#B53A31":"#A66512"}}>{m.status}</span></div><div style={{color:"#63716A",fontSize:14,marginTop:4}}>{m.date?new Date(m.date+"T12:00:00").toLocaleDateString("he-IL"):"תאריך טרם נקבע"}{m.blocker&&<> · {m.blocker}</>}</div></button>)}{!data.milestones.length&&<p>אין עדיין אבני דרך. הוסיפו למשל קבלת מפתח, מדידות, התקנות וכניסה.</p>}</Card>{editing&&<Card><h3 style={{marginTop:0}}>{editing.id?"עריכת אבן דרך":"אבן דרך חדשה"}</h3><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="שם"><input value={editing.name} onChange={e=>setEditing(x=>({...x,name:e.target.value}))} style={input}/></Field><Field label="תאריך"><input type="date" value={editing.date||""} onChange={e=>setEditing(x=>({...x,date:e.target.value,status:e.target.value&&x.status==="דורש אימות"?"מתוכנן":x.status,blocker:e.target.value&&x.blocker==="יש לאמת שנה ומועד"?"":x.blocker}))} style={input}/></Field></div><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="מצב"><select value={editing.status||"מתוכנן"} onChange={e=>setEditing(x=>({...x,status:e.target.value}))} style={input}>{["מתוכנן","בתהליך","ממתין","מעוכב","הושלם","דורש אימות"].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="חסם / הערה"><input value={editing.blocker||""} onChange={e=>setEditing(x=>({...x,blocker:e.target.value}))} style={input}/></Field></div><div style={{display:"flex",justifyContent:"end",gap:8,marginTop:12}}><Btn secondary onClick={()=>setEditing(null)}>ביטול</Btn><Btn onClick={save}>שמירת אבן דרך</Btn></div></Card>}</div>; }function Docs({ data, setData }) { return <div style={{display:"grid",gap:12}}><h2 style={{margin:0}}>מסמכים ובדק</h2><Card><Upload size={22} color="#256B57"/><h3>אחסון מסמכים יופעל לאחר חיבור מאובטח</h3><p style={{color:"#63716A"}}>בשלב זה המערכת לא מעלה קבצים. אפשר לרשום מסמך וקישור חיצוני בלבד, כדי למנוע הבטחה שגויה שהקובץ נשמר.</p><Btn secondary onClick={()=>setState(setData,d=>({documents:[...d.documents,{id:crypto.randomUUID(),name:"מסמך חדש",type:"טיוטה",url:""}]}))}>הוספת רישום מסמך</Btn>{data.documents.map(x=><div key={x.id} style={{marginTop:10}}>{x.name} · {x.type}</div>)}</Card><Card><h3 style={{marginTop:0}}>בדק ומסירה</h3><p>בעת מסירה תעדו ליקוי, תמונה, תאריך, אחראי ותאריך תיקון. עבודות חשמל ותשתיות יש לאשר מול בעל מקצוע מוסמך.</p></Card></div>; }
 function Checklist({ data, setData }) {
-  const [text, setText] = useState(""); const [group, setGroup] = useState(CHECKLIST_GROUPS[1]);
   const items = data.checklist || [];
+  const categories = data.checklistCategories || [];
+  const [text, setText] = useState(""); const [group, setGroup] = useState("");
+  const [newCategory, setNewCategory] = useState(""); const [categoryError, setCategoryError] = useState("");
+  const activeGroup = categories.includes(group) ? group : categories[0] || "";
   const done = items.filter(i => i.done).length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
-  const add = e => { e.preventDefault(); const t = text.trim(); if (!t) return; setState(setData, d => ({ checklist: [...(d.checklist || []), { id: crypto.randomUUID(), text: t, group, done: false }] })); setText(""); };
+  const add = e => { e.preventDefault(); const t = text.trim(); if (!t || !activeGroup) return; setState(setData, d => ({ checklist: [...(d.checklist || []), { id: crypto.randomUUID(), text: t, group: activeGroup, done: false }] })); setText(""); };
   const toggle = id => setState(setData, d => ({ checklist: d.checklist.map(i => i.id === id ? { ...i, done: !i.done } : i) }));
   const remove = id => setState(setData, d => ({ checklist: d.checklist.filter(i => i.id !== id) }));
+  const addCategory = e => {
+    e.preventDefault(); const name = newCategory.trim();
+    if (!name) return;
+    if (name.length > 40) { setCategoryError("שם קטגוריה עד 40 תווים"); return; }
+    if (categories.some(c => c.toLocaleLowerCase() === name.toLocaleLowerCase())) { setCategoryError("קטגוריה כזו כבר קיימת"); return; }
+    setState(setData, d => ({ checklistCategories: [...d.checklistCategories, name] })); setNewCategory(""); setCategoryError(""); setGroup(name);
+  };
+  const removeCategory = name => setState(setData, d => ({ checklistCategories: d.checklistCategories.filter(c => c !== name) }));
+  const orphans = items.filter(i => !categories.includes(i.group));
+  const sections = [...categories.map(c => [c, items.filter(i => i.group === c)]), ...(orphans.length ? [["ללא קטגוריה", orphans]] : [])];
   return <div style={{ display: "grid", gap: 12 }}>
     <div><h2 style={{ margin: 0 }}>צ'ק ליסט</h2><span style={{ color: "#63716A" }}>מה צריך לסגור סביב המעבר לדירה</span></div>
     <Card>
@@ -73,24 +94,83 @@ function Checklist({ data, setData }) {
     <Card>
       <form onSubmit={add} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
         <input value={text} onChange={e => setText(e.target.value)} placeholder="הוספת משימה לצ'ק ליסט" aria-label="משימה חדשה" style={input} />
-        <Btn onClick={() => {}}><Plus size={18} />הוסף</Btn>
-        <select value={group} onChange={e => setGroup(e.target.value)} aria-label="קבוצה" style={{ ...input, gridColumn: "1 / -1" }}>{CHECKLIST_GROUPS.map(g => <option key={g}>{g}</option>)}</select>
+        <Btn disabled={!activeGroup}><Plus size={18} />הוסף</Btn>
+        <select value={activeGroup} onChange={e => setGroup(e.target.value)} aria-label="קטגוריה" disabled={!categories.length} style={{ ...input, gridColumn: "1 / -1" }}>{categories.map(g => <option key={g}>{g}</option>)}</select>
       </form>
+      {!categories.length && <p style={{ margin: "8px 0 0", color: "#63716A" }}>אין קטגוריות. אפשר להוסיף קטגוריה בהמשך העמוד.</p>}
     </Card>
-    {CHECKLIST_GROUPS.map(g => { const rows = items.filter(i => i.group === g); if (!rows.length) return null; return <Card key={g}>
-      <h3 style={{ marginTop: 0 }}>{g}</h3>
+    {sections.map(([g, rows]) => rows.length ? <Card key={g}>
+      <h3 style={{ marginTop: 0 }}>{g} <span style={{ color: "#63716A", fontWeight: 400, fontSize: 14 }}>({rows.filter(i => i.done).length}/{rows.length})</span></h3>
       {rows.map(i => <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44, borderBottom: "1px solid #E5EAE6" }}>
         <label style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minHeight: 44, cursor: "pointer" }}><input type="checkbox" checked={!!i.done} onChange={() => toggle(i.id)} style={{ width: 20, height: 20, accentColor: "#238a67" }} /><span style={{ textDecoration: i.done ? "line-through" : "none", color: i.done ? "#63716A" : "inherit" }}>{i.text}</span></label>
         <button type="button" onClick={() => remove(i.id)} aria-label={`מחיקת ${i.text}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Trash2 size={17} /></button>
       </div>)}
-    </Card>; })}
+    </Card> : null)}
     {!items.length && <Card><p style={{ margin: 0, color: "#63716A" }}>הצ'ק ליסט ריק. אפשר להוסיף משימה למעלה.</p></Card>}
+    <Card>
+      <h3 style={{ marginTop: 0 }}>קטגוריות</h3>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        {categories.map(c => { const count = items.filter(i => i.group === c).length; return <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 999, background: "#E6F0EB", color: "#1D5A48" }}>{c} · {count}{count === 0 && <button type="button" onClick={() => removeCategory(c)} aria-label={`מחיקת הקטגוריה ${c}`} style={{ border: 0, background: "transparent", cursor: "pointer", padding: 0, display: "grid", color: "#1D5A48" }}><X size={15} /></button>}</span>; })}
+      </div>
+      <form onSubmit={addCategory} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+        <input value={newCategory} onChange={e => { setNewCategory(e.target.value); setCategoryError(""); }} placeholder="קטגוריה חדשה (למשל: משפטי, ציוד, ילדים)" aria-label="קטגוריה חדשה" style={input} />
+        <Btn secondary><Plus size={18} />הוסף</Btn>
+      </form>
+      {categoryError && <p role="alert" style={{ margin: "8px 0 0", color: "#b42318" }}>{categoryError}</p>}
+      <p style={{ margin: "10px 0 0", color: "#63716A", fontSize: 14 }}>קטגוריה נמחקת רק כשאין בה משימות (יש לה ‏X‏ כשהיא ריקה).</p>
+    </Card>
+  </div>;
+}
+// קישור: רק http/https. בלי סכמה מוסיפים https://. מחזיר "" (אין), null (לא תקין) או כתובת מלאה.
+const safeLink = v => {
+  const t = String(v || "").trim(); if (!t) return "";
+  try { const u = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`); return u.protocol === "http:" || u.protocol === "https:" ? u.href : null; } catch { return null; }
+};
+const emptyInspiration = () => ({ id: "", title: "", description: "", link: "" });
+function Inspirations({ data, setData }) {
+  const items = data.inspirations || [];
+  const [draft, setDraft] = useState(emptyInspiration()); const [error, setError] = useState("");
+  const patch = (key, value) => { setDraft(d => ({ ...d, [key]: value })); setError(""); };
+  const save = e => {
+    e.preventDefault();
+    const title = draft.title.trim(); if (!title) { setError("צריך כותרת"); return; }
+    const link = safeLink(draft.link); if (link === null) { setError("הקישור לא תקין. אפשר להדביק כתובת רגילה, למשל example.com/עמוד"); return; }
+    const entry = { id: draft.id || crypto.randomUUID(), title, description: draft.description.trim(), link };
+    setState(setData, d => ({ inspirations: d.inspirations.some(x => x.id === entry.id) ? d.inspirations.map(x => x.id === entry.id ? entry : x) : [entry, ...d.inspirations] }));
+    setDraft(emptyInspiration()); setError("");
+  };
+  const remove = item => { if (!window.confirm(`למחוק את "${item.title}"? הפעולה אינה הפיכה.`)) return; setState(setData, d => ({ inspirations: d.inspirations.filter(x => x.id !== item.id) })); if (draft.id === item.id) setDraft(emptyInspiration()); };
+  const editing = !!draft.id;
+  return <div style={{ display: "grid", gap: 12 }}>
+    <div><h2 style={{ margin: 0 }}>השראות</h2><span style={{ color: "#63716A" }}>רעיונות, תמונות וקישורים לבית החדש</span></div>
+    <Card>
+      <form onSubmit={save} style={{ display: "grid", gap: 10 }}>
+        <h3 style={{ margin: 0 }}>{editing ? "עריכת השראה" : "השראה חדשה"}</h3>
+        <Field label="כותרת"><input value={draft.title} onChange={e => patch("title", e.target.value)} style={input} /></Field>
+        <Field label="תיאור"><textarea value={draft.description} onChange={e => patch("description", e.target.value)} style={{ ...input, minHeight: 76, paddingTop: 8 }} /></Field>
+        <Field label="קישור"><input dir="ltr" inputMode="url" value={draft.link} onChange={e => patch("link", e.target.value)} placeholder="https://..." style={input} /></Field>
+        {error && <p role="alert" style={{ margin: 0, color: "#b42318" }}>{error}</p>}
+        <div style={{ display: "flex", justifyContent: "end", gap: 8 }}>{editing && <Btn secondary onClick={() => { setDraft(emptyInspiration()); setError(""); }}>ביטול</Btn>}<Btn>{editing ? "שמירה" : <><Plus size={18} />הוספה</>}</Btn></div>
+      </form>
+    </Card>
+    {items.map(item => <Card key={item.id}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
+        <h3 style={{ margin: 0, overflowWrap: "anywhere" }}>{item.title}</h3>
+        <div style={{ display: "flex", flex: "none" }}>
+          <button type="button" onClick={() => { setDraft({ ...item }); setError(""); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} aria-label={`עריכת ${item.title}`} style={{ border: 0, background: "transparent", color: "#44514A", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Pencil size={17} /></button>
+          <button type="button" onClick={() => remove(item)} aria-label={`מחיקת ${item.title}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Trash2 size={17} /></button>
+        </div>
+      </div>
+      {item.description && <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.description}</p>}
+      {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, color: "#176f7a", overflowWrap: "anywhere" }}><ExternalLink size={15} />{(() => { try { return new URL(item.link).hostname.replace(/^www\./, ""); } catch { return item.link; } })()}</a>}
+    </Card>)}
+    {!items.length && <Card><p style={{ margin: 0, color: "#63716A" }}>עדיין אין השראות. הוסף כותרת, תיאור וקישור למעלה.</p></Card>}
   </div>;
 }
 export default function RenovationHQ() {
  const { data: raw, setData, ready } = useStore(STORE_KEY, INIT); const [tab,setTab]=useState("dash"); const [editing,setEditing]=useState(null); const data=useMemo(()=>ensure(raw),[raw]); if(!ready)return <div style={{padding:24}}>טוען את חברת השיפוץ…</div>;
  const save=item=>{setState(setData,d=>{ const customName = item.supplierName?.trim(); let suppliers = d.suppliers || []; let saved = item; if (customName) { const existing = suppliers.find(s => s.name.trim().toLocaleLowerCase() === customName.toLocaleLowerCase()); const supplierId = existing?.id || crypto.randomUUID(); if (!existing) suppliers = [...suppliers, { ...emptySupplier(), id: supplierId, name: customName }]; saved = { ...item, supplierId, supplierName: "", isCustomSupplier: false }; } return { suppliers, items:d.items.some(x=>x.id===saved.id)?d.items.map(x=>x.id===saved.id?saved:x):[...d.items,saved] }; });setEditing(null);};
  const remove=id=>{ if (!window.confirm("למחוק את פריט הרכש? הפעולה אינה הפיכה.")) return; setState(setData,d=>({items:d.items.filter(x=>x.id!==id)})); };
- const content=tab==="dash"?<Dashboard data={data} select={setEditing}/>:tab==="items"?<Items data={data} edit={setEditing} add={()=>setEditing(emptyItem())} remove={remove}/>:tab==="suppliers"?<Suppliers data={data} setData={setData}/>:tab==="plan"?<Plan data={data} setData={setData}/>:tab==="checklist"?<Checklist data={data} setData={setData}/>:<Docs data={data} setData={setData}/>;
+ const content=tab==="dash"?<Dashboard data={data} select={setEditing}/>:tab==="items"?<Items data={data} edit={setEditing} add={()=>setEditing(emptyItem())} remove={remove}/>:tab==="suppliers"?<Suppliers data={data} setData={setData}/>:tab==="plan"?<Plan data={data} setData={setData}/>:tab==="checklist"?<Checklist data={data} setData={setData}/>:tab==="inspirations"?<Inspirations data={data} setData={setData}/>:<Docs data={data} setData={setData}/>;
  return <div dir="rtl" className="renovation-hq"><div className="renovation-shell" style={{display:"grid",gap:16}}><nav className="renovation-nav" aria-label="מחלקות השיפוץ" style={{display:"flex",gap:4,overflowX:"auto",borderBottom:"1px solid #DCE3DE",paddingBottom:8}}>{NAV.map(([id,label])=><button aria-current={tab===id?"page":undefined} key={id} onClick={()=>setTab(id)} style={{whiteSpace:"nowrap",minHeight:44,border:0,borderRadius:9,padding:"0 12px",background:tab===id?"#E6F0EB":"transparent",color:tab===id?"#1D5A48":"#44514A",font:"inherit",fontWeight:tab===id?700:400}}>{label}</button>)}</nav>{content}</div><nav className="renovation-mobile-nav" aria-label="ניווט מהיר">{NAV.map(([id,label])=><button aria-current={tab===id?"page":undefined} key={id} onClick={()=>setTab(id)}>{label.replace("תוכנית וזמן","תוכנית").replace("תקציב ורכש","רכש").replace("מסמכים ובדק","מסמכים")}</button>)}</nav>{editing&&<ItemEditor item={editing.name?editing:null} suppliers={data.suppliers} onSave={save} onClose={()=>setEditing(null)}/>}</div>;
 }
