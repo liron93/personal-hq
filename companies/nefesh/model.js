@@ -41,6 +41,7 @@ export function normalize(data) {
     owner: typeof task.owner === "string" ? task.owner : "",
     link: typeof task.link === "string" ? task.link : "",
     priority: ["urgent", "high", "normal", "low"].includes(task.priority) ? task.priority : "normal",
+    pomodoros: Number.isInteger(task.pomodoros) && task.pomodoros >= 1 && task.pomodoros <= 8 ? task.pomodoros : 1,
   }));
   next.focusTimer = data?.focusTimer && typeof data.focusTimer === "object" ? data.focusTimer : {};
   next.morningPlan = data?.morningPlan && typeof data.morningPlan === "object" ? data.morningPlan : {};
