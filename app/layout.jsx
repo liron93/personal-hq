@@ -16,7 +16,7 @@ export const metadata = {
   formatDetection: { telephone: false },
   icons: {
     icon: "/icon.svg",
-    apple: "/apple-icon.svg"
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }]
   }
 };
 
