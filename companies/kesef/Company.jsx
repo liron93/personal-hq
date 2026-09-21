@@ -30,6 +30,9 @@ export default function Company() {
   const { data: d, setData: setD, upd, ready } = useStore(STORE_KEY, INIT);
   const { data: core, ready: coreReady } = useStore(coreFacts.STORE_KEY, coreFacts.INIT);
   const [tab, setTab] = useState("dash");
+  // Keep fetched market data across department switches, but never credentials.
+  const [marketResult, setMarketResult] = useState(null);
+  const [marketSymbol, setMarketSymbol] = useState("AAPL");
 
   // כניסה בחודש חדש יוצרת צילום שווי נקי אוטומטית, בלי פעולה של המשתמש.
   // תלוי ב-d כדי לשרוד גם טעינה מאוחרת ששוטפת את המצב; אידמפוטנטי — אם הצילום קיים, d לא משתנה.
@@ -48,7 +51,7 @@ export default function Company() {
         <div className="finance-nav-status"><i />מערכת מקומית · Demo</div>
       </aside>
       <div className="finance-console-content">
-        {tab === "market" && <MarketConnection />}
+        {tab === "market" && <MarketConnection result={marketResult} setResult={setMarketResult} symbol={marketSymbol} setSymbol={setMarketSymbol} />}
         {tab === "dash" && <Dash d={d} core={core} onOpenBudget={() => setTab("budget")} />}
         {tab === "flow" && <Flow d={d} setD={setD} core={core} />}
         {tab === "history" && <History d={d} setD={setD} />}
