@@ -1,19 +1,20 @@
 "use client";
 import { useState } from "react";
-import { Check, ChevronLeft, Dumbbell } from "lucide-react";
+import { ChevronLeft, Dumbbell, Pencil } from "lucide-react";
 import { todayState, nextSession } from "../today.mjs";
-import { buildProgram, SHORT_ALTERNATIVE } from "../program.mjs";
+import { SHORT_ALTERNATIVE } from "../program.mjs";
+import { resolveProgram } from "../plan.mjs";
 import css from "./health-v2.module.css";
 
 const fmt = value => new Date(value + "T12:00").toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
 const loadText = e => (e.load ? e.load + " ק״ג" : e.hint || "לתעד משקל");
 
 function ExerciseList({ exercises }) {
-  return <ul className={css.exList}>{exercises.map(e => <li key={e.id}><strong>{e.name}</strong><span>{e.sets} סטים × {e.reps} · {loadText(e)}</span></li>)}</ul>;
+  return <ul className={css.exList}>{exercises.map(e => <li key={e.id}><strong>{e.name}</strong><span>{e.sets} סטים × <bdi dir="ltr">{e.reps}</bdi> · {loadText(e)}</span></li>)}</ul>;
 }
 
 // מסך "היום": פעולה אחת ברורה — האימון הבא לפי התוכנית. חלופה קצרה אחת רק אם אין זמן.
-export function TodayScreen({ d, today, onStart, onLogShort, onOpenJournal }) {
+export function TodayScreen({ d, today, onStart, onResume, onLogShort, onOpenJournal }) {
   const [shortOpen, setShortOpen] = useState(false);
   const s = todayState(d, today);
   const recs = s.recommendations.map((text, i) => <p key={i} className={css.recommend}>{text}</p>);
@@ -25,6 +26,8 @@ export function TodayScreen({ d, today, onStart, onLogShort, onOpenJournal }) {
   </div>;
 
   const done = s.status === "done";
+  const live = d.liveWorkout;
+  if (live) return <div className={css.stack}><section className={css.actionHero}><p className={css.eyebrow}>{fmt(today)}</p><h2>אימון {live.session} בתהליך</h2><p>האימון שלך נשמר. אפשר להמשיך בדיוק מאיפה שעצרת.</p><button className={css.heroCta} onClick={onResume}>המשך אימון {live.session}<ChevronLeft size={20} /></button></section></div>;
   return <div className={css.stack}>
     <section className={css.actionHero}>
       <p className={css.eyebrow}>{fmt(today)}</p>
@@ -51,30 +54,14 @@ export function TodayScreen({ d, today, onStart, onLogShort, onOpenJournal }) {
   </div>;
 }
 
-// מסך אימון ראשוני (שקוף לגרסה החיה): רשימת תרגילים, סימון, וסיום שנשמר ביומן.
-export function SessionScreen({ id, exercises, onFinish, onCancel }) {
-  const [checked, setChecked] = useState({});
-  return <div className={css.stack}>
-    <section className={css.actionHero}><p className={css.eyebrow}>אימון בתהליך</p><h2>אימון {id}</h2><p>מסמנים כל תרגיל אחרי שסיימת אותו. אם משהו כואב או מרגיש חריג — עוצרים.</p></section>
-    <section className={css.card}>
-      {exercises.map(e => <label key={e.id} className={css.exRow}>
-        <input type="checkbox" checked={!!checked[e.id]} onChange={() => setChecked(c => ({ ...c, [e.id]: !c[e.id] }))} />
-        <span><strong>{e.name}</strong><small>{e.sets} סטים × {e.reps} · {loadText(e)}</small></span>
-        {checked[e.id] && <Check size={18} />}
-      </label>)}
-    </section>
-    <button className={css.primary + " " + css.wide} onClick={onFinish}>סיום אימון ושמירה</button>
-    <button className={css.linkButton} onClick={onCancel}>יציאה בלי לשמור</button>
-  </div>;
-}
-
 // לשונית "אימון": כל אימוני A/B/C מהתוכנית, האימון הבא מסומן.
-export function WorkoutTab({ d, onStart }) {
-  const program = buildProgram(d.profile);
+export function WorkoutTab({ d, onStart, onResume, onEditPlan }) {
+  const program = resolveProgram(d);
   if (program.restricted) return <section className={css.card}><h3>התוכנית ממתינה לאיש/ת מקצוע</h3><p className={css.subtle}>סומנה מגבלה או אי־ודאות. לא מוצגת תוכנית תרגילים מותאמת.</p></section>;
   const next = nextSession(d.workouts, program.ids);
   return <div className={css.stack}>
-    <div className={css.sectionHead}><h2>האימונים שלי</h2></div>
+    <div className={css.sectionHead}><h2>האימונים שלי</h2><button className={css.linkButton} onClick={onEditPlan}><Pencil size={14} /> עריכת התוכנית</button></div>
+    {d.liveWorkout && <section className={css.card + " " + css.stack}><strong>אימון {d.liveWorkout.session} בתהליך</strong><button className={css.primary} onClick={onResume}>המשך אימון</button></section>}
     {program.ids.map(id => <section key={id} className={css.card + " " + css.stack}>
       <div className={css.sessionHead}><h3><Dumbbell size={18} /> אימון {id}</h3>{id === next && <span className={css.nextTag}>הבא בתור</span>}</div>
       <ExerciseList exercises={program.sessions[id]} />

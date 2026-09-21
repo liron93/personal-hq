@@ -36,3 +36,16 @@
 @media(max-width:380px){.navItem span{font-size:11px}}
 /* בנייד, הדוק הגלובלי של המנכ״ל יושב בתחתית — ניווט החברה מוגבה מעליו כדי שיישאר נראה ולחיץ */
 @media(max-width:760px){.bottomNav{bottom:74px}.shell{padding-bottom:190px}}
+
+/* Slice 2: אימון חי ועורך תוכנית */
+.liveHead{display:flex;justify-content:space-between;align-items:center;gap:8px}.liveHead .eyebrow{margin:0}.liveTitle{margin:0 0 4px;font-size:22px;line-height:1.3}
+.skippedDot{background:var(--coral)!important;opacity:.6}
+.restBar{display:grid;gap:8px;padding:14px 16px;border-radius:18px;background:var(--violetSoft);border:1px solid #d9d5ff}.restDone{grid-template-columns:1fr auto;align-items:center;background:var(--mintSoft);border-color:var(--mint)}.restTop{display:flex;justify-content:space-between;align-items:baseline}.restTop strong{font-size:28px;font-variant-numeric:tabular-nums;color:#4b41c9}.restTrack{height:6px;border-radius:9px;background:#d9d5ff;overflow:hidden}.restTrack i{display:block;height:100%;background:var(--violet);transition:width 1s linear}.restActions{display:flex;gap:8px;flex-wrap:wrap}
+.setGrid{display:grid;gap:8px;grid-template-columns:32px 1fr 1fr 52px;align-items:center}.setGrid>small{color:var(--muted);font-size:12px;text-align:center}.setRow{display:contents}.setNum{display:grid;place-items:center;font-weight:800;color:var(--muted)}.setRow .field{min-height:48px;width:100%;padding:0 10px;border-radius:12px;text-align:center;font-size:17px}
+.doneBtn{min-height:48px;min-width:48px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--muted);display:grid;place-items:center;cursor:pointer}.doneBtn.doneOn{background:var(--mint);border-color:var(--mint);color:#093c33}
+.rowBtns{display:flex;gap:8px;flex-wrap:wrap}.rowBtns>button{flex:1;min-width:120px}.rowBtns .iconButton{flex:0 0 48px;min-width:48px}
+.effortRow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.effort{min-height:48px;border:1px solid var(--line);border-radius:13px;background:var(--bg);color:var(--ink);font-weight:700;cursor:pointer}.effort.selected{background:var(--mintSoft);border-color:var(--mint);color:#155c4d}
+.replaceBox{display:grid;gap:10px;padding:12px;border-radius:14px;background:var(--bg)}
+.sumRow{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:56px;padding:8px 0;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:right;cursor:pointer;color:var(--ink)}.sumRow:last-child{border-bottom:0}.sumRow span{display:grid;gap:2px}.sumRow small{color:var(--muted)}
+.editEx{display:grid;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}.editEx label{display:grid;gap:4px;font-size:13px;color:var(--muted)}.editGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.editEx .field{min-height:46px;padding:0 10px;border-radius:12px;width:100%}.editEx [aria-invalid="true"]{border-color:#b34a3d}
+.status:disabled,.iconButton:disabled,.secondary:disabled,.primary:disabled{opacity:.45;cursor:not-allowed}

@@ -1,5 +1,6 @@
 // לוגיקה טהורה של מסך "היום": מה האימון הבא, מה הסטטוס להיום, ומה ההמלצות (טקסט בלבד).
-import { buildProgram, SESSION_IDS } from "./program.mjs";
+import { SESSION_IDS } from "./program.mjs";
+import { resolveProgram } from "./plan.mjs";
 
 const DAY = 86400000;
 const parse = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
@@ -28,7 +29,7 @@ export function todayState(data, today) {
   const d = data || {};
   const profile = d.profile || {};
   const workouts = d.workouts || [];
-  const program = buildProgram(profile);
+  const program = resolveProgram(d);
   const goal = Number(profile.baseline?.weeklyWorkoutGoal) || null;
   const weekDone = weekWorkoutCount(workouts, today);
   const recommendations = [];
