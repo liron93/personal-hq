@@ -16,7 +16,7 @@ export function Row({ label, children, last, bold }) {
 // המספר הוא הגיבור הוויזואלי: גדול ומודגש, התווית מעליו קטנה ומושתקת
 export function Metric({ label, value, sub, color }) {
   return (
-    <div style={{ flex: 1, background: CARD, border: `1px solid ${LINE}`, borderRadius: RADIUS, boxShadow: SHADOW, padding: "14px 16px" }}>
+    <div style={{ flex: "1 1 120px", minWidth: 0, overflowWrap: "anywhere", background: CARD, border: `1px solid ${LINE}`, borderRadius: RADIUS, boxShadow: SHADOW, padding: "14px 16px" }}>
       <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 26, fontWeight: 600, color: color || INK, lineHeight: 1.15 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{sub}</div>}

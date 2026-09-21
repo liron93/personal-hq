@@ -17,7 +17,7 @@ function CatRow({ item, onUpdate, onDelete }) {
         <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
           <input type="checkbox" checked={!!item.done} onChange={e => onUpdate({ ...item, done: e.target.checked })} style={{ marginTop: 3 }} />
           <div style={{ minWidth: 0, cursor: "pointer" }} onClick={() => setOpen(!open)}>
-            <div style={{ fontSize: 14, textDecoration: item.done ? "line-through" : "none", opacity: item.done ? 0.5 : 1 }}>{item.n}</div>
+            <div style={{ fontSize: 14, overflowWrap: "anywhere", textDecoration: item.done ? "line-through" : "none", opacity: item.done ? 0.5 : 1 }}>{item.n}</div>
             <div style={{ fontSize: 11, color: MUTED }}>
               מתוכנן: {ils(est)}
               {act > 0 && <span style={{ color: over ? RUST : GREEN }}> · בפועל: {ils(act)} · {pct}%</span>}
@@ -62,7 +62,7 @@ export default function Budget({ d, setD }) {
   return (
     <div>
       {alerts.length > 0 && <div className="budget-alert"><strong>{alerts.length} חריגות או התראות תקציב</strong><span>{alerts.map(x => x.message).join(" · ")}</span></div>}
-      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
         <Metric label="מתוכנן" value={ils(planned)} />
         <Metric label="בפועל" value={ils(actual)} color={actual > planned ? RUST : GREEN} />
         <Metric label={diff >= 0 ? "נשאר בתקציב" : "חריגה"} value={ils(Math.abs(diff))} color={diff >= 0 ? GREEN : RUST} />

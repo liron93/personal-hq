@@ -129,10 +129,10 @@ export default function AuthGate({ children }) {
 
   return (
     <>
-      <div style={{ background: "#EEF4FF", borderBottom: "1px solid #C7D7FE", padding: "8px 16px", display: "flex", gap: 12, alignItems: "center", justifyContent: "center", direction: "rtl", fontSize: 13 }}>
+      <div style={{ background: "#EEF4FF", borderBottom: "1px solid #C7D7FE", padding: "4px 16px", display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", justifyContent: "center", direction: "rtl", fontSize: 13 }}>
         <span>מחובר באופן מאובטח. הנתונים מסתנכרנים לחשבון שלך.</span>
-        <button onClick={registerPasskey} disabled={busy} style={{ border: 0, background: "transparent", color: "#1D4ED8", cursor: "pointer", fontWeight: 700 }}>הוסף Passkey למכשיר הזה</button>
-        <button onClick={signOut} style={{ border: 0, background: "transparent", color: "#475467", cursor: "pointer" }}>יציאה</button>
+        <button onClick={registerPasskey} disabled={busy} style={{ border: 0, background: "transparent", color: "#1D4ED8", cursor: "pointer", fontWeight: 700, minHeight: 44, padding: "0 8px" }}>הוסף Passkey למכשיר הזה</button>
+        <button onClick={signOut} style={{ border: 0, background: "transparent", color: "#475467", cursor: "pointer", minHeight: 44, padding: "0 8px" }}>יציאה</button>
       </div>
       {message && <div role="status" style={{ textAlign: "center", background: "#FFFAEB", padding: 8, color: "#7A5B00", direction: "rtl" }}>{message}</div>}
       {children}

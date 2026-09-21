@@ -26,18 +26,18 @@ export default function CompanyTasks({ d, setD }) {
         <button onClick={addUpdate} style={primaryBtn}><Plus size={16} /></button>
       </div>
       <div style={{ display: "grid", gap: 8, marginBottom: 24 }}>
-        {d.updates.map(u => <div key={u.id} style={{ fontSize: 14 }}><span style={{ color: MUTED, fontSize: 12 }}>{new Date(u.date).toLocaleDateString("he-IL")} — </span>{u.text}</div>)}
+        {d.updates.map(u => <div key={u.id} style={{ fontSize: 14, overflowWrap: "anywhere" }}><span style={{ color: MUTED, fontSize: 12 }}>{new Date(u.date).toLocaleDateString("he-IL")} — </span>{u.text}</div>)}
       </div>
 
       <Sec title="משימות" />
       <div style={cardStyle}>
         {d.tasks.map((t, i) => (
           <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i === d.tasks.length - 1 ? "none" : `1px solid ${LINE}` }}>
-            <button onClick={() => toggleTask(t.id)} style={{ border: `1px solid ${t.done ? GREEN : MUTED}`, background: t.done ? GREEN : "transparent", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <button onClick={() => toggleTask(t.id)} style={{ border: `1px solid ${t.done ? GREEN : MUTED}`, background: t.done ? GREEN : "transparent", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><span aria-hidden style={{ position: "absolute", inset: -10 }} />
               {t.done && <Check size={12} color="#fff" />}
             </button>
-            <span style={{ flex: 1, fontSize: 15, textDecoration: t.done ? "line-through" : "none", color: t.done ? MUTED : INK }}>{t.text}</span>
-            <button onClick={() => removeTask(t.id)} style={{ border: "none", background: "none", cursor: "pointer", color: MUTED }}><X size={14} /></button>
+            <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontSize: 15, textDecoration: t.done ? "line-through" : "none", color: t.done ? MUTED : INK }}>{t.text}</span>
+            <button onClick={() => removeTask(t.id)} aria-label="מחיקת משימה" style={{ border: "none", background: "none", cursor: "pointer", color: MUTED, flexShrink: 0, minWidth: 40, minHeight: 40, display: "grid", placeItems: "center" }}><X size={14} /></button>
           </div>
         ))}
       </div>
