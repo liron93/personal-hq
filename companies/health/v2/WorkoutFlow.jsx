@@ -2,15 +2,15 @@
 import { useState } from "react";
 import { ChevronLeft, Dumbbell, Pencil } from "lucide-react";
 import { todayState, nextSession } from "../today.mjs";
-import { SHORT_ALTERNATIVE } from "../program.mjs";
+import { SHORT_ALTERNATIVE, formatLoads } from "../program.mjs";
 import { resolveProgram } from "../plan.mjs";
 import css from "./health-v2.module.css";
 
 const fmt = value => new Date(value + "T12:00").toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
-const loadText = e => (e.load ? e.load + " ק״ג" : e.hint || "לתעד משקל");
+const loadText = e => "משקל: " + formatLoads(e.loads);
 
 function ExerciseList({ exercises }) {
-  return <ul className={css.exList}>{exercises.map(e => <li key={e.id}><strong>{e.name}</strong><span>{e.sets} סטים × <bdi dir="ltr">{e.reps}</bdi> · {loadText(e)}</span></li>)}</ul>;
+  return <ul className={css.exList}>{exercises.map(e => <li key={e.id}><strong>{e.name}</strong><span>{e.sets} סטים × <bdi dir="ltr">{e.reps || "—"}</bdi> · {loadText(e)}</span></li>)}</ul>;
 }
 
 // מסך "היום": פעולה אחת ברורה — האימון הבא לפי התוכנית. חלופה קצרה אחת רק אם אין זמן.
@@ -70,7 +70,7 @@ export function WorkoutTab({ d, onStart, onResume, onEditPlan, onBuildPlan }) {
   </div>;
   const next = nextSession(d.workouts, program.ids);
   return <div className={css.stack}>
-    <div className={css.sectionHead}><h2>האימונים שלי</h2><button className={css.linkButton} onClick={onEditPlan}><Pencil size={14} /> עריכת התוכנית</button></div>
+    <div className={css.sectionHead}><h2>האימונים שלי</h2><span className={css.headBtns}><button className={css.linkButton} onClick={onEditPlan}><Pencil size={14} /> עריכת התוכנית</button><button className={css.linkButton} onClick={onBuildPlan}>ייבוא תוכנית</button></span></div>
     {d.liveWorkout && <section className={css.card + " " + css.stack}><strong>אימון {d.liveWorkout.session} בתהליך</strong><button className={css.primary} onClick={onResume}>המשך אימון</button></section>}
     {program.ids.map(id => <section key={id} className={css.card + " " + css.stack}>
       <div className={css.sessionHead}><h3><Dumbbell size={18} /> אימון {id}</h3>{id === next && <span className={css.nextTag}>הבא בתור</span>}</div>

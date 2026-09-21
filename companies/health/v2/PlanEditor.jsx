@@ -2,10 +2,13 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { emptyProgram, normalizeProgram, updateExercise, addExercise, removeExercise, moveExercise, addSession, removeSession, cleanLoad } from "../plan.mjs";
+import { parseReps, parseWeight, UNSET } from "../program.mjs";
 import css from "./health-v2.module.css";
 
 const RESTS = [30, 45, 60, 75, 90, 120, 180];
-const badLoad = e => e.load !== null && e.load !== "" && cleanLoad(e.load) === null;
+const badLoadAt = v => v !== null && v !== undefined && String(v).trim() !== "" && parseWeight(v) === null;
+const badLoads = e => (e.loads || []).some(badLoadAt);
+const badReps = e => parseReps(e.reps) === null;
 
 // עורך תוכנית A/B/C. טיוטה מקומית; נשמר ל-data.program רק בלחיצה על "שמירה".
 export default function PlanEditor({ program, onSave, onClose }) {
@@ -16,8 +19,8 @@ export default function PlanEditor({ program, onSave, onClose }) {
   const edit = fn => { setError(""); setDraft(p => fn(p) || p); };
 
   const save = () => {
-    const invalid = ids.some(id => draft.sessions[id].some(badLoad));
-    if (invalid) { setError("משקל חייב להיות מספר (למשל 12.5), או להישאר ריק."); return; }
+    if (ids.some(id => draft.sessions[id].some(badLoads))) { setError("משקל חייב להיות מספר גדול מ-0 (למשל 12.5), או להישאר ריק (טרם נקבע)."); return; }
+    if (ids.some(id => draft.sessions[id].some(badReps))) { setError("לכל תרגיל צריך טווח חזרות תקין: 8-12 או מספר בודד כמו 12."); return; }
     if (ids.some(id => draft.sessions[id].some(e => !e.name.trim()))) { setError("לכל תרגיל צריך שם."); return; }
     const clean = normalizeProgram({ ...draft, source: "custom", updatedAt: nowISO() });
     if (!clean) { setError("התוכנית ריקה."); return; }
@@ -32,10 +35,12 @@ export default function PlanEditor({ program, onSave, onClose }) {
       {draft.sessions[sid].map((e, i, list) => <div key={e.id} className={css.editEx}>
         <label>שם התרגיל<input className={css.field} value={e.name} onChange={ev => edit(p => updateExercise(p, sid, e.id, { name: ev.target.value }))} /></label>
         <div className={css.editGrid}>
-          <label>סטים<select className={css.field} value={e.sets} onChange={ev => edit(p => updateExercise(p, sid, e.id, { sets: Number(ev.target.value) }))}>{[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
-          <label>חזרות<input className={css.field} dir="ltr" value={e.reps} onChange={ev => edit(p => updateExercise(p, sid, e.id, { reps: ev.target.value }))} /></label>
-          <label>משקל (ק״ג)<input className={css.field} inputMode="decimal" value={e.load ?? ""} placeholder={e.hint || "לא הוזן"} aria-invalid={badLoad(e)} onChange={ev => edit(p => updateExercise(p, sid, e.id, { load: ev.target.value }))} /></label>
+          <label>סטים<select className={css.field} value={e.sets} onChange={ev => edit(p => updateExercise(p, sid, e.id, { sets: Number(ev.target.value) }))}>{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+          <label>חזרות (8-12 או 12)<input className={css.field} dir="ltr" inputMode="text" value={e.reps} aria-invalid={e.reps !== "" && badReps(e)} onChange={ev => edit(p => updateExercise(p, sid, e.id, { reps: ev.target.value }))} /></label>
           <label>מנוחה<select className={css.field} value={e.rest} onChange={ev => edit(p => updateExercise(p, sid, e.id, { rest: Number(ev.target.value) }))}>{[...new Set([...RESTS, e.rest])].sort((a, b) => a - b).map(s => <option key={s} value={s}>{s} שנ׳</option>)}</select></label>
+        </div>
+        <div className={css.stack}><span className={css.loadTitle}>משקל לכל סט (ק״ג). ריק = {UNSET}</span>
+          <div className={css.loadGrid}>{Array.from({ length: e.sets }, (_, si) => <label key={si}>סט {si + 1}<input className={css.field} inputMode="decimal" value={e.loads?.[si] ?? ""} placeholder={UNSET} aria-invalid={badLoadAt(e.loads?.[si])} onChange={ev => edit(p => updateExercise(p, sid, e.id, { loads: Array.from({ length: e.sets }, (_, k) => (k === si ? ev.target.value : e.loads?.[k] ?? null)) }))} /></label>)}</div>
         </div>
         <div className={css.rowBtns}>
           <button className={css.iconButton} aria-label="הזזה למעלה" disabled={i === 0} onClick={() => edit(p => moveExercise(p, sid, e.id, -1))}><ArrowUp size={18} /></button>

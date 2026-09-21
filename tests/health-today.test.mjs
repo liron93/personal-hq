@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isRestricted, parseProgramText, SHORT_ALTERNATIVE } from "../companies/health/program.mjs";
+import { isRestricted, SHORT_ALTERNATIVE } from "../companies/health/program.mjs";
 import { resolveProgram, importFromText } from "../companies/health/plan.mjs";
 import { nextSession, todayState, weekStartISO, weekWorkoutCount, sessionLogEntry } from "../companies/health/today.mjs";
 
@@ -10,7 +10,7 @@ const TEXT = `A
 B
 תרגיל ג | 3 | 6-8 | 22.5
 C
-תרגיל ד, 4, 12`;
+תרגיל ד | 4 | 12`;
 const program = importFromText(TEXT, "t").program;
 const withPlan = { profile: { complete: true }, program, workouts: [] };
 
@@ -23,22 +23,13 @@ test("no stored program => empty state, never a default plan", () => {
   }
 });
 
-test("quick import: parses A/B/C, keeps missing weight empty, reports bad lines", () => {
+test("quick import basics (full format coverage lives in health-plan-import.test.mjs)", () => {
   assert.deepEqual(Object.keys(program.sessions), ["A", "B", "C"]);
-  assert.equal(program.sessions.A[0].load, "40");
-  assert.equal(program.sessions.A[1].load, null);
+  assert.deepEqual(program.sessions.A[0].loads, ["40", "40", "40"]);
+  assert.deepEqual(program.sessions.A[1].loads, [null, null]);
   assert.equal(program.sessions.C[0].sets, 4);
-  const r = parseProgramText("תרגיל לפני כותרת | 3 | 8\nאימון A\nבלי סטים\nעם סטים | x | 8\nחסר חזרות | 3\nתקין | 3 | 8-10");
-  assert.equal(r.errors.length, 4);
-  assert.equal(r.sessions.A.length, 1);
-  const bad = importFromText("A\nתרגיל | 3 | 8 | כבד");
-  assert.equal(bad.program, null);
-  assert.equal(bad.errors.length, 1);
+  assert.equal(program.sessions.C[0].reps, "12");
   assert.equal(importFromText("").program, null);
-  const dec = importFromText("B\nתרגיל | 3 | 8-12 | 22,5\nעוד, 2, 10, 15").program;
-  assert.equal(dec.sessions.B[0].load, "22.5");
-  assert.equal(dec.sessions.B[1].sets, 2);
-  assert.equal(dec.sessions.B[1].load, "15");
 });
 
 test("safety limitation or sensitive flag blocks the program", () => {

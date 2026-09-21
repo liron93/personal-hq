@@ -2,10 +2,24 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import * as L from "../live.mjs";
+import { formatLoads, UNSET } from "../program.mjs";
 import css from "./health-v2.module.css";
 
 const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-const planLine = e => <>{e.plan.sets} סטים × <bdi dir="ltr">{e.plan.reps}</bdi>{e.plan.load ? ` · ${e.plan.load} ק״ג` : e.plan.hint ? ` · ${e.plan.hint}` : ""}</>;
+const planLine = e => <>{e.plan.sets} סטים × <bdi dir="ltr">{e.plan.reps || "—"}</bdi> · משקל: {formatLoads(e.plan.loads)}</>;
+const lastLine = last => last.sets.map(s => (s.weight === null ? "משקל לא הוזן" : s.weight + " ק״ג") + " × " + (s.reps ?? "?")).join(" · ");
+
+function SetRows({ e, ei, apply }) {
+  return <div className={css.setGrid} role="group" aria-label="סטים">
+    <span /><small>משקל (ק״ג)</small><small>חזרות</small><span />
+    {e.sets.map((s, si) => <div className={css.setRow} key={si}>
+      <span className={css.setNum}>{si + 1}</span>
+      <input className={css.field} inputMode="decimal" aria-label={`משקל בסט ${si + 1}`} value={s.weight} onChange={ev => apply(l => L.setSetField(l, ei, si, "weight", ev.target.value))} placeholder={UNSET} />
+      <input className={css.field} inputMode="numeric" aria-label={`חזרות בסט ${si + 1}`} value={s.reps} onChange={ev => apply(l => L.setSetField(l, ei, si, "reps", ev.target.value))} placeholder={e.plan.reps} dir="ltr" />
+      <button className={css.doneBtn + " " + (s.done ? css.doneOn : "")} aria-pressed={s.done} aria-label={`סט ${si + 1} בוצע`} onClick={() => apply(l => L.toggleSetDone(l, ei, si, Date.now()))}><Check size={20} /></button>
+    </div>)}
+  </div>;
+}
 
 function RestBar({ live, now, onAdd, onSkip }) {
   const left = L.restRemaining(live, now);
@@ -19,7 +33,8 @@ function RestBar({ live, now, onAdd, onSkip }) {
   </section>;
 }
 
-export default function LiveWorkout({ initial, onCommit, onFinish, onLeave, today, exitReq, onRequestExit, onDismissExit }) {
+export default function LiveWorkout({ initial, onCommit, onFinish, onLeave, today, exitReq, onRequestExit, onDismissExit, onUpdatePlan }) {
+  const [planUpdated, setPlanUpdated] = useState({});
   const [live, setLive] = useState(initial);
   const [idx, setIdx] = useState(0);
   const [now, setNow] = useState(() => Date.now());
@@ -79,15 +94,21 @@ export default function LiveWorkout({ initial, onCommit, onFinish, onLeave, toda
   const dialog = exitReq && L.needsExitConfirm(live) ? <div className={css.modalBack} role="presentation"><div className={css.modal} role="alertdialog" aria-modal="true" aria-labelledby="exit-title"><h3 id="exit-title">לצאת מהאימון?</h3><p className={css.subtle}>מה שסימנת עד עכשיו נשמר. אפשר להמשיך בהמשך מאותה נקודה.</p><button className={css.primary} autoFocus onClick={() => resolve("stay")}>המשך אימון</button><button className={css.secondary} onClick={() => resolve("finish")}>סיום ושמירה ביומן</button><button className={css.secondary} onClick={() => resolve("leave")}>יציאה, לשמור להמשך</button><button className={css.linkButton} onClick={() => resolve("cancel")}>ביטול האימון בלי לשמור</button></div></div> : null;
 
   if (view === "summary") return <div className={css.stack}>{dialog}
-    <section className={css.actionHero}><p className={css.eyebrow}>סיכום אימון {live.session}</p><h2>{sum.doneSets} סטים בוצעו</h2><p>{sum.doneExercises} מתוך {sum.exercises} תרגילים{sum.skipped ? " · דולגו " + sum.skipped : ""}</p></section>
-    <section className={css.card}>
-      {live.exercises.map((x, i) => <button key={x.exId} className={css.sumRow} onClick={() => { setIdx(i); setView("work"); }}>
-        <span><strong>{x.name}</strong><small>{x.status === "skipped" ? "דולג" : `${x.sets.filter(s => s.done).length} מתוך ${x.sets.length} סטים`}{x.effort ? " · " + L.EFFORTS[x.effort] : ""}</small></span>
-        <ChevronLeft size={18} />
-      </button>)}
-    </section>
+    <section className={css.actionHero}><p className={css.eyebrow}>עדכון ביצוע · אימון {live.session}</p><h2>{sum.doneSets} סטים בוצעו</h2><p>בדקו את מה שבוצע בפועל, תקנו משקל או חזרות אם צריך, ורק אז שמרו. סט שלא סומן כבוצע לא יישמר. התוכנית לא משתנה בעצמה.</p></section>
+    {live.exercises.map((x, i) => {
+      const proposal = L.planUpdateFor(live, i);
+      return <section key={x.exId} className={css.card + " " + css.stack}>
+        <div className={css.sessionHead}><h3>{x.name}</h3>{x.status === "skipped" && <span className={css.nextTag}>דולג</span>}</div>
+        {x.status === "skipped" ? <button className={css.secondary} onClick={() => apply(l => L.skipExercise(l, i))}>ביטול הדילוג</button> : <>
+          <p className={css.subtle}>מתוכנן: {planLine(x)}{x.effort ? " · הרגשה: " + L.EFFORTS[x.effort] : ""}</p>
+          <SetRows e={x} ei={i} apply={apply} />
+          {planUpdated[x.exId] ? <p className={css.subtle}>התוכנית עודכנה: {formatLoads(planUpdated[x.exId])}</p>
+            : proposal && <button className={css.secondary} onClick={() => { onUpdatePlan(live.session, x.exId, proposal); setPlanUpdated(p => ({ ...p, [x.exId]: proposal })); }}>עדכן את התוכנית למשקל שבוצע ({formatLoads(proposal)})</button>}
+        </>}
+      </section>;
+    })}
     {confirmEmpty && <p className={css.validation} role="alert">לא סומן אף סט כבוצע. לשמור בכל זאת?</p>}
-    <button className={css.primary + " " + css.wide} onClick={finish}>{confirmEmpty ? "כן, לשמור אימון" : "סיום ושמירה"}</button>
+    <button className={css.primary + " " + css.wide} onClick={finish}>{confirmEmpty ? "כן, לשמור אימון" : "אישור ושמירה ביומן"}</button>
     <button className={css.secondary} onClick={() => { setConfirmEmpty(false); setView("work"); }}>חזרה לאימון</button>
     <button className={css.linkButton} onClick={() => onRequestExit("today")}>יציאה מהאימון</button>
   </div>;
@@ -105,19 +126,11 @@ export default function LiveWorkout({ initial, onCommit, onFinish, onLeave, toda
         <h2 className={css.liveTitle}>{e.name}</h2>
         <p className={css.subtle}>מתוכנן: {planLine(e)}</p>
         {e.replacedFrom && <p className={css.subtle}>הוחלף במקום: {e.replacedFrom}</p>}
-        {e.last && <p className={css.subtle}>בפעם הקודמת ({e.last.date}): {e.last.sets.map(s => `${s.weight ?? "?"} ק״ג × ${s.reps ?? "?"}`).join(" · ")}</p>}
+        {e.last && <p className={css.subtle}>בפעם הקודמת ({e.last.date}): {lastLine(e.last)}</p>}
       </div>
 
       {e.status === "skipped" ? <div className={css.stack}><p>התרגיל דולג.</p><button className={css.secondary} onClick={() => apply(l => L.skipExercise(l, idx))}>ביטול הדילוג</button></div> : <>
-        <div className={css.setGrid} role="group" aria-label="סטים">
-          <span /><small>משקל (ק״ג)</small><small>חזרות</small><span />
-          {e.sets.map((s, si) => <div className={css.setRow} key={si}>
-            <span className={css.setNum}>{si + 1}</span>
-            <input className={css.field} inputMode="decimal" aria-label={`משקל בסט ${si + 1}`} value={s.weight} onChange={ev => apply(l => L.setSetField(l, idx, si, "weight", ev.target.value))} placeholder="—" />
-            <input className={css.field} inputMode="numeric" aria-label={`חזרות בסט ${si + 1}`} value={s.reps} onChange={ev => apply(l => L.setSetField(l, idx, si, "reps", ev.target.value))} placeholder={e.plan.reps} dir="ltr" />
-            <button className={css.doneBtn + " " + (s.done ? css.doneOn : "")} aria-pressed={s.done} aria-label={`סט ${si + 1} בוצע`} onClick={() => apply(l => L.toggleSetDone(l, idx, si, Date.now()))}><Check size={20} /></button>
-          </div>)}
-        </div>
+        <SetRows e={e} ei={idx} apply={apply} />
         <div className={css.rowBtns}>
           <button className={css.secondary} onClick={() => apply(l => L.addSet(l, idx))}>הוספת סט</button>
           {e.sets.length > 1 && <button className={css.secondary} onClick={() => apply(l => L.removeSet(l, idx, e.sets.length - 1))}>הסרת סט אחרון</button>}

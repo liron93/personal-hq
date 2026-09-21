@@ -1,6 +1,9 @@
 // לוגיקה טהורה של אימון חי: סטים, משקל, חזרות, מאמץ, הערה, טיימר מנוחה, דילוג/החלפה וסיום.
 // המצב נשמר ב-data.liveWorkout (שדה אופציונלי) כדי שרענון הדף לא יאבד אימון בתהליך.
-// אין כאן המצאת משקלים: משקל ממולא רק מהתוכנית (אם הוזן שם) — אחרת נשאר ריק.
+// אין כאן המצאת משקלים: לכל סט ממולא מראש רק המשקל שנקבע בתוכנית לאותו סט; "טרם נקבע" נשאר ריק והמשתמש ממלא.
+import { parseWeight } from "./program.mjs";
+import { lastPerformance } from "./history.mjs";
+export { lastPerformance };
 
 export const EFFORTS = { easy: "קל", ok: "מתאים", hard: "קשה" };
 
@@ -10,20 +13,10 @@ export function num(v) {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-// ביצוע אחרון של תרגיל (לפי שם) מתוך היסטוריית האימונים החיים — מידע אמיתי בלבד.
-export function lastPerformance(workouts, name) {
-  const list = (workouts || []).filter(w => w && w.log && Array.isArray(w.log.exercises)).sort((a, b) => (b.date + (b.createdAt || "")).localeCompare(a.date + (a.createdAt || "")));
-  for (const w of list) {
-    const e = w.log.exercises.find(x => x.name === name && x.status !== "skipped" && x.sets && x.sets.length);
-    if (e) return { date: w.date, sets: e.sets };
-  }
-  return null;
-}
-
 const ex = (e, workouts) => ({
   exId: e.id, name: e.name, plannedName: e.name, replacedFrom: null, status: "pending",
-  plan: { sets: e.sets, reps: e.reps, load: e.load ?? null, hint: e.hint || "", rest: e.rest || 75 },
-  sets: Array.from({ length: e.sets }, () => ({ weight: e.load ? String(e.load) : "", reps: "", done: false })),
+  plan: { sets: e.sets, reps: e.reps, loads: e.loads.slice(), rest: e.rest || 75 },
+  sets: Array.from({ length: e.sets }, (_, i) => ({ weight: e.loads[i] ? String(e.loads[i]) : "", reps: "", done: false, planned: e.loads[i] || null })),
   effort: "", note: "", last: lastPerformance(workouts, e.name),
 });
 
@@ -47,7 +40,7 @@ export function toggleSetDone(live, ei, si, now) {
   return next;
 }
 export function addSet(live, ei) {
-  return setAt(live, ei, e => { const last = e.sets[e.sets.length - 1]; return { ...e, sets: [...e.sets, { weight: last ? last.weight : "", reps: "", done: false }] }; });
+  return setAt(live, ei, e => { const last = e.sets[e.sets.length - 1]; return { ...e, sets: [...e.sets, { weight: last ? last.weight : "", reps: "", done: false, planned: null }] }; });
 }
 export function removeSet(live, ei, si) {
   return setAt(live, ei, e => (e.sets.length <= 1 ? e : { ...e, sets: e.sets.filter((_, i) => i !== si) }));
@@ -64,7 +57,7 @@ export function replaceExercise(live, ei, newName) {
   if (!name) return live;
   return setAt(live, ei, e => ({
     ...e, name, replacedFrom: e.replacedFrom || e.plannedName, status: "pending", last: null,
-    plan: { ...e.plan, load: null, hint: "" }, sets: e.sets.map(() => ({ weight: "", reps: "", done: false })),
+    plan: { ...e.plan, loads: e.plan.loads.map(() => null) }, sets: e.sets.map(() => ({ weight: "", reps: "", done: false, planned: null })),
   }));
 }
 
@@ -102,7 +95,7 @@ export function finishLive(live, { now, today }) {
       exercises: live.exercises.map(e => ({
         name: e.name, plannedName: e.plannedName, replacedFrom: e.replacedFrom, status: e.status,
         effort: e.effort, note: e.note,
-        sets: e.status === "skipped" ? [] : e.sets.filter(s => s.done).map(s => ({ weight: num(s.weight), reps: num(s.reps) })),
+        sets: e.status === "skipped" ? [] : e.sets.filter(s => s.done).map(s => { const w = parseWeight(s.weight); return { weight: w === null ? null : parseFloat(w), reps: num(s.reps) }; }),
       })),
     },
   };
@@ -123,3 +116,13 @@ export function resolveExit(live, choice) {
   return { action: "stay", keep: true };
 }
 export const needsExitConfirm = live => hasProgress(live);
+
+// הצעה לעדכון התוכנית למשקל שבוצע, לתרגיל אחד (רק בלחיצה מפורשת של המשתמש). מחזיר מערך משקלים חדש או null אם אין מה לעדכן.
+// רק סטים שסומנו כבוצעו ויש להם משקל חיובי משנים את המשקל המתוכנן; שאר הסטים נשארים כמו בתוכנית.
+export function planUpdateFor(live, ei) {
+  const e = live.exercises[ei];
+  if (!e || e.status === "skipped" || e.replacedFrom) return null;
+  const next = e.plan.loads.map((planned, i) => { const s = e.sets[i]; const w = s && s.done ? parseWeight(s.weight) : null; return w !== null ? w : planned; });
+  const same = next.every((w, i) => (w || null) === (e.plan.loads[i] || null));
+  return same ? null : next;
+}

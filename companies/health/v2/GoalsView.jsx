@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { addWeighIn, removeWeighIn, addSteps, removeSteps, cleanKg, cleanSteps, goalTarget, movingAverage, forecast, weekSummary, MIN_POINTS, MIN_SPAN_DAYS, WINDOW_DAYS } from "../goals.mjs";
 import { addDaysISO } from "../today.mjs";
+import { historyList, exerciseHistory, normalizeName } from "../history.mjs";
 import css from "./health-v2.module.css";
 
 const shortDate = iso => new Date(iso + "T12:00").toLocaleDateString("he-IL", { day: "numeric", month: "short" });
@@ -41,6 +42,30 @@ function WeightChart({ series }) {
     </svg>
     <div className={css.chartAxis}><span>{shortDate(series[0].date)}</span><span>נקודות: שקילות · קו: ממוצע נע 7 ימים</span><span>{shortDate(series[series.length - 1].date)}</span></div>
   </div>;
+}
+
+const setText = s => (s.weight === null ? "משקל לא הוזן" : s.weight + " ק״ג") + " × " + (s.reps ?? "?");
+const trendText = t => t.kind === "insufficient" ? "אין עדיין מספיק אימונים עם משקל להשוואה." : t.kind === "same" ? `משקל הסט הגבוה ללא שינוי ב-${t.sessions} האימונים האחרונים.` : `משקל הסט הגבוה ${t.kind === "up" ? "עלה" : "ירד"} ב-${Math.abs(t.delta)} ק״ג ב-${t.sessions} האימונים האחרונים.`;
+
+// התקדמות לפי תרגיל: נגזר מרשומות אימון שנשמרו. מידע בלבד.
+function ExerciseProgress({ workouts }) {
+  const [open, setOpen] = useState(null);
+  const list = useMemo(() => historyList(workouts), [workouts]);
+  const hist = useMemo(() => exerciseHistory(workouts), [workouts]);
+  return <section className={css.card + " " + css.stack}>
+    <h3>התקדמות לפי תרגיל</h3>
+    {list.length === 0 ? <p className={css.subtle}>עוד אין היסטוריה. אחרי שתשמרו אימון חי, כל תרגיל יופיע כאן עם הביצוע האחרון, השיא ומגמה פשוטה.</p> : list.map(x => <div key={x.key} className={css.histItem}>
+      <button className={css.histHead} aria-expanded={open === x.key} onClick={() => setOpen(open === x.key ? null : x.key)}>
+        <span><strong>{x.name}</strong><small>אחרון ({shortDate(x.last.date)}): {x.last.sets.map(setText).join(" · ")}</small></span>
+      </button>
+      {open === x.key && <div className={css.histBody}>
+        <p className={css.subtle}>שיא: {x.best ? `${x.best.weight} ק״ג × ${x.best.reps ?? "?"} (${shortDate(x.best.date)})` : "אין משקל מתועד"}</p>
+        <p className={css.subtle}>{trendText(x.trend)}</p>
+        <div>{hist.get(normalizeName(x.name)).sessions.slice(-6).reverse().map((s, i) => <div className={css.weighRow} key={i}><span>{longDate(s.date)}</span><strong>{s.sets.map(setText).join(" · ")}</strong></div>)}</div>
+        <p className={css.disclaimer}>מידע מתוך מה שתועד בלבד, ללא המלצות.</p>
+      </div>}
+    </div>)}
+  </section>;
 }
 
 function WeeklyGoalsCard({ baseline, setD }) {
@@ -137,6 +162,8 @@ export default function GoalsView({ d, setD, today, uid }) {
       {recent.length > 0 && <div>{recent.map(w => <div className={css.weighRow} key={w.id}><span>{longDate(w.date)}</span><strong>{kg(w.kg)}</strong><button className={css.iconButton} aria-label={`מחיקת שקילה ${shortDate(w.date)}`} onClick={() => setD(p => ({ ...p, weighIns: removeWeighIn(p.weighIns, w.id) }))}><Trash2 size={16} /></button></div>)}</div>}
       {weighIns.length === 0 && <p className={css.subtle}>עוד אין שקילות. שקילה אחת בכמה ימים מספיקה כדי לבנות מגמה.</p>}
     </section>
+
+    <ExerciseProgress workouts={d.workouts} />
 
     <WeeklyGoalsCard baseline={d.profile?.baseline} setD={setD} />
 

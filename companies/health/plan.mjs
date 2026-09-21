@@ -1,28 +1,33 @@
 // מודל תוכנית A/B/C ניתנת לעריכה. שדה אופציונלי חדש ב-blob: data.program.
 // בלי data.program אין תוכנית (מצב ריק): לא ממציאים תרגילים. נתונים שמורים לא נמחקים.
-import { isRestricted, parseProgramText, DEFAULT_REST, SESSION_IDS } from "./program.mjs";
+import { isRestricted, parseProgramText, parseWeight, canonReps, DEFAULT_REST, SESSION_IDS } from "./program.mjs";
 
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const asInt = (v, fallback) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : fallback; };
 
-// משקל נשמר רק אם הוא מספר אמיתי. כל דבר אחר הופך ל-null — לעולם לא ממציאים ערך.
-export function cleanLoad(v) {
-  if (v === null || v === undefined) return null;
-  const s = String(v).trim().replace(",", ".");
-  return /^\d+(\.\d+)?$/.test(s) ? s : null;
+// משקל נשמר רק אם הוא מספר חיובי אמיתי (0 אינו משקל). כל דבר אחר הופך ל-null = "טרם נקבע". לעולם לא ממציאים ערך.
+export const cleanLoad = parseWeight;
+
+// משקלים לכל סט: מערך באורך מספר הסטים. תאימות לאחור: משקל בודד (load / weight) חל על כל הסטים.
+// lenient=true (טיוטה בעורך): שומר מחרוזות כפי שהוקלדו; אחרת מנקה ל-null כשלא תקין.
+function loadsFor(raw, sets, lenient) {
+  const clean = v => (lenient ? (v === null || v === undefined || v === "" ? null : String(v)) : parseWeight(v));
+  let src;
+  if (Array.isArray(raw.loads)) src = raw.loads;
+  else { const single = raw.load ?? raw.weight; src = Array(sets).fill(single ?? null); }
+  return Array.from({ length: sets }, (_, i) => clean(src[i]));
 }
 
-// lenient=true: מצב טיוטה בעורך — שומר שם ומשקל כפי שהוקלדו (גם ריקים/חלקיים); רק שמירה סופית מנקה.
 export function cleanExercise(raw, fallbackId, lenient = false) {
   const name = typeof raw?.name === "string" ? (lenient ? raw.name : raw.name.trim()) : "";
   if (!lenient && !name) return null;
+  const sets = clamp(asInt(raw.sets, 3), 1, 10);
   return {
     id: typeof raw.id === "string" && raw.id ? raw.id : fallbackId,
     name,
-    sets: clamp(asInt(raw.sets, 2), 1, 10),
-    reps: lenient && typeof raw.reps === "string" ? raw.reps : typeof raw.reps === "string" && raw.reps.trim() ? raw.reps.trim() : "8–12",
-    load: lenient ? (raw.load === null || raw.load === undefined || raw.load === "" ? null : String(raw.load)) : cleanLoad(raw.load),
-    hint: typeof raw.hint === "string" ? raw.hint : "",
+    sets,
+    reps: lenient && typeof raw.reps === "string" ? raw.reps : canonReps(raw.reps),
+    loads: loadsFor(raw, sets, lenient),
     rest: clamp(asInt(raw.rest, DEFAULT_REST), 15, 600),
   };
 }
@@ -54,19 +59,10 @@ export function resolveProgram(data) {
 }
 
 // ייבוא/הזנה מהירה מטקסט לתוכנית תקינה. מחזיר { program, errors }; program=null אם אין אף תרגיל תקין.
-// משקל שאינו מספר נדחה (שגיאה), לא מתוקן.
 export function importFromText(text, now = "") {
   const { sessions, errors } = parseProgramText(text);
-  const errs = [...errors];
-  const clean = {};
-  for (const [sid, list] of Object.entries(sessions)) {
-    clean[sid] = list.filter((e, i) => {
-      if (e.load !== null && cleanLoad(e.load) === null) { errs.push({ line: 0, message: `משקל לא תקין בתרגיל "${e.name}" (${e.load})` }); return false; }
-      return true;
-    });
-  }
-  const program = normalizeProgram({ version: 1, source: "imported", updatedAt: now, sessions: clean });
-  return { program, errors: errs };
+  const program = normalizeProgram({ version: 1, source: "imported", updatedAt: now, sessions });
+  return { program, errors };
 }
 
 export const emptyProgram = () => ({ version: 1, source: "custom", updatedAt: "", sessions: {} });
@@ -83,7 +79,7 @@ export function addExercise(program, sid, name, now) {
   const s = cloneSessions(program);
   const list = s[sid] || [];
   let n = list.length + 1; while (list.some(e => e.id === `${sid}${n}`)) n++;
-  s[sid] = [...list, { id: `${sid}${n}`, name, sets: 2, reps: "8–12", load: null, hint: "", rest: DEFAULT_REST }];
+  s[sid] = [...list, { id: `${sid}${n}`, name, sets: 3, reps: "", loads: [null, null, null], rest: DEFAULT_REST }];
   return touch(program, s, now);
 }
 export function removeExercise(program, sid, exId, now) {
@@ -110,4 +106,9 @@ export function removeSession(program, sid, now) {
   if (ids.length <= 1 || ids[ids.length - 1] !== sid) return program; // מסירים רק את האחרון, כדי לשמור על רצף A/B/C
   const s = cloneSessions(program); delete s[sid];
   return touch(program, s, now);
+}
+
+// עדכון מפורש של משקלי תרגיל בתוכנית (כפתור "עדכן את התוכנית למשקל שבוצע"). לעולם לא אוטומטי.
+export function applyLoads(program, sid, exId, loads, now) {
+  return normalizeProgram(updateExercise(program, sid, exId, { loads }, now)) || program;
 }

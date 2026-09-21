@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, MoreHorizontal, Pencil, Settings, Trash2, TrendingUp, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, uid } from "../model";
-import { resolveProgram } from "../plan.mjs";
+import { resolveProgram, normalizeProgram, applyLoads } from "../plan.mjs";
 import { weekSummary } from "../goals.mjs";
 import { startLive } from "../live.mjs";
 import { sessionLogEntry } from "../today.mjs";
@@ -109,10 +109,11 @@ export default function HealthApp() {
  // keep=false: אימון שבוטל או ריק נמחק; keep=true: נשאר ב-data.liveWorkout וניתן להמשיך.
  const leaveLive=(nextTab,keep)=>{if(!keep)setD(p=>({...p,liveWorkout:null}));setLiveOpen(false);setExitReq(null);setComposer(null);setPlanView(null);setTab(nextTab||"today");};
  const savePlan=next=>{setD(p=>({...p,program:next}));setPlanView(null);toastFor("התוכנית נשמרה.");};
- const loadPlan=next=>{setD(p=>({...p,program:next}));setPlanView("editor");toastFor("התוכנית נטענה. אפשר לערוך ולשמור.");};
- const live=liveOpen&&d.liveWorkout?<LiveWorkout key={d.liveWorkout.id} initial={d.liveWorkout} today={today} onCommit={l=>setD(p=>({...p,liveWorkout:l}))} onFinish={finishLive} onLeave={leaveLive} exitReq={exitReq} onRequestExit={t=>setExitReq({tab:t})} onDismissExit={()=>setExitReq(null)}/>:null;
+ const loadPlan=next=>{setD(p=>({...p,programBackup:p.program||p.programBackup,program:next}));setPlanView("editor");toastFor("התוכנית נטענה. אפשר לערוך ולשמור.");};
+ const updatePlan=(sid,exId,loads)=>setD(p=>{const cur=normalizeProgram(p.program);return cur?{...p,program:applyLoads(cur,sid,exId,loads,new Date().toISOString())}:p;});
+ const live=liveOpen&&d.liveWorkout?<LiveWorkout key={d.liveWorkout.id} initial={d.liveWorkout} today={today} onCommit={l=>setD(p=>({...p,liveWorkout:l}))} onFinish={finishLive} onLeave={leaveLive} exitReq={exitReq} onRequestExit={t=>setExitReq({tab:t})} onDismissExit={()=>setExitReq(null)} onUpdatePlan={updatePlan}/>:null;
  const build=()=>{setComposer(null);setTab("workout");setPlanView("builder");};
  const workoutTab=<><WorkoutTab d={d} onStart={startSession} onResume={()=>setLiveOpen(true)} onEditPlan={()=>setPlanView("editor")} onBuildPlan={()=>setPlanView("builder")}/><Journal d={d} setD={setD} setComposer={setComposer} remove={remove} mode="move"/></>;
- const content=composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:live?live:planView==="builder"?<PlanBuilder onLoad={loadPlan} onManual={()=>setPlanView("editor")} onClose={()=>setPlanView(null)}/>:planView==="editor"?<PlanEditor program={program} onSave={savePlan} onClose={()=>setPlanView(null)}/>:tab==="today"?<TodayScreen d={d} today={today} onStart={startSession} onResume={()=>setLiveOpen(true)} onLogShort={logShort} onOpenJournal={()=>navigate("workout")} onBuildPlan={build}/>:tab==="workout"?workoutTab:tab==="nutrition"?<NutritionTab d={d} today={today}><Journal d={d} setD={setD} setComposer={setComposer} remove={remove} mode="food"/></NutritionTab>:tab==="progress"?<GoalsView d={d} setD={setD} today={today} uid={uid}/>:<SettingsView d={d} setD={setD} editProfile={editProfile}/>;
+ const content=composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:live?live:planView==="builder"?<PlanBuilder hasExisting={!program.empty} onLoad={loadPlan} onManual={()=>setPlanView("editor")} onClose={()=>setPlanView(null)}/>:planView==="editor"?<PlanEditor program={program} onSave={savePlan} onClose={()=>setPlanView(null)}/>:tab==="today"?<TodayScreen d={d} today={today} onStart={startSession} onResume={()=>setLiveOpen(true)} onLogShort={logShort} onOpenJournal={()=>navigate("workout")} onBuildPlan={build}/>:tab==="workout"?workoutTab:tab==="nutrition"?<NutritionTab d={d} today={today}><Journal d={d} setD={setD} setComposer={setComposer} remove={remove} mode="food"/></NutritionTab>:tab==="progress"?<GoalsView d={d} setD={setD} today={today} uid={uid}/>:<SettingsView d={d} setD={setD} editProfile={editProfile}/>;
  return <div className={css.shell}><Header/><Nav tab={tab} onNavigate={navigate}/><main className={css.content}>{content}</main>{toast&&<div className={css.toast} role="status"><span>{toast}</span>{deleted&&<button onClick={undo}>ביטול</button>}</div>}</div>;
 }

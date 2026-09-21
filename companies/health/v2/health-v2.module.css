@@ -63,3 +63,9 @@
 .modalBack{position:fixed;inset:0;z-index:60;background:rgba(23,48,43,.45);display:grid;place-items:center;padding:16px}.modal{width:min(100%,420px);display:grid;gap:10px;background:#fff;border-radius:22px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:right}.modal h3{margin:0;font-size:20px}.modal .primary,.modal .secondary{width:100%}
 .pbLabel{display:grid;gap:6px;font-size:14px;font-weight:700}.pbText{min-height:180px;line-height:1.7;resize:vertical;font-family:inherit}.pbErrors{padding:12px;border-radius:14px;background:#fff1ee;color:#8a3a2c;font-size:14px}.pbErrors ul{margin:6px 0 0;padding:0 18px 0 0;line-height:1.7}
 .navItem{min-width:0}.navItem span{white-space:nowrap}
+
+/* משקל לכל סט, היסטוריית תרגיל */
+.loadTitle{font-size:13px;color:var(--muted)}.loadGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}.loadGrid label{display:grid;gap:4px;font-size:12px;color:var(--muted)}.loadGrid .field{min-height:46px;padding:0 8px;text-align:center}
+.setRow .field::placeholder,.loadGrid .field::placeholder{font-size:12px}
+.histItem{border-bottom:1px solid var(--line)}.histItem:last-child{border-bottom:0}.histHead{width:100%;display:flex;text-align:right;background:transparent;border:0;padding:12px 0;min-height:56px;cursor:pointer;color:var(--ink)}.histHead span{display:grid;gap:3px}.histHead small{color:var(--muted);line-height:1.5}.histBody{padding:0 0 12px}
+.headBtns{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
