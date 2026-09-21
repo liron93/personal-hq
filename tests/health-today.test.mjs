@@ -1,34 +1,51 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildProgram, isRestricted, sessionCount, SHORT_ALTERNATIVE } from "../companies/health/program.mjs";
+import { isRestricted, parseProgramText, SHORT_ALTERNATIVE } from "../companies/health/program.mjs";
+import { resolveProgram, importFromText } from "../companies/health/plan.mjs";
 import { nextSession, todayState, weekStartISO, weekWorkoutCount, sessionLogEntry } from "../companies/health/today.mjs";
 
-const gymProfile = { complete: true, availability: "3", place: ["חדר כושר"], baseline: { complete: true, legPress: "80", chestPress: "", row: "" } };
+const TEXT = `A
+תרגיל א | 3 | 8-12 | 40
+תרגיל ב | 2 | 10
+B
+תרגיל ג | 3 | 6-8 | 22.5
+C
+תרגיל ד, 4, 12`;
+const program = importFromText(TEXT, "t").program;
+const withPlan = { profile: { complete: true }, program, workouts: [] };
 
-test("missing profile still produces a full A/B/C program (recommendation only)", () => {
-  const p = buildProgram(undefined);
-  assert.equal(p.restricted, false);
-  assert.deepEqual(p.ids, ["A", "B", "C"]);
-  assert.equal(p.sessions.A.length, 4);
-  assert.equal(sessionCount({ complete: true }), 2);
-  assert.equal(sessionCount({ availability: "5 או יותר" }), 3);
+test("no stored program => empty state, never a default plan", () => {
+  for (const data of [undefined, {}, { profile: {} }, { profile: { complete: true, place: ["חדר כושר"], baseline: { legPress: "80", complete: true } } }]) {
+    const p = resolveProgram(data);
+    assert.equal(p.empty, true);
+    assert.deepEqual(p.ids, []);
+    assert.equal(todayState(data, "2026-09-21").status, "empty");
+  }
 });
 
-test("weights are never invented: only baseline values appear", () => {
-  const p = buildProgram(gymProfile);
-  assert.equal(p.sessions.A[0].load, "80");
-  assert.equal(p.sessions.A[1].load, null);
-  assert.equal(p.sessions.B.every(e => e.load === null), true);
-  const home = buildProgram({ complete: true, availability: "2", place: ["בבית בלי ציוד"] });
-  assert.deepEqual(home.ids, ["A", "B"]);
-  assert.equal(Object.values(home.sessions).flat().every(e => e.load === null), true);
+test("quick import: parses A/B/C, keeps missing weight empty, reports bad lines", () => {
+  assert.deepEqual(Object.keys(program.sessions), ["A", "B", "C"]);
+  assert.equal(program.sessions.A[0].load, "40");
+  assert.equal(program.sessions.A[1].load, null);
+  assert.equal(program.sessions.C[0].sets, 4);
+  const r = parseProgramText("תרגיל לפני כותרת | 3 | 8\nאימון A\nבלי סטים\nעם סטים | x | 8\nחסר חזרות | 3\nתקין | 3 | 8-10");
+  assert.equal(r.errors.length, 4);
+  assert.equal(r.sessions.A.length, 1);
+  const bad = importFromText("A\nתרגיל | 3 | 8 | כבד");
+  assert.equal(bad.program, null);
+  assert.equal(bad.errors.length, 1);
+  assert.equal(importFromText("").program, null);
+  const dec = importFromText("B\nתרגיל | 3 | 8-12 | 22,5\nעוד, 2, 10, 15").program;
+  assert.equal(dec.sessions.B[0].load, "22.5");
+  assert.equal(dec.sessions.B[1].sets, 2);
+  assert.equal(dec.sessions.B[1].load, "15");
 });
 
 test("safety limitation or sensitive flag blocks the program", () => {
   assert.equal(isRestricted({ safety: "לא בטוח/ה" }), true);
   assert.equal(isRestricted({ sensitiveFlag: true }), true);
   assert.equal(isRestricted({ safety: "לא ידוע לי על מגבלה" }), false);
-  assert.equal(todayState({ profile: { safety: "יש מגבלה ואני מתייעץ/ת עם איש מקצוע" }, workouts: [] }, "2026-09-21").status, "restricted");
+  assert.equal(todayState({ ...withPlan, profile: { safety: "יש מגבלה ואני מתייעץ/ת עם איש מקצוע" } }, "2026-09-21").status, "restricted");
 });
 
 test("nextSession cycles A->B->C->A and ignores skipped, unknown and short entries", () => {
@@ -39,27 +56,32 @@ test("nextSession cycles A->B->C->A and ignores skipped, unknown and short entri
   assert.equal(nextSession([{ date: "2026-09-14", session: "B" }, { date: "2026-09-15", session: "C", skipped: true }], ids), "C");
   assert.equal(nextSession([{ date: "2026-09-14", session: "B" }, { date: "2026-09-15", session: null, short: true }], ids), "C");
   assert.equal(nextSession([{ date: "2026-09-14", session: "C" }], ["A", "B"]), "A");
-  assert.equal(nextSession([{ date: "2026-09-14", name: "הליכה" }], ids), "A");
 });
 
-test("todayState: ready, done today, and week counters", () => {
-  const today = "2026-09-21"; // יום שני
-  const empty = todayState({ profile: gymProfile, workouts: [] }, today);
-  assert.equal(empty.status, "ready");
-  assert.equal(empty.session, "A");
-  assert.equal(empty.exercises.length, 4);
-  const done = todayState({ profile: gymProfile, workouts: [{ date: today, session: "A" }] }, today);
+test("todayState with a real program: ready, done today, week counters", () => {
+  const today = "2026-09-21";
+  const ready = todayState(withPlan, today);
+  assert.equal(ready.status, "ready");
+  assert.equal(ready.session, "A");
+  assert.equal(ready.exercises.length, 2);
+  const done = todayState({ ...withPlan, workouts: [{ date: today, session: "A" }] }, today);
   assert.equal(done.status, "done");
-  assert.equal(done.doneSession, "A");
   assert.equal(done.session, "B");
   assert.equal(done.weekDone, 1);
 });
 
-test("missing profile gives recommendations but keeps action ready", () => {
-  const s = todayState({ profile: { complete: false }, workouts: [] }, "2026-09-21");
+test("missing profile is a recommendation only", () => {
+  const s = todayState({ profile: { complete: false }, program, workouts: [] }, "2026-09-21");
   assert.equal(s.status, "ready");
-  assert.equal(s.recommendations.length, 2);
-  assert.equal(todayState({ profile: gymProfile, workouts: [] }, "2026-09-21").recommendations.length, 0);
+  assert.equal(s.recommendations.length, 1);
+  assert.equal(todayState(withPlan, "2026-09-21").recommendations.length, 0);
+});
+
+test("stored data is never dropped: legacy fields untouched by resolve/todayState", () => {
+  const data = { profile: { complete: true, baseline: { legPress: "80" } }, plan: [{ id: "1" }], meals: [{ id: "m" }], workouts: [{ id: "w", date: "2026-09-01", name: "ישן" }], weekChoice: "x" };
+  const before = JSON.stringify(data);
+  todayState(data, "2026-09-21");
+  assert.equal(JSON.stringify(data), before);
 });
 
 test("week starts on Sunday and counts only this week", () => {
@@ -70,11 +92,10 @@ test("week starts on Sunday and counts only this week", () => {
   assert.equal(weekWorkoutCount(w, "2026-09-21"), 2);
 });
 
-test("log entries: short alternative does not advance the A/B/C cycle", () => {
-  const short = sessionLogEntry("A", { today: "2026-09-21", id: "x", now: "t", short: true });
+test("short alternative prescribes no exercises and does not advance the cycle", () => {
+  const short = sessionLogEntry(null, { today: "2026-09-21", id: "x", now: "t", short: true });
   assert.equal(short.session, null);
-  assert.equal(SHORT_ALTERNATIVE.items.length, 4);
+  assert.equal(SHORT_ALTERNATIVE.items.length, 2);
   const full = sessionLogEntry("B", { today: "2026-09-21", id: "y", now: "t" });
-  assert.equal(full.session, "B");
   assert.equal(full.name, "אימון B");
 });

@@ -19,13 +19,12 @@ function RestBar({ live, now, onAdd, onSkip }) {
   </section>;
 }
 
-export default function LiveWorkout({ initial, onCommit, onFinish, onCancel, onLeave, today }) {
+export default function LiveWorkout({ initial, onCommit, onFinish, onLeave, today, exitReq, onRequestExit, onDismissExit }) {
   const [live, setLive] = useState(initial);
   const [idx, setIdx] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [view, setView] = useState("work"); // work | summary
   const [replacing, setReplacing] = useState(null);
-  const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const liveRef = useRef(initial);
   const closed = useRef(false);
@@ -57,9 +56,29 @@ export default function LiveWorkout({ initial, onCommit, onFinish, onCancel, onL
     closed.current = true;
     onFinish(L.finishLive(liveRef.current, { now: Date.now(), today }));
   };
-  const cancel = () => { if (!confirmCancel) { setConfirmCancel(true); return; } closed.current = true; onCancel(); };
+  const leave = (tab, keep) => { closed.current = true; if (keep) onCommit(liveRef.current); onLeave(tab, keep); };
+  const resolve = choice => {
+    const r = L.resolveExit(liveRef.current, choice);
+    const tab = exitReq?.tab || "today";
+    if (r.action === "summary") { setView("summary"); onDismissExit(); return; }
+    if (r.action === "stay") { onDismissExit(); return; }
+    leave(tab, r.keep);
+  };
+  // יציאה שביקשו מבחוץ (ניווט או חזרה בדפדפן): אימון ריק נזרק בשקט, אחרת מציגים אישור.
+  useEffect(() => { if (exitReq && !L.needsExitConfirm(liveRef.current)) leave(exitReq.tab, false); }, [exitReq]); // eslint-disable-line
+  // כפתור חזרה בדפדפן: לא יוצאים בשקט, מבקשים אישור.
+  useEffect(() => {
+    const url = window.location.pathname + window.location.search;
+    if (window.location.hash === "#live") window.history.replaceState(window.history.state, "", url); // אחרי רענון
+    window.history.pushState(window.history.state, "", url + "#live");
+    const onPop = ev => { if (closed.current) return; ev.stopImmediatePropagation(); window.history.pushState(window.history.state, "", url + "#live"); onRequestExit("today"); };
+    window.addEventListener("popstate", onPop, true);
+    return () => { window.removeEventListener("popstate", onPop, true); if (window.location.hash === "#live") window.history.back(); };
+  }, []); // eslint-disable-line
 
-  if (view === "summary") return <div className={css.stack}>
+  const dialog = exitReq && L.needsExitConfirm(live) ? <div className={css.modalBack} role="presentation"><div className={css.modal} role="alertdialog" aria-modal="true" aria-labelledby="exit-title"><h3 id="exit-title">לצאת מהאימון?</h3><p className={css.subtle}>מה שסימנת עד עכשיו נשמר. אפשר להמשיך בהמשך מאותה נקודה.</p><button className={css.primary} autoFocus onClick={() => resolve("stay")}>המשך אימון</button><button className={css.secondary} onClick={() => resolve("finish")}>סיום ושמירה ביומן</button><button className={css.secondary} onClick={() => resolve("leave")}>יציאה, לשמור להמשך</button><button className={css.linkButton} onClick={() => resolve("cancel")}>ביטול האימון בלי לשמור</button></div></div> : null;
+
+  if (view === "summary") return <div className={css.stack}>{dialog}
     <section className={css.actionHero}><p className={css.eyebrow}>סיכום אימון {live.session}</p><h2>{sum.doneSets} סטים בוצעו</h2><p>{sum.doneExercises} מתוך {sum.exercises} תרגילים{sum.skipped ? " · דולגו " + sum.skipped : ""}</p></section>
     <section className={css.card}>
       {live.exercises.map((x, i) => <button key={x.exId} className={css.sumRow} onClick={() => { setIdx(i); setView("work"); }}>
@@ -70,12 +89,12 @@ export default function LiveWorkout({ initial, onCommit, onFinish, onCancel, onL
     {confirmEmpty && <p className={css.validation} role="alert">לא סומן אף סט כבוצע. לשמור בכל זאת?</p>}
     <button className={css.primary + " " + css.wide} onClick={finish}>{confirmEmpty ? "כן, לשמור אימון" : "סיום ושמירה"}</button>
     <button className={css.secondary} onClick={() => { setConfirmEmpty(false); setView("work"); }}>חזרה לאימון</button>
-    <button className={css.linkButton} onClick={cancel}>{confirmCancel ? "לחיצה נוספת לביטול האימון בלי לשמור" : "ביטול האימון"}</button>
+    <button className={css.linkButton} onClick={() => onRequestExit("today")}>יציאה מהאימון</button>
   </div>;
 
-  return <div className={css.stack}>
+  return <div className={css.stack}>{dialog}
     <div className={css.liveHead}>
-      <button className={css.linkButton} onClick={() => { closed.current = true; onCommit(liveRef.current); onLeave(); }}>יציאה (האימון נשמר)</button>
+      <button className={css.linkButton} onClick={() => onRequestExit("today")}>יציאה מהאימון</button>
       <span className={css.eyebrow}>אימון {live.session} · תרגיל {idx + 1} מתוך {total}</span>
     </div>
     <div className={css.progressLine}>{live.exercises.map((x, i) => <i key={x.exId} className={i === idx ? css.done : x.status === "skipped" ? css.skippedDot : x.sets.every(s => s.done) ? css.done : ""} />)}</div>

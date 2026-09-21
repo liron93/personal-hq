@@ -43,6 +43,23 @@ function WeightChart({ series }) {
   </div>;
 }
 
+function WeeklyGoalsCard({ baseline, setD }) {
+  const [open, setOpen] = useState(false);
+  const [g, setG] = useState({ weeklyWorkoutGoal: baseline?.weeklyWorkoutGoal || "", weeklyStepGoal: baseline?.weeklyStepGoal || "", weeklyFoodGoal: baseline?.weeklyFoodGoal || "" });
+  const save = e => { e.preventDefault(); setD(p => ({ ...p, profile: { ...p.profile, baseline: { ...(p.profile.baseline || {}), ...g } } })); setOpen(false); };
+  const has = g.weeklyWorkoutGoal || g.weeklyStepGoal || g.weeklyFoodGoal;
+  return <section className={css.card + " " + css.stack}>
+    <div className={css.sessionHead}><h3>יעדי השבוע</h3><button className={css.linkButton} onClick={() => setOpen(o => !o)}>{open ? "סגירה" : has ? "עדכון" : "קביעה"}</button></div>
+    {!open && <p className={css.subtle}>{has ? `אימונים: ${g.weeklyWorkoutGoal || "—"} · צעדים ביום: ${g.weeklyStepGoal || "—"} · ימי תיעוד אוכל: ${g.weeklyFoodGoal || "—"}` : "עוד לא נקבעו יעדים. הם יוצגו בתמונה השבועית מעל."}</p>}
+    {open && <form className={css.stack} onSubmit={save}>
+      <label>אימונים בשבוע<select className={css.field} value={g.weeklyWorkoutGoal} onChange={e => setG({ ...g, weeklyWorkoutGoal: e.target.value })}><option value="">ללא יעד</option>{[1, 2, 3, 4, 5, 6].map(n => <option key={n}>{n}</option>)}</select></label>
+      <label>ממוצע צעדים ליום<input className={css.field} inputMode="numeric" value={g.weeklyStepGoal} onChange={e => setG({ ...g, weeklyStepGoal: e.target.value })} placeholder="ללא יעד" /></label>
+      <label>ימי תיעוד אוכל בשבוע<select className={css.field} value={g.weeklyFoodGoal} onChange={e => setG({ ...g, weeklyFoodGoal: e.target.value })}><option value="">ללא יעד</option>{[1, 2, 3, 4, 5, 6, 7].map(n => <option key={n}>{n}</option>)}</select></label>
+      <button className={css.primary}>שמירת יעדים</button>
+    </form>}
+  </section>;
+}
+
 export default function GoalsView({ d, setD, today, uid }) {
   const [offset, setOffset] = useState(0);
   const [weight, setWeight] = useState(""), [wDate, setWDate] = useState(today), [wErr, setWErr] = useState("");
@@ -120,6 +137,8 @@ export default function GoalsView({ d, setD, today, uid }) {
       {recent.length > 0 && <div>{recent.map(w => <div className={css.weighRow} key={w.id}><span>{longDate(w.date)}</span><strong>{kg(w.kg)}</strong><button className={css.iconButton} aria-label={`מחיקת שקילה ${shortDate(w.date)}`} onClick={() => setD(p => ({ ...p, weighIns: removeWeighIn(p.weighIns, w.id) }))}><Trash2 size={16} /></button></div>)}</div>}
       {weighIns.length === 0 && <p className={css.subtle}>עוד אין שקילות. שקילה אחת בכמה ימים מספיקה כדי לבנות מגמה.</p>}
     </section>
+
+    <WeeklyGoalsCard baseline={d.profile?.baseline} setD={setD} />
 
     <section className={css.card + " " + css.stack}>
       <p className={css.eyebrow}>תחזית להגעה ליעד</p>

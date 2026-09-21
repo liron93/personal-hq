@@ -1,28 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildProgram } from "../companies/health/program.mjs";
-import { resolveProgram, importBase, normalizeProgram, updateExercise, addExercise, removeExercise, moveExercise, addSession, removeSession, cleanLoad } from "../companies/health/plan.mjs";
+import { resolveProgram, importFromText, emptyProgram, normalizeProgram, updateExercise, addExercise, removeExercise, moveExercise, addSession, removeSession, cleanLoad } from "../companies/health/plan.mjs";
 import * as L from "../companies/health/live.mjs";
 import { todayState } from "../companies/health/today.mjs";
 
-const gym = { complete: true, availability: "3", place: ["חדר כושר"], baseline: { complete: true, legPress: "80", chestPress: "", row: "" } };
+const TEXT = "A\nלחיצת רגליים | 2 | 8-12 | 80\nלחיצת חזה במכונה | 2 | 8-12\nחתירה בישיבה | 2 | 8-12\nפלאנק קצר | 2 | 8-12\nB\nדדליפט רומני | 2 | 8-12\nלחיצת כתפיים | 2 | 8-12\nפולי עליון | 2 | 8-12\nדד־באג | 2 | 8-12\nC\nתרגיל ג1 | 2 | 8-12\nתרגיל ג2 | 2 | 8-12";
+const gym = { complete: true };
+const base = importFromText(TEXT, "2026-09-21").program;
 const T0 = Date.parse("2026-09-21T08:00:00.000Z");
 
-test("resolveProgram: derived when nothing stored (backward compatible), stored wins otherwise", () => {
-  const derived = resolveProgram({ profile: gym });
-  assert.equal(derived.source, "derived");
-  assert.deepEqual(derived.ids, ["A", "B", "C"]);
-  const base = importBase(derived, "2026-09-21");
+test("resolveProgram: empty without a stored program, stored program otherwise", () => {
+  assert.equal(resolveProgram({ profile: gym }).empty, true);
   const stored = resolveProgram({ profile: gym, program: base });
   assert.equal(stored.source, "imported");
+  assert.deepEqual(stored.ids, ["A", "B", "C"]);
   assert.equal(stored.sessions.A[0].load, "80");
 });
 
-test("importing a plan never invents missing weights", () => {
-  const derived = buildProgram({ complete: true, availability: "2", place: ["חדר כושר"], baseline: { legPress: "", complete: true } });
-  const base = importBase({ ...derived, sessions: derived.sessions }, "");
-  for (const list of Object.values(base.sessions)) for (const e of list) assert.equal(e.load, null);
-  // ערכים לא מספריים / שליליים / ריקים מנוקים ל-null, לא מתוקנים
+test("imported plan never invents missing weights", () => {
+  for (const e of base.sessions.A.slice(1)) assert.equal(e.load, null);
+  for (const list of Object.values(base.sessions)) for (const e of list) assert.equal(e.hint, "");
   assert.equal(cleanLoad("כבד"), null);
   assert.equal(cleanLoad(""), null);
   assert.equal(cleanLoad("-5"), null);
@@ -31,9 +28,8 @@ test("importing a plan never invents missing weights", () => {
 });
 
 test("safety restriction overrides any stored program", () => {
-  const stored = importBase(buildProgram(gym), "");
-  assert.equal(resolveProgram({ profile: { safety: "לא בטוח/ה" }, program: stored }).restricted, true);
-  assert.equal(todayState({ profile: { sensitiveFlag: true }, program: stored, workouts: [] }, "2026-09-21").status, "restricted");
+  assert.equal(resolveProgram({ profile: { safety: "לא בטוח/ה" }, program: base }).restricted, true);
+  assert.equal(todayState({ profile: { sensitiveFlag: true }, program: base, workouts: [] }, "2026-09-21").status, "restricted");
 });
 
 test("normalizeProgram rejects garbage and repairs bounds", () => {
@@ -48,8 +44,10 @@ test("normalizeProgram rejects garbage and repairs bounds", () => {
 });
 
 test("plan editing: update, add, remove (keeps >=1), move, add/remove session", () => {
-  let p = importBase(buildProgram({ complete: true, availability: "1", place: [] }), "");
+  let p = addSession(emptyProgram(), "t");
   assert.deepEqual(Object.keys(p.sessions), ["A"]);
+  p = addExercise(p, "A", "בדיקה", "t");
+  p = updateExercise(p, "A", p.sessions.A[0].id, { name: "תרגיל" }, "t");
   p = updateExercise(p, "A", "A1", { name: "מקבילים", load: "12", sets: 3 }, "t");
   assert.equal(p.sessions.A[0].name, "מקבילים");
   assert.equal(p.sessions.A[0].sets, 3);
@@ -69,7 +67,7 @@ test("plan editing: update, add, remove (keeps >=1), move, add/remove session", 
   assert.deepEqual(Object.keys(removeSession(p, "B", "t").sessions), ["A"]);
 });
 
-const program = resolveProgram({ profile: gym });
+const program = resolveProgram({ profile: gym, program: base });
 const fresh = () => L.startLive(program, "A", { id: "w1", now: T0, workouts: [] });
 
 test("startLive: weight prefilled only from the plan, otherwise empty", () => {
@@ -140,7 +138,7 @@ test("finishLive logs only done sets, skipped exercises empty, numbers parsed", 
   assert.deepEqual(w.log.exercises[0].sets, [{ weight: 80, reps: 10 }, { weight: null, reps: 8 }]);
   assert.deepEqual(w.log.exercises[3].sets, []);
   assert.deepEqual(w.log.exercises[1].sets, []);
-  assert.equal(todayState({ profile: gym, workouts: [w] }, "2026-09-21").status, "done");
+  assert.equal(todayState({ profile: gym, program: base, workouts: [w] }, "2026-09-21").status, "done");
 });
 
 test("lastPerformance finds the latest real logged sets by exercise name", () => {
@@ -155,4 +153,29 @@ test("lastPerformance finds the latest real logged sets by exercise name", () =>
   const live = L.startLive(program, "B", { id: "w", now: T0, workouts });
   assert.equal(live.exercises[2].last.sets[0].weight, 35);
   assert.equal(live.exercises[2].sets[0].weight, ""); // מידע להצגה בלבד, לא מולא אוטומטית
+});
+
+test("exit mid-workout: empty workout needs no confirmation and is dropped; progress is kept on leave", () => {
+  let live = fresh();
+  assert.equal(L.hasProgress(live), false);
+  assert.equal(L.needsExitConfirm(live), false);
+  assert.deepEqual(L.resolveExit(live, "leave"), { action: "leave", keep: false });
+  live = L.setSetField(live, 0, 0, "reps", "8");
+  assert.equal(L.hasProgress(live), true);
+  assert.equal(L.needsExitConfirm(live), true);
+  assert.deepEqual(L.resolveExit(live, "leave"), { action: "leave", keep: true });
+  assert.deepEqual(L.resolveExit(live, "stay"), { action: "stay", keep: true });
+  assert.deepEqual(L.resolveExit(live, "finish"), { action: "summary", keep: true });
+  assert.deepEqual(L.resolveExit(live, "cancel"), { action: "leave", keep: false });
+  assert.deepEqual(L.resolveExit(live, "???"), { action: "stay", keep: true });
+});
+
+test("refresh mid-workout: the live state survives a JSON round trip (as stored) and the rest timer stays absolute", () => {
+  let live = fresh();
+  live = L.setSetField(live, 0, 0, "reps", "9");
+  live = L.toggleSetDone(live, 0, 0, T0);
+  const restored = JSON.parse(JSON.stringify(live));
+  assert.deepEqual(restored, live);
+  assert.equal(L.restRemaining(restored, T0 + 20000), 55);
+  assert.equal(L.summary(restored).doneSets, 1);
 });

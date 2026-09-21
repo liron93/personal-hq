@@ -1,6 +1,6 @@
 // מודל תוכנית A/B/C ניתנת לעריכה. שדה אופציונלי חדש ב-blob: data.program.
-// בלי data.program התוכנית נגזרת מהפרופיל (buildProgram) — תאימות לאחור מלאה, שום נתון לא נמחק.
-import { buildProgram, isRestricted, DEFAULT_REST, SESSION_IDS } from "./program.mjs";
+// בלי data.program אין תוכנית (מצב ריק): לא ממציאים תרגילים. נתונים שמורים לא נמחקים.
+import { isRestricted, parseProgramText, DEFAULT_REST, SESSION_IDS } from "./program.mjs";
 
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const asInt = (v, fallback) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : fallback; };
@@ -44,22 +44,32 @@ export function normalizeProgram(raw, lenient = false) {
   return { version: 1, source: raw.source === "custom" ? "custom" : "imported", updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : "", sessions };
 }
 
-// התוכנית בפועל: מגבלת בטיחות תמיד קודמת; אחרת תוכנית שמורה; אחרת נגזרת מהפרופיל.
+// התוכנית בפועל: מגבלת בטיחות תמיד קודמת; אחרת התוכנית השמורה; אחרת מצב ריק (empty).
 export function resolveProgram(data) {
   const profile = data?.profile || {};
-  if (isRestricted(profile)) return { restricted: true, ids: [], sessions: {}, source: "restricted" };
+  if (isRestricted(profile)) return { restricted: true, empty: false, ids: [], sessions: {}, source: "restricted" };
   const stored = normalizeProgram(data?.program);
-  if (stored) return { restricted: false, ids: SESSION_IDS.filter(sid => stored.sessions[sid]), sessions: stored.sessions, source: stored.source };
-  const derived = buildProgram(profile);
-  return { ...derived, source: "derived" };
+  if (stored) return { restricted: false, empty: false, ids: SESSION_IDS.filter(sid => stored.sessions[sid]), sessions: stored.sessions, source: stored.source };
+  return { restricted: false, empty: true, ids: [], sessions: {}, source: "none" };
 }
 
-// יבוא תוכנית קיימת כבסיס: מעתיקים בדיוק מה שיש. משקל חסר נשאר null (מוצג "לא הוזן"), לא מנוחש.
-export function importBase(program, now = "") {
-  const sessions = {};
-  for (const sid of program.ids) sessions[sid] = program.sessions[sid].map(e => ({ ...e, load: cleanLoad(e.load) }));
-  return normalizeProgram({ version: 1, source: "imported", updatedAt: now, sessions });
+// ייבוא/הזנה מהירה מטקסט לתוכנית תקינה. מחזיר { program, errors }; program=null אם אין אף תרגיל תקין.
+// משקל שאינו מספר נדחה (שגיאה), לא מתוקן.
+export function importFromText(text, now = "") {
+  const { sessions, errors } = parseProgramText(text);
+  const errs = [...errors];
+  const clean = {};
+  for (const [sid, list] of Object.entries(sessions)) {
+    clean[sid] = list.filter((e, i) => {
+      if (e.load !== null && cleanLoad(e.load) === null) { errs.push({ line: 0, message: `משקל לא תקין בתרגיל "${e.name}" (${e.load})` }); return false; }
+      return true;
+    });
+  }
+  const program = normalizeProgram({ version: 1, source: "imported", updatedAt: now, sessions: clean });
+  return { program, errors: errs };
 }
+
+export const emptyProgram = () => ({ version: 1, source: "custom", updatedAt: "", sessions: {} });
 
 const touch = (program, sessions, now) => normalizeProgram({ ...program, source: "custom", updatedAt: now ?? program.updatedAt, sessions }, true);
 const cloneSessions = program => Object.fromEntries(Object.entries(program.sessions).map(([k, v]) => [k, v.map(e => ({ ...e }))]));

@@ -107,3 +107,19 @@ export function finishLive(live, { now, today }) {
     },
   };
 }
+
+// האם נעשה משהו באימון (סט שסומן, הערה, מאמץ, דילוג או החלפה). אימון ריק אינו דורש אישור יציאה.
+export function hasProgress(live) {
+  return live.exercises.some(e => e.status === "skipped" || e.replacedFrom || e.effort || e.note.trim() || e.sets.some(s => s.done || String(s.reps).trim()));
+}
+
+// יציאה באמצע אימון (כפתור יציאה, ניווט, חזרה בדפדפן). choice: stay | leave | finish | cancel.
+// leave = האימון נשמר וניתן להמשיך; finish = מעבר לסיכום; cancel = השלכה. אימון ריק נזרק בשקט ביציאה.
+export function resolveExit(live, choice) {
+  if (choice === "stay") return { action: "stay", keep: true };
+  if (choice === "finish") return { action: "summary", keep: true };
+  if (choice === "cancel") return { action: "leave", keep: false };
+  if (choice === "leave") return { action: "leave", keep: hasProgress(live) };
+  return { action: "stay", keep: true };
+}
+export const needsExitConfirm = live => hasProgress(live);

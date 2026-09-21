@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
-import { importBase, normalizeProgram, updateExercise, addExercise, removeExercise, moveExercise, addSession, removeSession, cleanLoad } from "../plan.mjs";
+import { emptyProgram, normalizeProgram, updateExercise, addExercise, removeExercise, moveExercise, addSession, removeSession, cleanLoad } from "../plan.mjs";
 import css from "./health-v2.module.css";
 
 const RESTS = [30, 45, 60, 75, 90, 120, 180];
@@ -9,7 +9,7 @@ const badLoad = e => e.load !== null && e.load !== "" && cleanLoad(e.load) === n
 
 // עורך תוכנית A/B/C. טיוטה מקומית; נשמר ל-data.program רק בלחיצה על "שמירה".
 export default function PlanEditor({ program, onSave, onClose }) {
-  const [draft, setDraft] = useState(() => (program.source === "derived" ? importBase(program) : { ...program }));
+  const [draft, setDraft] = useState(() => (program.empty ? emptyProgram() : { ...program }));
   const [error, setError] = useState("");
   const ids = ["A", "B", "C"].filter(id => draft.sessions[id]);
   const nowISO = () => new Date().toISOString();
@@ -26,7 +26,7 @@ export default function PlanEditor({ program, onSave, onClose }) {
 
   return <div className={css.stack}>
     <div className={css.sectionHead}><h2>עריכת התוכנית</h2><button className={css.linkButton} onClick={onClose}>ביטול</button></div>
-    <p className={css.subtle}>{program.source === "derived" ? "זו התוכנית שנבנתה מהפרופיל, כבסיס לעריכה. משקל שלא הוזן נשאר ריק, ולא מנחשים אותו." : "אפשר לשנות שמות, סטים, חזרות, משקל ומנוחה. הכול נשמר רק בלחיצה על שמירה."}</p>
+    <p className={css.subtle}>{ids.length === 0 ? "התוכנית ריקה. מוסיפים אימון ואז תרגילים. משקל שלא מזינים נשאר ריק." : "אפשר לשנות שמות, סטים, חזרות, משקל ומנוחה. הכול נשמר רק בלחיצה על שמירה."}</p>
     {ids.map(sid => <section key={sid} className={css.card + " " + css.stack}>
       <div className={css.sessionHead}><h3>אימון {sid}</h3>{ids.length > 1 && sid === ids[ids.length - 1] && <button className={css.status + " " + css.skipped} onClick={() => edit(p => removeSession(p, sid))}>הסרת אימון</button>}</div>
       {draft.sessions[sid].map((e, i, list) => <div key={e.id} className={css.editEx}>

@@ -58,3 +58,8 @@
 .chartWrap{display:grid;gap:4px}.chart{width:100%;height:auto;background:var(--bg);border-radius:14px}.chartDot{fill:var(--violet);opacity:.5}.chartLine{stroke:var(--mint);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.chartAxis{direction:ltr;display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--muted)}
 .weighRow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}.weighRow span{flex:1}.weighRow .iconButton{width:44px}
 .forecastTitle{margin:0;font-size:21px;line-height:1.35}.disclaimer{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
+
+/* סבב תיקון: בונה תוכנית, דיאלוג יציאה, ניווט */
+.modalBack{position:fixed;inset:0;z-index:60;background:rgba(23,48,43,.45);display:grid;place-items:center;padding:16px}.modal{width:min(100%,420px);display:grid;gap:10px;background:#fff;border-radius:22px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:right}.modal h3{margin:0;font-size:20px}.modal .primary,.modal .secondary{width:100%}
+.pbLabel{display:grid;gap:6px;font-size:14px;font-weight:700}.pbText{min-height:180px;line-height:1.7;resize:vertical;font-family:inherit}.pbErrors{padding:12px;border-radius:14px;background:#fff1ee;color:#8a3a2c;font-size:14px}.pbErrors ul{margin:6px 0 0;padding:0 18px 0 0;line-height:1.7}
+.navItem{min-width:0}.navItem span{white-space:nowrap}

@@ -33,11 +33,11 @@ export function todayState(data, today) {
   const goal = Number(profile.baseline?.weeklyWorkoutGoal) || null;
   const weekDone = weekWorkoutCount(workouts, today);
   const recommendations = [];
-  if (!profile.complete) recommendations.push("כדאי להשלים את הפרופיל בהגדרות כדי להתאים את התוכנית. בינתיים האימון להיום כבר מוכן.");
-  if (!program.restricted && !profile.baseline?.complete) recommendations.push("אין משקלי עבודה שמורים. מתחילים קל, ומתעדים בסוף כל תרגיל.");
+  if (!profile.complete) recommendations.push("אפשר להשלים פרופיל בהגדרות, אבל זה לא חובה כדי להתאמן.");
 
   if (program.restricted) return { status: "restricted", session: null, exercises: [], program, weekDone, goal, recommendations: [] };
 
+  if (program.empty) return { status: "empty", session: null, exercises: [], program, weekDone, goal, recommendations };
   const todaysSession = workouts.filter(w => valid(w) && w.date === today && program.ids.includes(w.session)).sort(order).pop();
   const session = nextSession(workouts, program.ids);
   return {
