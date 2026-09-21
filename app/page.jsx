@@ -11,6 +11,7 @@ import * as coreFacts from "@/lib/coreFacts";
 import { useAccess } from "@/lib/useAccess";
 import { isHqVisible, visibleCompanySlugs } from "@/lib/workspace";
 import MemberHome from "./MemberHome";
+import { buildJarvisContext } from "@/lib/jarvis-context";
 import styles from "./home.module.css";
 import overlay from "./overlays.module.css";
 
@@ -45,9 +46,9 @@ function Flag({ flag }) { return <span className={`${styles.dot} ${flag === "amb
 
 // שער היכולות: member בלי hq.view (למשל מעצבת) לא רואה את מסך המנכ״ל אלא רשימה של מה שמותר לו.
 export default function Page() {
-  const { ready, access } = useAccess();
+  const { ready, access, refresh } = useAccess();
   if (!ready) return <main className={styles.page}><p style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>טוען…</p></main>;
-  if (!isHqVisible(access)) return <MemberHome access={access} />;
+  if (!isHqVisible(access)) return <MemberHome access={access} refresh={refresh} />;
   return <CEO access={access} />;
 }
 
@@ -56,7 +57,7 @@ function CEO({ access }) {
   // רק חברות שמותר לראות. הרשימה יציבה בין רינדורים כדי לא לטעון שוב.
   const visibleList = useMemo(() => { const ok = new Set(visibleCompanySlugs(access, COMPANIES.map(c => c.slug))); return COMPANIES.filter(c => ok.has(c.slug)); }, [access]);
   const summaries = useSummaries(visibleList);
-  const { data: core, upd: coreUpd, ready: coreReady, readOnly: coreReadOnly } = useStore(coreFacts.STORE_KEY, coreFacts.INIT);
+  const { data: core, upd: coreUpd, ready: coreReady, readOnly: coreReadOnly, denied: coreDenied } = useStore(coreFacts.STORE_KEY, coreFacts.INIT);
   const [menuOpen, setMenuOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -88,26 +89,9 @@ function CEO({ access }) {
     return actions.slice(0, 6);
   }, [summaries, career]);
 
-  const jarvisContext = useMemo(() => {
-    if (!Object.keys(summaries).length) return null;
-    const homeItems = (summaries["beit-hadash"]?.data?.items || [])
-      .filter(item => item.beforeMove && item.status !== "הושלם")
-      .map(item => ({ name: item.name, status: item.status, dueDate: item.dueDate || null, estimate: item.estimate || null }));
-    const wellbeingToday = summaries.nefesh?.data?.today;
-    const openDecisions = (summaries.nefesh?.data?.decisions || [])
-      .filter(item => item?.status === "open")
-      .map(item => item.title || item.text)
-      .filter(Boolean);
-    return {
-      greeting, openTasks, urgentActions,
-      money: { income, mortgageMonthly: core?.mortgageMonthly ?? null },
-      home: { items: homeItems, paid: home?.paid ?? null, planned: home?.planned ?? null },
-      finance: { netWorth: finance?.netWorth ?? null, overBudget: finance?.overBudget ?? null },
-      career: { activeJobs: career?.activeJobs ?? null, nextStep: career?.nextStep ?? null },
-      health: { weekWorkouts: health?.weekWorkouts ?? null, weekMeals: health?.weekMeals ?? null, goal: health?.profile?.goal ?? null },
-      wellbeing: { load: wellbeingToday?.load || null, status: wellbeingToday?.status || null, openDecisions },
-    };
-  }, [summaries, urgentActions, openTasks, greeting, income, core, home, finance, career, health]);
+  const jarvisContext = useMemo(() => buildJarvisContext({
+    visible: new Set(visibleList.map(c => c.slug)), greeting, openTasks, urgentActions, income, core, coreDenied, summaries,
+  }), [visibleList, coreDenied, summaries, urgentActions, openTasks, greeting, income, core]);
 
   useEffect(() => {
     if (!jarvisContext) return;

@@ -13,7 +13,7 @@ function useReadOnlyDom(ref, on) {
 
 /** עוטף דף חברה: מסתיר חברה בלי יכולת קריאה, ומסמן קריאה בלבד. חברה אישית (בריאות, נפשי) מוסתרת ממי שהוא member. */
 export default function AccessGate({ slug, children }) {
-  const { ready, access } = useAccess();
+  const { ready, access, refresh } = useAccess();
   const ref = useRef(null);
   const readOnly = ready && canViewCompany(access, slug) && isCompanyReadOnly(access, slug);
   useReadOnlyDom(ref, readOnly);
@@ -24,6 +24,14 @@ export default function AccessGate({ slug, children }) {
     return () => window.removeEventListener("hq:save-conflict", onConflict);
   }, []);
   if (!ready) return <div style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>טוען…</div>;
+  if (access?.reason === "unavailable") {
+    // fail-closed: לא ניתן לאמת הרשאות, לכן לא מציגים תוכן. הבדיקה חוזרת אוטומטית.
+    return <main style={{ maxWidth: 520, margin: "80px auto", padding: 24, textAlign: "center", lineHeight: 1.7 }}>
+      <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>לא ניתן לאמת הרשאות כרגע</h1>
+      <p style={{ opacity: 0.7, margin: "0 0 16px" }}>בדקו חיבור. הבדיקה תיעשה שוב אוטומטית.</p>
+      <button onClick={refresh} style={{ border: 0, background: "transparent", color: "#4059AD", cursor: "pointer" }}>נסו שוב עכשיו</button>
+    </main>;
+  }
   if (!canViewCompany(access, slug)) {
     return <main style={{ maxWidth: 520, margin: "80px auto", padding: 24, textAlign: "center", lineHeight: 1.7 }}>
       <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>אין לך גישה לחלק הזה</h1>

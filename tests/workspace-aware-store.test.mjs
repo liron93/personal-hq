@@ -10,6 +10,7 @@ globalThis.window = { localStorage: { getItem: k => (ls.has(k) ? ls.get(k) : nul
 const { loadStateWithClient, loadWithClient, saveWithClient, localKey } = await import("../lib/store.js");
 const { resolveAccess, visibleCompanySlugs, isCompanyReadOnly, isHqVisible, canViewCompany, isMissingRelation } = await import("../lib/workspace.js");
 const { capabilitiesForTemplate, DEFAULT_PARTNER_TEMPLATE } = await import("../lib/authz/capabilities.js");
+const { buildJarvisContext } = await import("../lib/jarvis-context.js");
 const { isEditControl, applyReadOnly, READONLY_TITLE } = await import("../lib/readonly-dom.js");
 
 // כל המזהים כאן בדויים.
@@ -23,7 +24,7 @@ function fakeDb({ rbac = true, members = {}, workspaceOwner = OWNER, failWorkspa
   const ws = new Map(); // workspace_state: "<ws>|<key>" -> { data, at }
   let tick = 0;
   const calls = [];
-  const flags = { failWorkspaces };
+  const flags = { failWorkspaces, hang: false, failCaps: false };
   const putWs = (key, data) => ws.set(`${WS}|${key}`, { data, at: `t${++tick}` }); // כתיבה של "מישהו אחר"
   const wsData = key => ws.get(`${WS}|${key}`)?.data;
   const client = uid => ({
@@ -44,6 +45,8 @@ function fakeDb({ rbac = true, members = {}, workspaceOwner = OWNER, failWorkspa
             },
             then(res, rej) {
               if (!rbac) return Promise.resolve({ data: null, error: { code: "PGRST205", message: `Could not find the table 'public.${table}' in the schema cache` } }).then(res, rej);
+              if (flags.hang && table === "workspaces") return new Promise(() => {});
+              if (flags.failCaps && table === "member_capabilities") return Promise.resolve({ data: null, error: { message: "fetch failed" } }).then(res, rej);
               if (flags.failWorkspaces) return Promise.resolve({ data: null, error: { message: "fetch failed" } }).then(res, rej);
               if (table === "workspaces") { const m = members[uid]; return Promise.resolve({ data: hasWorkspace && (m || uid === workspaceOwner) ? [{ id: WS, owner_id: workspaceOwner }] : [], error: null }).then(res, rej); }
               if (table === "member_capabilities") return Promise.resolve({ data: (members[uid]?.caps || []).map(([capability, revoked_at]) => ({ capability, revoked_at: revoked_at || null })), error: null }).then(res, rej);
@@ -109,15 +112,13 @@ test("isMissingRelation recognises the common not-deployed errors and nothing el
 });
 
 
-test("owner without a shared workspace yet: exactly as today (company_state, everything visible)", async () => {
+test("RBAC enabled but no shared workspace visible (unapproved user, or owner before step 010): restricted, nothing visible", async () => {
   reset(); const db = fakeDb({ hasWorkspace: false }); const c = db.client(OWNER);
   const access = await resolveAccess(c);
-  assert.equal(access.mode, "personal"); assert.equal(access.reason, "no_workspace");
-  assert.deepEqual(await saveWithClient(c, KESEF, { net: 5 }), { synced: true });
-  assert.equal(db.tables.company_state.has(`${OWNER}|${KESEF}`), true);
-  assert.equal(db.ws.size, 0);
-  assert.deepEqual(visibleCompanySlugs(access, SLUGS), SLUGS);
-  assert.equal(isHqVisible(access), true);
+  assert.deepEqual([access.mode, access.reason], ["restricted", "no_workspace"]);
+  assert.deepEqual(visibleCompanySlugs(access, SLUGS), []);
+  assert.equal(isHqVisible(access), false);
+  for (const slug of SLUGS) { assert.equal(canViewCompany(access, slug), false); assert.equal(isCompanyReadOnly(access, slug), true); }
 });
 
 test("owner WITH a shared workspace uses workspace_state for shared keys (one copy), full access, personal keys unchanged", async () => {
@@ -173,8 +174,10 @@ test("a member never seeds the workspace from their own company_state", async ()
 test("user without a workspace membership: personal space as today (nothing shared)", async () => {
   reset(); const db = fakeDb({ hasWorkspace: false }); const c = db.client(STRANGER);
   const access = await resolveAccess(c);
-  assert.equal(access.mode, "personal"); assert.equal(access.reason, "no_workspace");
-  await saveWithClient(c, BEIT, { x: 1 });
+  assert.deepEqual([access.mode, access.reason], ["restricted", "no_workspace"]);
+  assert.deepEqual(visibleCompanySlugs(access, SLUGS), []);
+  assert.equal(isHqVisible(access), false);
+  await saveWithClient(c, BEIT, { x: 1 }); // אחסון נשאר אישי (ה-UI לא נגיש); ה-RLS מגן
   assert.equal(db.writes()[0].table, "company_state");
 });
 
@@ -303,7 +306,7 @@ test("a transient failure while resolving access is not cached, and falls back t
   reset(); const bad = fakeDb({ failWorkspaces: true, members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
   const c = bad.client(PARTNER);
   const a1 = await resolveAccess(c);
-  assert.equal(a1.mode, "personal"); assert.equal(a1.reason, "unavailable");
+  assert.deepEqual([a1.mode, a1.reason], ["restricted", "unavailable"]);
   await saveWithClient(c, KESEF, { x: 1 });
   assert.equal(bad.writes().at(-1).table, "company_state");
   bad.flags.failWorkspaces = false;
@@ -399,4 +402,150 @@ test("applyReadOnly disables inputs and edit buttons with a clear title, leaves 
   assert.equal(input.disabled, true); assert.equal(add.disabled, true); assert.equal(nav.disabled, false);
   assert.equal(add.attrs.title, READONLY_TITLE);
   off();
+});
+
+// ---------- fail-closed בהצגה ----------
+
+const expectClosed = (access, reason) => {
+  assert.deepEqual([access.mode, access.reason], ["restricted", reason]);
+  assert.deepEqual(visibleCompanySlugs(access, SLUGS), []);
+  assert.equal(isHqVisible(access), false);
+  for (const slug of SLUGS) assert.equal(canViewCompany(access, slug), false, slug);
+};
+
+test("not_enabled (RBAC never deployed) keeps the legacy behaviour: everything visible, owner not locked out", async () => {
+  reset(); const db = fakeDb({ rbac: false });
+  const access = await resolveAccess(db.client(OWNER));
+  assert.deepEqual([access.mode, access.reason], ["personal", "not_enabled"]);
+  assert.deepEqual(visibleCompanySlugs(access, SLUGS), SLUGS);
+  assert.equal(isHqVisible(access), true);
+  assert.equal(isCompanyReadOnly(access, "kesef"), false);
+});
+
+test("unavailable: a failing workspace query shows nothing (no restricted company, no CEO screen)", async () => {
+  reset(); const db = fakeDb({ failWorkspaces: true, members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
+  expectClosed(await resolveAccess(db.client(PARTNER)), "unavailable");
+});
+
+test("timeout: a hanging workspace query fails closed instead of showing everything", async () => {
+  reset(); const db = fakeDb(); db.flags.hang = true;
+  expectClosed(await resolveAccess(db.client(PARTNER), { timeoutMs: 20 }), "unavailable");
+});
+
+test("a failed capabilities lookup fails closed (never falls back to full visibility)", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } }); db.flags.failCaps = true;
+  expectClosed(await resolveAccess(db.client(PARTNER)), "unavailable");
+});
+
+test("a malformed response fails closed", async () => {
+  reset();
+  const weird = { auth: { getSession: async () => ({ data: { session: { user: { id: PARTNER } } } }) }, from: () => ({ select: () => ({ eq: () => ({ limit: async () => ({ data: "nope", error: null }) }) }) }) };
+  expectClosed(await resolveAccess(weird), "unavailable");
+});
+
+test("a removed member loses the cached grants: restricted, and a later network drop does not bring them back", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
+  assert.equal((await resolveAccess(db.client(PARTNER))).mode, "member"); // אומת ונשמר
+  assert.ok(ls.has(`u:${PARTNER}:hq:access:v1`));
+  const removed = fakeDb({ hasWorkspace: false });
+  expectClosed(await resolveAccess(removed.client(PARTNER)), "no_workspace");
+  assert.equal(ls.has(`u:${PARTNER}:hq:access:v1`), false, "cache cleared on removal");
+  removed.flags.failWorkspaces = true;
+  expectClosed(await resolveAccess(removed.client(PARTNER)), "unavailable");
+});
+
+test("member with capabilities: sees exactly what the grants allow", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
+  assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(PARTNER)), SLUGS), ["beit-hadash", "kesef", "avoda"]);
+  assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(DESIGNER)), SLUGS), ["beit-hadash"]);
+});
+
+test("owner (verified): sees everything", async () => {
+  reset(); const db = fakeDb();
+  const a = await resolveAccess(db.client(OWNER));
+  assert.deepEqual(visibleCompanySlugs(a, SLUGS), SLUGS); assert.equal(isHqVisible(a), true);
+});
+
+test("network drops AFTER verification: last verified grants are used, without widening access (partner)", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
+  const first = await resolveAccess(db.client(PARTNER));
+  assert.equal(first.mode, "member");
+  db.flags.failWorkspaces = true;
+  const off = await resolveAccess(db.client(PARTNER));
+  assert.deepEqual([off.mode, off.reason, off.stale], ["member", "cached", true]);
+  assert.deepEqual(off.grants, first.grants);
+  assert.deepEqual(visibleCompanySlugs(off, SLUGS), ["beit-hadash", "kesef", "avoda"]);
+  assert.equal(isCompanyReadOnly(off, "kesef"), true); // B נשארת קריאה בלבד גם offline
+});
+
+test("network drops AFTER verification: the owner is not locked out (member-owner and legacy not_enabled)", async () => {
+  reset(); let db = fakeDb(); await resolveAccess(db.client(OWNER));
+  db.flags.failWorkspaces = true;
+  const off = await resolveAccess(db.client(OWNER));
+  assert.deepEqual([off.mode, off.isOwner, off.reason], ["member", true, "cached"]);
+  assert.deepEqual(visibleCompanySlugs(off, SLUGS), SLUGS);
+  reset(); db = fakeDb({ rbac: false }); await resolveAccess(db.client(OWNER));
+  const off2 = await resolveAccess(fakeDb({ failWorkspaces: true }).client(OWNER));
+  assert.deepEqual([off2.mode, off2.reason], ["personal", "cached"]);
+  assert.deepEqual(visibleCompanySlugs(off2, SLUGS), SLUGS);
+});
+
+test("the last-verified cache is per user: another user on the same device gets nothing from it", async () => {
+  reset(); const db = fakeDb();
+  await resolveAccess(db.client(OWNER));
+  db.flags.failWorkspaces = true;
+  expectClosed(await resolveAccess(db.client(STRANGER)), "unavailable");
+});
+
+test("a tampered or expired last-verified cache is ignored (fail closed)", async () => {
+  reset(); const db = fakeDb();
+  await resolveAccess(db.client(OWNER));
+  const k = `u:${OWNER}:hq:access:v1`;
+  const good = JSON.parse(ls.get(k));
+  db.flags.failWorkspaces = true;
+  ls.set(k, JSON.stringify({ ...good, at: Date.now() - 31 * 24 * 3600 * 1000 })); // ישן מדי
+  expectClosed(await resolveAccess(db.client(OWNER)), "unavailable");
+  ls.set(k, JSON.stringify({ ...good, mode: "restricted" })); // מצב לא מאומת
+  expectClosed(await resolveAccess(db.client(OWNER)), "unavailable");
+  ls.set(k, "{not json");
+  expectClosed(await resolveAccess(db.client(OWNER)), "unavailable");
+  ls.set(k, JSON.stringify({ ...good, grants: ["core.write", "made.up"] })); // יכולות לא קיימות מסוננות
+  assert.equal((await resolveAccess(db.client(OWNER))).grants.includes("made.up"), false);
+});
+
+test("unknown or missing access object is closed everywhere", () => {
+  for (const a of [null, undefined, {}, { mode: "weird" }]) {
+    assert.deepEqual(visibleCompanySlugs(a, SLUGS), []);
+    assert.equal(isHqVisible(a), false);
+    assert.equal(canViewCompany(a, "kesef"), false);
+  }
+});
+
+// ---------- JARVIS ----------
+
+const SUMMARIES = {
+  "beit-hadash": { summary: { renovation: { paid: 1, planned: 2 } }, data: { items: [{ name: "x", status: "בתהליך", beforeMove: true }] } },
+  kesef: { summary: { netWorth: 999, overBudget: false }, data: {} },
+  health: { summary: { weekWorkouts: 3, profile: { goal: "secret-goal" } }, data: {} },
+  avoda: { summary: { activeJobs: 2, nextStep: { company: "acme", text: "call" } }, data: {} },
+  nefesh: { summary: {}, data: { today: { load: 9, status: "secret-status" }, decisions: [{ status: "open", title: "private decision" }] } },
+};
+const ctx = (visible, extra = {}) => buildJarvisContext({ visible: new Set(visible), greeting: "hi", openTasks: 1, urgentActions: [], income: 5, core: { mortgageMonthly: 7 }, coreDenied: false, summaries: SUMMARIES, ...extra });
+
+test("JARVIS context contains only sections of visible companies, and hidden ones are absent entirely", () => {
+  const lior = ctx(["beit-hadash", "kesef", "avoda"]);
+  assert.deepEqual(Object.keys(lior).sort(), ["career", "finance", "greeting", "home", "money", "openTasks", "urgentActions"]);
+  const text = JSON.stringify(lior);
+  for (const leak of ["secret-goal", "secret-status", "private decision", "weekWorkouts", "wellbeing", "health"]) assert.equal(text.includes(leak), false, leak);
+  assert.deepEqual(Object.keys(ctx(["beit-hadash"], { coreDenied: true })).sort(), ["greeting", "home", "openTasks", "urgentActions"]);
+  assert.deepEqual(Object.keys(ctx([])).sort(), ["greeting", "money", "openTasks", "urgentActions"]);
+  assert.equal(ctx(["health", "nefesh"]).health.goal, "secret-goal"); // כשהכול גלוי (owner / RBAC כבוי)
+});
+
+test("JARVIS visible set derived from access: restricted and unapproved get no company sections", async () => {
+  reset();
+  for (const access of [await resolveAccess(fakeDb({ failWorkspaces: true }).client(PARTNER)), await resolveAccess(fakeDb({ hasWorkspace: false }).client(PARTNER))]) {
+    const keys = Object.keys(ctx(visibleCompanySlugs(access, SLUGS), { coreDenied: true }));
+    assert.deepEqual(keys.sort(), ["greeting", "openTasks", "urgentActions"]);
+  }
 });
