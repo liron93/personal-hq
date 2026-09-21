@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import styles from "./career.module.css";
 import { useStore } from "@/lib/store";
 import { DEFAULT_PREFS, normalizePrefs } from "./practice-tracks";
+import { effectiveStatus, isActiveJob, statusForSave, withFlag } from "./job-status";
 import { PracticeHub, HistoryHub, InterviewHub, LearningHub, CommunicationsHub } from "./CareerExpansion";
 
 const STATUS = {
@@ -14,6 +15,7 @@ const STATUS = {
   offer: "הצעה",
   rejected: "נדחתה",
   withdrawn: "נסגרה",
+  irrelevant: "לא רלוונטי",
 };
 const NAV = [
   ["today", "היום"],
@@ -106,9 +108,9 @@ function useCareerData() {
 function Notice({ children, kind = "info" }) { return <p className={kind === "error" ? styles.error : styles.notice} role={kind === "error" ? "alert" : undefined}>{children}</p>; }
 function Status({ value }) { return <span className={styles["status_" + value] || styles.status}>{STATUS[value] || value}</span>; }
 
-function Today({ jobs, onOpen, onNavigate }) {
+function Today({ jobs, flags, onOpen, onNavigate }) {
   const day = today();
-  const active = jobs.filter(job => !["rejected", "withdrawn"].includes(job.status));
+  const active = jobs.filter(job => isActiveJob(job, flags));
   const due = active.filter(job => job.next_action_at && job.next_action_at <= day).sort((a,b) => (a.next_action_at || "").localeCompare(b.next_action_at || ""));
   const missing = active.filter(job => !job.next_action || !job.next_action_at);
   const focus = due[0] || missing[0];
@@ -132,13 +134,13 @@ function Today({ jobs, onOpen, onNavigate }) {
   </div>;
 }
 
-function Jobs({ jobs, onSave, onOpen }) {
+function Jobs({ jobs, flags, onSave, onOpen }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState(blankJob);
   const [message, setMessage] = useState("");
-  const visible = jobs.filter(job => (filter === "all" || job.status === filter) && (job.company_name + " " + job.role_title).toLowerCase().includes(query.toLowerCase()));
+  const visible = jobs.filter(job => (filter === "all" || effectiveStatus(job, flags) === filter) && (job.company_name + " " + job.role_title).toLowerCase().includes(query.toLowerCase()));
   const create = async event => {
     event.preventDefault(); setMessage("");
     if (!draft.company_name.trim() || !draft.role_title.trim()) { setMessage("יש למלא חברה ותפקיד."); return; }
@@ -157,14 +159,14 @@ function Jobs({ jobs, onSave, onOpen }) {
         {message && <Notice kind="error">{message}</Notice>}<button className={styles.primary}>שמירת משרה</button>
       </form>}
       <div className={styles.listTools}><input aria-label="חיפוש משרות" placeholder="חיפוש חברה או תפקיד" value={query} onChange={event => setQuery(event.target.value)} /><select aria-label="סינון סטטוס" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">כל הסטטוסים</option>{Object.entries(STATUS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></div>
-      <div className={styles.jobList}>{visible.map(job => <button onClick={() => onOpen(job)} key={job.id} className={styles.jobCard}><span className={styles.jobIdentity}><strong>{job.role_title}</strong><small>{job.company_name}</small></span><span><Status value={job.status} /><small>{job.next_action_at || "ללא מועד"}</small></span></button>)}</div>
+      <div className={styles.jobList}>{visible.map(job => <button onClick={() => onOpen(job)} key={job.id} className={styles.jobCard}><span className={styles.jobIdentity}><strong>{job.role_title}</strong><small>{job.company_name}</small></span><span><Status value={effectiveStatus(job, flags)} /><small>{job.next_action_at || "ללא מועד"}</small></span></button>)}</div>
       {!visible.length && <Empty label={jobs.length ? "לא נמצאו משרות בסינון הזה" : "עדיין אין משרות במרכז הקריירה"} action="הוספת המשרה הראשונה" onClick={() => setAdding(true)} />}
     </section>
   </div>;
 }
 
-function JobDetail({ job, onClose, onSave }) {
-  const [draft, setDraft] = useState({...blankJob, ...job, next_action_at: job.next_action_at || ""});
+function JobDetail({ job, flags, onClose, onSave }) {
+  const [draft, setDraft] = useState({...blankJob, ...job, status: effectiveStatus(job, flags), next_action_at: job.next_action_at || ""});
   const [message, setMessage] = useState("");
   const save = async event => { event.preventDefault(); const result = await onSave(draft, job.id); if (result.error) setMessage(result.error); else onClose(); };
   const qs = Array.isArray(job.tailored_questions) ? job.tailored_questions : [];
@@ -210,6 +212,12 @@ export default function Company() {
   // העדפות אישיות של המשתמש/ת: מסלול תרגול (מוצר / HR) וניסיונות תרגול HR. נשמר במרחב האישי בלבד.
   const { data: rawPrefs, setData: setPrefs } = useStore("hq:career-prefs:v1", DEFAULT_PREFS);
   const prefs = normalizePrefs(rawPrefs);
+  // "לא רלוונטי" נשמר במסד כסגורה, והסימון במרחב האישי (ראו job-status.js).
+  const saveJobWithFlag = async (draft, id) => {
+    const result = await data.saveJob({ ...draft, status: statusForSave(draft.status) }, id);
+    if (result?.data?.id) setPrefs(p => ({ ...normalizePrefs(p), irrelevantJobs: withFlag(normalizePrefs(p).irrelevantJobs, result.data.id, draft.status) }));
+    return result;
+  };
   const [view, setView] = useState("today");
   const [selected, setSelected] = useState(null);
   if (data.state === "loading") return <p className={styles.loading}>טוען את חברת הקריירה…</p>;
@@ -218,8 +226,8 @@ export default function Company() {
   return <div className={styles.root} dir="rtl">
     <aside className={styles.sidebar}><div className={styles.brand}><span>HQ</span><strong>קריירה</strong></div><nav aria-label="מחלקות קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav><div className={styles.user}>{data.user.email}</div></aside>
     <main className={styles.main}><nav className={styles.mobileNav} aria-label="ניווט קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav>
-      {view === "today" && <Today jobs={data.jobs} onOpen={setSelected} onNavigate={setView}/>}
-      {view === "jobs" && <Jobs jobs={data.jobs} onOpen={setSelected} onSave={data.saveJob}/>}
+      {view === "today" && <Today jobs={data.jobs} flags={prefs.irrelevantJobs} onOpen={setSelected} onNavigate={setView}/>}
+      {view === "jobs" && <Jobs jobs={data.jobs} flags={prefs.irrelevantJobs} onOpen={setSelected} onSave={saveJobWithFlag}/>}
       {view === "updates" && <CommunicationsHub user={data.user}/>}
       {view === "profile" && <Profile profile={data.profile} onSave={data.saveProfile}/>}
       {view === "cv" && <CvCenter cvs={data.cvs} onUpload={data.uploadCv} onActive={data.makeActive}/>} 
@@ -228,6 +236,6 @@ export default function Company() {
       {view === "interview" && <InterviewHub user={data.user} jobs={data.jobs}/>} 
       {view === "learning" && <LearningHub user={data.user} prefs={prefs}/>}
     </main>
-    {selected && <JobDetail job={selected} onClose={() => setSelected(null)} onSave={data.saveJob}/>}
+    {selected && <JobDetail job={selected} flags={prefs.irrelevantJobs} onClose={() => setSelected(null)} onSave={saveJobWithFlag}/>}
   </div>;
 }

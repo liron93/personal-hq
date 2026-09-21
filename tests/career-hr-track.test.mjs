@@ -29,7 +29,7 @@ test("ברירת מחדל היא מסלול המוצר, וחשבון קיים ב
   assert.equal(normalizePrefs(null).track, "pm");
   assert.equal(normalizePrefs(undefined).track, "pm");
   assert.equal(normalizePrefs({ track: "nonsense" }).track, "pm");
-  assert.deepEqual(normalizePrefs(DEFAULT_PREFS), { track: "pm", hrAttempts: [] });
+  assert.deepEqual(normalizePrefs(DEFAULT_PREFS), { track: "pm", hrAttempts: [], irrelevantJobs: {} });
   const banks = { pm, hr };
   assert.equal(questionsFor("pm", banks), pm);
   assert.equal(questionsFor("hr", banks), hr);

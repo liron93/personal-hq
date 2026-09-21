@@ -3,9 +3,10 @@
 // אין כאן קריאה ל-Supabase: הטבלה career_answers מחייבת שהשאלה תהיה קיימת ב-career_questions (מפתח זר),
 // ושאלות ה-HR עדיין לא נזרעו שם. עד שתאושר מיגרציה, ניסיונות HR נשארים מקומיים למשתמש/ת.
 // הקובץ טהור (בלי ייבוא JSON) כדי שאפשר לבדוק אותו ישירות ב-node.
+import { normalizeFlags } from "./job-status.js";
 
 export const TRACKS = Object.freeze({ pm: "ניהול מוצר", hr: "משאבי אנוש" });
-export const DEFAULT_PREFS = Object.freeze({ track: "pm", hrAttempts: [] });
+export const DEFAULT_PREFS = Object.freeze({ track: "pm", hrAttempts: [], irrelevantJobs: {} });
 export const MAX_ATTEMPT_CHARS = 5000;
 export const MAX_ATTEMPTS = 500;
 // קידומת ייחודית: בנק המוצר הקיים כולל כבר שאלות עם מזהים hr-001..015 (ראיונות התנהגותיים), ואלה נשמרים ב-Supabase כמו קודם.
@@ -22,7 +23,7 @@ export function normalizePrefs(raw) {
     .filter(a => a && isHrQuestion(a.questionId) && typeof a.text === "string" && typeof a.id === "string" && typeof a.createdAt === "string")
     .slice(0, MAX_ATTEMPTS)
     .map(a => ({ id: a.id, questionId: a.questionId, text: a.text.slice(0, MAX_ATTEMPT_CHARS), createdAt: a.createdAt }));
-  return { track, hrAttempts };
+  return { track, hrAttempts, irrelevantJobs: normalizeFlags(raw?.irrelevantJobs) };
 }
 
 export const setTrack = (prefs, track) => ({ ...normalizePrefs(prefs), track: isTrack(track) ? track : "pm" });
