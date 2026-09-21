@@ -1,5 +1,6 @@
+import AccessGate from "../AccessGate";
 import Company from "@/companies/nefesh/Company";
 
 export default function Page() {
-  return <Company />;
+  return <AccessGate slug="nefesh"><Company /></AccessGate>;
 }
