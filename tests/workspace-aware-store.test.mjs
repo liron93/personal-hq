@@ -244,10 +244,10 @@ test("designer (Shaked): edits Beit Hadash incl. documents end to end; finance a
   assert.equal(canViewCompany(access, "avoda"), false);
 });
 
-test("partner sees Beit Hadash, finance and her own (empty) career; never health or wellbeing", async () => {
+test("partner sees Beit Hadash, finance and her own (empty) career; never wellbeing (nefesh)", async () => {
   reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
   const access = await resolveAccess(db.client(PARTNER));
-  assert.deepEqual(visibleCompanySlugs(access, SLUGS), ["beit-hadash", "kesef", "avoda"]);
+  assert.deepEqual(visibleCompanySlugs(access, SLUGS), ["beit-hadash", "kesef", "health", "avoda"]);
   assert.equal(isHqVisible(access), true);
   assert.equal(isCompanyReadOnly(access, "avoda"), false);
 });
@@ -456,7 +456,7 @@ test("a removed member loses the cached grants: restricted, and a later network 
 
 test("member with capabilities: sees exactly what the grants allow", async () => {
   reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
-  assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(PARTNER)), SLUGS), ["beit-hadash", "kesef", "avoda"]);
+  assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(PARTNER)), SLUGS), ["beit-hadash", "kesef", "health", "avoda"]);
   assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(DESIGNER)), SLUGS), ["beit-hadash"]);
 });
 
@@ -474,7 +474,7 @@ test("network drops AFTER verification: last verified grants are used, without w
   const off = await resolveAccess(db.client(PARTNER));
   assert.deepEqual([off.mode, off.reason, off.stale], ["member", "cached", true]);
   assert.deepEqual(off.grants, first.grants);
-  assert.deepEqual(visibleCompanySlugs(off, SLUGS), ["beit-hadash", "kesef", "avoda"]);
+  assert.deepEqual(visibleCompanySlugs(off, SLUGS), ["beit-hadash", "kesef", "health", "avoda"]);
   assert.equal(isCompanyReadOnly(off, "kesef"), true); // B נשארת קריאה בלבד גם offline
 });
 
@@ -548,4 +548,40 @@ test("JARVIS visible set derived from access: restricted and unapproved get no c
     const keys = Object.keys(ctx(visibleCompanySlugs(access, SLUGS), { coreDenied: true }));
     assert.deepEqual(keys.sort(), ["greeting", "openTasks", "urgentActions"]);
   }
+});
+
+// ---------- הפרדת נתונים אישיים: ליאור לעולם לא טוענת נתונים של ה-owner ----------
+
+const OWNER_PERSONAL = { [HEALTH]: { owner: "owner-health-secret" }, "hq:health:v1": { owner: "owner-training-secret" }, "career-v1": { owner: "owner-career-secret" } };
+
+test("Lior (B+) never loads the owner's personal data (health, career, wellbeing): every company_state read is by her own user id", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps(DEFAULT_PARTNER_TEMPLATE) } } });
+  for (const [k, v] of Object.entries(OWNER_PERSONAL)) db.tables.company_state.set(`${OWNER}|${k}`, v);
+  const c = db.client(PARTNER);
+  for (const key of Object.keys(OWNER_PERSONAL)) {
+    const r = await loadStateWithClient(c, key);
+    assert.deepEqual([r.value, r.shared, r.canWrite], [null, false, true], key); // ריק, אישי, שלה
+  }
+  const reads = db.calls.filter(x => x.table === "company_state" && x.op === "read");
+  assert.equal(reads.length, 3);
+  for (const r of reads) assert.equal(r.f.user_id, PARTNER);
+  assert.equal(db.calls.some(x => x.table === "workspace_state"), false, "personal keys never touch the shared workspace");
+  // מה שהיא כותבת נשאר שלה, והנתונים של ה-owner לא משתנים
+  await saveWithClient(c, "career-v1", { jobs: [{ company: "hr-job" }] });
+  assert.deepEqual(db.tables.company_state.get(`${OWNER}|career-v1`), OWNER_PERSONAL["career-v1"]);
+  assert.deepEqual(db.tables.company_state.get(`${PARTNER}|career-v1`), { jobs: [{ company: "hr-job" }] });
+  assert.equal(ls.has(localKey("career-v1", OWNER)), false);
+});
+
+test("Lior's JARVIS context never includes the owner's personal data or nefesh; her own health/career sections are hers only", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps(DEFAULT_PARTNER_TEMPLATE) } } });
+  const access = await resolveAccess(db.client(PARTNER));
+  const visible = new Set(visibleCompanySlugs(access, SLUGS));
+  assert.equal(visible.has("nefesh"), false);
+  // הסיכומים נטענים רק לחברות הגלויות: הנתונים האישיים של ה-owner אף פעם לא הגיעו לכאן, וגם אם היו, nefesh לא נשלח
+  const summaries = { ...SUMMARIES };
+  const out = ctx([...visible], { summaries });
+  assert.equal("wellbeing" in out, false);
+  assert.equal(JSON.stringify(out).includes("secret-status"), false);
+  assert.equal(JSON.stringify(out).includes("private decision"), false);
 });
