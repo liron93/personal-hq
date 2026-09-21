@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowUpLeft, BellRing, Bot, BriefcaseBusiness, Building2, Ch
 import { COMPANIES } from "@/companies/registry";
 import { load, useStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import * as coreFacts from "@/lib/coreFacts";
 import styles from "./home.module.css";
 import overlay from "./overlays.module.css";
@@ -97,7 +98,7 @@ export default function CEO() {
   useEffect(() => {
     if (!jarvisContext) return;
     let alive = true;
-    fetch("/api/jarvis", {
+    apiFetch("/api/jarvis", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(jarvisContext),
@@ -118,13 +119,13 @@ export default function CEO() {
     setChatMessages(nextMessages);
     setChatSending(true);
     try {
-      const res = await fetch("/api/jarvis/chat", {
+      const res = await apiFetch("/api/jarvis/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ messages: nextMessages, context: jarvisContext }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.reply) { setChatError(data?.error || "JARVIS לא הצליח לענות."); return; }
+      if (!res.ok || !data?.reply) { setChatError(apiErrorMessage(res.status, data?.error, "JARVIS לא הצליח לענות.")); return; }
       setChatMessages(list => [...list, { role: "model", text: data.reply }]);
     } catch {
       setChatError("שגיאה בפנייה ל-JARVIS.");

@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { apiFetch, apiErrorMessage } from '@/lib/api-client.mjs';
 import s from './market-connection.module.css';
 
 async function call(method='GET',payload) {
   const {data}=await supabase.auth.getSession();
   if(!data.session?.access_token)throw new Error('יש להתחבר לחשבון לפני בדיקת החיבור.');
-  const response=await fetch('/api/market/eodhd',{method,credentials:'same-origin',headers:{Authorization:`Bearer ${data.session.access_token}`,...(payload?{'Content-Type':'application/json'}:{})},...(payload?{body:JSON.stringify(payload)}:{}),cache:'no-store'});
-  const value=await response.json();if(!response.ok)throw new Error(value.error||'בדיקת החיבור נכשלה.');return value;
+  const response=await apiFetch('/api/market/eodhd',{method,credentials:'same-origin',headers:payload?{'Content-Type':'application/json'}:{},...(payload?{body:JSON.stringify(payload)}:{}),cache:'no-store'});
+  const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(apiErrorMessage(response.status,value.error,'בדיקת החיבור נכשלה.'));return value;
 }
 export default function MarketConnection({result,setResult,symbol,setSymbol}) {
   const [status,setStatus]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
