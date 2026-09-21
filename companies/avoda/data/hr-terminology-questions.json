@@ -1,0 +1,287 @@
+[
+  {
+    "id": "hrm-term-001",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מה מודד eNPS?",
+    "options": [
+      "נכונות עובדים להמליץ על החברה כמקום עבודה",
+      "שיעור העזיבה השנתי",
+      "עלות גיוס ממוצעת",
+      "מספר עובדים למנהל"
+    ],
+    "correct_answer": "נכונות עובדים להמליץ על החברה כמקום עבודה",
+    "explanation": "Employee Net Promoter Score. שאלה אחת (\"עד כמה תמליץ...\") ונטו של מקדמים פחות מבקרים."
+  },
+  {
+    "id": "hrm-term-002",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו Time-to-Hire?",
+    "options": [
+      "הזמן מפרסום המשרה או פנייה ראשונה ועד שהמועמד מקבל הצעה",
+      "משך הראיון הממוצע",
+      "משך ההכשרה של עובד חדש",
+      "שעות העבודה השבועיות"
+    ],
+    "correct_answer": "הזמן מפרסום המשרה או פנייה ראשונה ועד שהמועמד מקבל הצעה",
+    "explanation": "מדד יעילות של תהליך הגיוס. חשוב להגדיר מתי מתחילים ומתי מסיימים, כדי להשוות בין תקופות."
+  },
+  {
+    "id": "hrm-term-003",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו Pre-boarding?",
+    "options": [
+      "הקשר והכנת העובד בין חתימת החוזה ליום העבודה הראשון",
+      "ראיון היציאה",
+      "הכשרה מקצועית לעובד וותיק",
+      "חוזה ניסיון"
+    ],
+    "correct_answer": "הקשר והכנת העובד בין חתימת החוזה ליום העבודה הראשון",
+    "explanation": "מוריד נשירה לפני התחלה ומקצר את זמן ההטמעה."
+  },
+  {
+    "id": "hrm-term-004",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מה מטרת שיטת STAR בראיון?",
+    "options": [
+      "לארגן תשובה על מקרה אמיתי: מצב, משימה, פעולה, תוצאה",
+      "לחשב שכר",
+      "למדוד מעורבות עובדים",
+      "לדרג מועמדים לפי גיל"
+    ],
+    "correct_answer": "לארגן תשובה על מקרה אמיתי: מצב, משימה, פעולה, תוצאה",
+    "explanation": "משמשת גם את המראיין להערכת התנהגות בפועל, לא רק כוונות."
+  },
+  {
+    "id": "hrm-term-005",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו משוב 360?",
+    "options": [
+      "משוב על עובד ממנהל, עמיתים וכפופים",
+      "משוב רק מהמנהל הישיר",
+      "סקר שביעות רצון לקוחות",
+      "מדד לשעות נוספות"
+    ],
+    "correct_answer": "משוב על עובד ממנהל, עמיתים וכפופים",
+    "explanation": "מתאים בעיקר לפיתוח ולא כבסיס בלעדי לשכר או פיטורים."
+  },
+  {
+    "id": "hrm-term-006",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהי מטריצת 9 תיבות (9-Box)?",
+    "options": [
+      "כלי הממפה עובדים לפי ביצועים ופוטנציאל",
+      "כלי לחישוב שכר",
+      "תבנית לחוזה עבודה",
+      "רשימת מדדי גיוס"
+    ],
+    "correct_answer": "כלי הממפה עובדים לפי ביצועים ופוטנציאל",
+    "explanation": "משמש לתכנון פיתוח ומחליפים, ודורש כיול בין מנהלים כדי להיות הוגן."
+  },
+  {
+    "id": "hrm-term-007",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו PIP?",
+    "options": [
+      "תוכנית לשיפור ביצועים עם יעדים ולוחות זמנים",
+      "חבילת הטבות חדשה",
+      "מבחן התאמה",
+      "סקר מעורבות"
+    ],
+    "correct_answer": "תוכנית לשיפור ביצועים עם יעדים ולוחות זמנים",
+    "explanation": "מטרתה לתת הזדמנות אמיתית להשתפר. יש לתעד ולהפעיל בתום לב ולפי הדין."
+  },
+  {
+    "id": "hrm-term-008",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו ATS?",
+    "options": [
+      "מערכת לניהול מועמדים ותהליכי גיוס",
+      "מערכת שכר",
+      "מערכת נוכחות",
+      "תוכנית פנסיה"
+    ],
+    "correct_answer": "מערכת לניהול מועמדים ותהליכי גיוס",
+    "explanation": "Applicant Tracking System: מרכזת מועמדים, סטטוסים, משובים ודוחות."
+  },
+  {
+    "id": "hrm-term-009",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מה מבדיל ראיון מובנה מראיון חופשי?",
+    "options": [
+      "אותן שאלות וקריטריוני הערכה לכל המועמדים",
+      "הוא קצר יותר תמיד",
+      "הוא נעשה רק בטלפון",
+      "הוא ללא מראיין"
+    ],
+    "correct_answer": "אותן שאלות וקריטריוני הערכה לכל המועמדים",
+    "explanation": "מקטין הטיות ומשפר תוקף חיזוי ביחס לראיון חופשי."
+  },
+  {
+    "id": "hrm-term-010",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו Employer Branding?",
+    "options": [
+      "הדימוי והערך שהארגון מציג כמעסיק",
+      "עיצוב לוגו החברה",
+      "תקציב שיווק מוצרים",
+      "קוד לבוש"
+    ],
+    "correct_answer": "הדימוי והערך שהארגון מציג כמעסיק",
+    "explanation": "כולל הבטחה לעובד (EVP), חוויית מועמד ושפה בשוק."
+  },
+  {
+    "id": "hrm-term-011",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "איזה מדד מתאר עלות בפועל של גיוס עובד?",
+    "options": [
+      "Cost-per-Hire",
+      "eNPS",
+      "Span of Control",
+      "Absenteeism"
+    ],
+    "correct_answer": "Cost-per-Hire",
+    "explanation": "כולל פרסום, שכר מגייסים, דמי השמה, ועבודת זמן. חשוב להשוות לפי סוג משרה."
+  },
+  {
+    "id": "hrm-term-012",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מה מודד Span of Control?",
+    "options": [
+      "מספר הכפופים למנהל",
+      "אורך הראיון",
+      "שכר ממוצע",
+      "משך ההכשרה"
+    ],
+    "correct_answer": "מספר הכפופים למנהל",
+    "explanation": "טווח בקרה גדול מדי מקשה על משוב ופיתוח, וקטן מדי מייקר את המבנה."
+  },
+  {
+    "id": "hrm-term-013",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו ראיון יציאה (Exit Interview)?",
+    "options": [
+      "שיחה עם עובד שעוזב להבנת הסיבות ולמידה",
+      "ראיון גיוס שני",
+      "בדיקת רקע",
+      "ראיון קידום"
+    ],
+    "correct_answer": "שיחה עם עובד שעוזב להבנת הסיבות ולמידה",
+    "explanation": "כדאי לצרף שיחה אחרי כמה חודשים כדי לקבל תשובות כנות יותר, ולראות דפוסים ולא מקרים בודדים."
+  },
+  {
+    "id": "hrm-term-014",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מה ההבדל בין Absenteeism ל-Turnover?",
+    "options": [
+      "Absenteeism: היעדרות מהעבודה. Turnover: עזיבה של עובדים",
+      "אותו דבר",
+      "Absenteeism: גיוס. Turnover: שכר",
+      "Absenteeism: העלאת שכר. Turnover: קידום"
+    ],
+    "correct_answer": "Absenteeism: היעדרות מהעבודה. Turnover: עזיבה של עובדים",
+    "explanation": "שני מדדים שונים. שניהם יכולים להצביע על שחיקה, אך בכיוונים שונים."
+  },
+  {
+    "id": "hrm-term-015",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהי הטיית ההילה (Halo Effect) בראיון?",
+    "options": [
+      "תכונה חיובית אחת משפיעה על ההערכה של כל השאר",
+      "העדפת מועמד דומה לעצמך",
+      "חיפוש מידע שמאשר את דעתך",
+      "לחץ על מועמד"
+    ],
+    "correct_answer": "תכונה חיובית אחת משפיעה על ההערכה של כל השאר",
+    "explanation": "לכן מומלץ לדרג כל קריטריון בנפרד ולפני דיון קבוצתי."
+  },
+  {
+    "id": "hrm-term-016",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו Onboarding מוצלח מבחינת מדד?",
+    "options": [
+      "הגעה ליעדי 30/60/90 ושימור אחרי שנה",
+      "מספר המסמכים שנחתמו",
+      "מספר ימי החופשה",
+      "שיעור השכר"
+    ],
+    "correct_answer": "הגעה ליעדי 30/60/90 ושימור אחרי שנה",
+    "explanation": "לא מסתפקים בשביעות רצון ביום הראשון, אלא במעבר להצלחה ולשימור."
+  },
+  {
+    "id": "hrm-term-017",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו OKR?",
+    "options": [
+      "מסגרת לקביעת יעד שאפתני עם תוצאות מפתח מדידות",
+      "מערכת שכר",
+      "סוג ראיון",
+      "מבחן התאמה"
+    ],
+    "correct_answer": "מסגרת לקביעת יעד שאפתני עם תוצאות מפתח מדידות",
+    "explanation": "Objectives and Key Results. בדרך כלל רבעוני ושקוף בארגון."
+  },
+  {
+    "id": "hrm-term-018",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו Talent Pool?",
+    "options": [
+      "מאגר מועמדים או עובדים פוטנציאליים לתפקידים עתידיים",
+      "קבוצת עובדים בהעברה",
+      "קרן פנסיה",
+      "חוזה קבלן"
+    ],
+    "correct_answer": "מאגר מועמדים או עובדים פוטנציאליים לתפקידים עתידיים",
+    "explanation": "חשוב לשמור עליו חי בקשר שוטף ולעמוד בכללי פרטיות."
+  },
+  {
+    "id": "hrm-term-019",
+    "category": "מונחים ב-HR",
+    "difficulty": "easy",
+    "question_type": "multiple_choice",
+    "question": "מהו שימוע עובד?",
+    "options": [
+      "הליך שבו העובד מקבל הזדמנות להשמיע טענות לפני החלטה על פיטורים",
+      "ראיון גיוס",
+      "סקר מעורבות",
+      "שיחת משוב שנתית"
+    ],
+    "correct_answer": "הליך שבו העובד מקבל הזדמנות להשמיע טענות לפני החלטה על פיטורים",
+    "explanation": "לפי הפסיקה בישראל חובה לקיים שימוע בתום לב, עם הודעה מראש ואפשרות אמיתית לשכנע. יש להתייעץ עם גורם משפטי."
+  }
+]

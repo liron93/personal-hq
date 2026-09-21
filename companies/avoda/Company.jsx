@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import styles from "./career.module.css";
+import { useStore } from "@/lib/store";
+import { DEFAULT_PREFS, normalizePrefs } from "./practice-tracks";
 import { PracticeHub, HistoryHub, InterviewHub, LearningHub, CommunicationsHub } from "./CareerExpansion";
 
 const STATUS = {
@@ -205,6 +207,9 @@ function Empty({ label, action, onClick }) { return <div className={styles.empty
 
 export default function Company() {
   const data = useCareerData();
+  // העדפות אישיות של המשתמש/ת: מסלול תרגול (מוצר / HR) וניסיונות תרגול HR. נשמר במרחב האישי בלבד.
+  const { data: rawPrefs, setData: setPrefs } = useStore("hq:career-prefs:v1", DEFAULT_PREFS);
+  const prefs = normalizePrefs(rawPrefs);
   const [view, setView] = useState("today");
   const [selected, setSelected] = useState(null);
   if (data.state === "loading") return <p className={styles.loading}>טוען את חברת הקריירה…</p>;
@@ -218,10 +223,10 @@ export default function Company() {
       {view === "updates" && <CommunicationsHub user={data.user}/>}
       {view === "profile" && <Profile profile={data.profile} onSave={data.saveProfile}/>}
       {view === "cv" && <CvCenter cvs={data.cvs} onUpload={data.uploadCv} onActive={data.makeActive}/>} 
-      {view === "practice" && <PracticeHub user={data.user} jobs={data.jobs}/>} 
-      {view === "history" && <HistoryHub user={data.user}/>} 
+      {view === "practice" && <PracticeHub user={data.user} jobs={data.jobs} prefs={prefs} setPrefs={setPrefs}/>} 
+      {view === "history" && <HistoryHub user={data.user} prefs={prefs}/>} 
       {view === "interview" && <InterviewHub user={data.user} jobs={data.jobs}/>} 
-      {view === "learning" && <LearningHub user={data.user}/>}
+      {view === "learning" && <LearningHub user={data.user} prefs={prefs}/>}
     </main>
     {selected && <JobDetail job={selected} onClose={() => setSelected(null)} onSave={data.saveJob}/>}
   </div>;
