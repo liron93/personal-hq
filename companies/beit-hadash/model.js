@@ -29,10 +29,16 @@ export const INIT = {
   inspirations: [], // { id, title, description, link }
 };
 
+// פירוט של רכישה: שורות (דגם, כמות, מחיר, קישור). שורה שנפסלה לא נספרת. רכישה בלי שורות ממשיכה לעבוד כמו קודם.
+export const LINE_STATUSES = ["לבדיקה", "בהצעה", "נבחר", "הוזמן", "הגיע", "נפסל"];
+export const linesTotal = item => (item?.lines || []).filter(l => l.status !== "נפסל").reduce((sum, l) => sum + Number(l.price || 0) * Math.max(1, Number(l.qty || 1)), 0);
+// עלות סופית אם הוזנה, אחרת סכום הפירוט, אחרת ההערכה.
+export const itemTotal = item => Number(item?.finalCost || linesTotal(item) || item?.estimate || 0);
+
 export function summarize(data) {
   const d = data?.renovationV2 ? data : INIT;
   const urgent = d.items.filter(item => item.beforeMove && item.status !== "הושלם");
-  const planned = d.items.reduce((sum, item) => sum + Number(item.finalCost || item.estimate || 0), 0);
+  const planned = d.items.reduce((sum, item) => sum + itemTotal(item), 0);
   const paid = d.items.reduce((sum, item) => sum + item.payments.reduce((subtotal, payment) => subtotal + Number(payment.amount || 0), 0), 0);
   return {
     openTasks: urgent.length,
