@@ -3,6 +3,7 @@
 
 export const SESSION_IDS = ["A", "B", "C"];
 export const SAFE_ANSWER = "לא ידוע לי על מגבלה";
+export const DEFAULT_REST = 75; // שניות; ההנחיה הקיימת היא 60–90
 
 // מגבלה או אי-ודאות => לא בונים תוכנית תרגילים מותאמת (כמו ב-README של החברה).
 export function isRestricted(profile) {
@@ -48,7 +49,7 @@ export function buildProgram(profile) {
   const base = hasGym(p) ? gymSessions(p.baseline || {}) : homeSessions();
   const sessions = {};
   for (const id of ids) {
-    sessions[id] = base[id].map((e, i) => ({ id: `${id}${i + 1}`, name: e.name, sets: 2, reps: "8–12", load: e.load, hint: e.hint }));
+    sessions[id] = base[id].map((e, i) => ({ id: `${id}${i + 1}`, name: e.name, sets: 2, reps: "8–12", load: e.load, hint: e.hint, rest: DEFAULT_REST }));
   }
   return { restricted: false, ids, sessions };
 }
