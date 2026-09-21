@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, ExternalLink, AlertTriangle, Upload, X, Pencil } from "lucide-react";
 import { useStore, cp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import { ACCEPT_ATTR, CUSTOM_CATEGORY, DOC_CATEGORIES, createHomeDocuments, formatSize, messageFor, objectPath, validateUpload } from "@/lib/home-documents";
 import { STORE_KEY, INIT, DEFAULT_CHECKLIST, CHECKLIST_GROUPS } from "./model";
 import "./renovation-v2.css";
 
@@ -65,11 +66,108 @@ function Dashboard({ data, select }) {
 }
 function Items({ data, edit, add, remove }) { const [room, setRoom] = useState(""); const [status, setStatus] = useState(""); const visible = data.items.filter(i => (!room || i.room === room) && (!status || i.status === status)); return <div style={{ display: "grid", gap: 12 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><h2 style={{ margin: 0 }}>תקציב ורכש</h2><span style={{ color: "#63716A" }}>כל רכישה נשמרת פעם אחת</span></div><Btn onClick={add}><Plus size={18} />רכישה</Btn></div><div className="renovation-filterbar"><select aria-label="סינון לפי חדר" value={room} onChange={e=>setRoom(e.target.value)}><option value="">כל החדרים</option>{rooms.map(x=><option key={x}>{x}</option>)}</select><select aria-label="סינון לפי מצב" value={status} onChange={e=>setStatus(e.target.value)}><option value="">כל המצבים</option>{["לבחירה","בהצעת מחיר","הוזמן","בהמתנה לאספקה","בהתקנה","הושלם","מעוכב"].map(x=><option key={x}>{x}</option>)}</select><span style={{color:"#65746D",alignSelf:"center"}}>{visible.length} פריטים</span></div>{data.items.length ? visible.map(i => { const total = Number(i.finalCost || i.estimate || 0), paid = i.payments.reduce((s,p)=>s+Number(p.amount||0),0); return <Card key={i.id}><button onClick={() => edit(i)} style={{ width: "100%", textAlign: "start", border: 0, background: "transparent", font: "inherit", cursor: "pointer" }}><div style={{ display:"flex",justifyContent:"space-between",gap:8 }}><b>{i.name}</b><span style={{ color:"#256B57" }}>{i.status}</span></div><div style={{ color:"#63716A",fontSize:14,marginTop:4 }}>{i.room} · {i.category} · יעד: {i.dueDate || "לא נקבע"}</div><div style={{ display:"flex",justifyContent:"space-between",marginTop:10 }}><span>תוכנית {money(total)}</span><span>יתרה {money(Math.max(0,total-paid))}</span></div></button><div style={{ display:"flex",justifyContent:"space-between",marginTop:10 }}><span>{i.link && <a href={i.link} target="_blank" rel="noreferrer" style={{color:"#256B57"}}><ExternalLink size={15} /> קישור</a>}</span><button onClick={() => remove(i.id)} style={{border:0,background:"transparent",color:"#B53A31",font:"inherit"}}>מחיקה</button></div></Card>; }) : <Card><p>עוד אין רכישות. התחילו בפריט שיש לו זמן אספקה ארוך או שחוסם החלטה.</p><Btn onClick={add}><Plus size={18} />הוספת פריט ראשון</Btn></Card>}</div>; }
 function Suppliers({ data, setData }) { const [editing,setEditing]=useState(null); const blank=()=>({...emptySupplier()}); const save=()=>{if(!editing?.name?.trim())return;setState(setData,d=>({suppliers:d.suppliers.some(x=>x.id===editing.id)?d.suppliers.map(x=>x.id===editing.id?editing:x):[...d.suppliers,editing]}));setEditing(null);};return <div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><h2 style={{margin:0}}>ספקים</h2><span style={{color:"#63716A"}}>אנשי קשר, כסף וקבצים קשורים</span></div><Btn onClick={()=>setEditing(blank())}><Plus size={18}/>ספק</Btn></div>{editing&&<Card><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="שם ספק / בעל מקצוע"><input value={editing.name} onChange={e=>setEditing(x=>({...x,name:e.target.value}))} style={input}/></Field><Field label="תחום"><input value={editing.trade} onChange={e=>setEditing(x=>({...x,trade:e.target.value}))} placeholder="לדוגמה: מיזוג" style={input}/></Field></div><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="טלפון"><input dir="ltr" value={editing.phone} onChange={e=>setEditing(x=>({...x,phone:e.target.value}))} style={input}/></Field><Field label="קישור להצעת מחיר"><input dir="ltr" value={editing.quoteUrl||""} onChange={e=>setEditing(x=>({...x,quoteUrl:e.target.value}))} placeholder="https://" style={input}/></Field></div><Field label="קישור למסמך / חוזה"><input dir="ltr" value={editing.documentUrl||""} onChange={e=>setEditing(x=>({...x,documentUrl:e.target.value}))} placeholder="https://" style={input}/></Field><Field label="הערה"><textarea value={editing.note} onChange={e=>setEditing(x=>({...x,note:e.target.value}))} style={{...input,minHeight:68,paddingTop:8}}/></Field><div style={{display:"flex",justifyContent:"end",gap:8,marginTop:10}}><Btn secondary onClick={()=>setEditing(null)}>ביטול</Btn><Btn onClick={save}>שמירת ספק</Btn></div></Card>}{data.suppliers.map(s=>{const linked=data.items.filter(i=>i.supplierId===s.id);const total=linked.reduce((sum,i)=>sum+Number(i.finalCost||i.estimate||0),0);const paid=linked.reduce((sum,i)=>sum+i.payments.reduce((x,p)=>x+Number(p.amount||0),0),0);return <Card key={s.id}><div style={{display:"flex",justifyContent:"space-between",gap:12}}><div><b>{s.name}</b><div style={{color:"#63716A"}}>{s.trade||"תחום טרם הוזן"}{s.phone&&<> · {s.phone}</>}</div><div style={{marginTop:8,fontSize:14}}>פריטים: {linked.length} · סוכם {money(total)} · שולם {money(paid)} · יתרה {money(Math.max(0,total-paid))}</div>{s.note&&<div style={{color:"#63716A",fontSize:14,marginTop:6}}>{s.note}</div>}{(s.quoteUrl||s.documentUrl)&&<div style={{display:"flex",gap:12,marginTop:8,fontSize:14}}>{s.quoteUrl&&<a href={s.quoteUrl} target="_blank" rel="noreferrer">הצעת מחיר</a>}{s.documentUrl&&<a href={s.documentUrl} target="_blank" rel="noreferrer">מסמך / חוזה</a>}</div>}</div><Btn secondary onClick={()=>setEditing({...s})}>עריכה</Btn></div></Card>})}{!data.suppliers.length&&!editing&&<Card>עדיין אין ספקים. אפשר להוסיף בעל מקצוע כאן או מתוך פריט רכש.</Card>}</div>; }function Plan({ data, setData }) { const [editing,setEditing]=useState(null); const today=new Date(); today.setHours(0,0,0,0); const cutoff=new Date(today); cutoff.setDate(cutoff.getDate()+7); const upcoming=[...(data.milestones||[]).filter(x=>x.date).map(x=>({name:x.name,date:x.date,detail:x.status||"אבן דרך"})),...(data.items||[]).filter(x=>x.dueDate&&x.status!=="הושלם").map(x=>({name:x.name,date:x.dueDate,detail:x.status||"רכש"}))].filter(x=>{const d=new Date(x.date+"T12:00:00");return d>=today&&d<=cutoff;}).sort((x,y)=>x.date.localeCompare(y.date)); const timeline=[...(data.milestones||[])].sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")); const nextMilestone=timeline.find(x=>x.status!=="הושלם"); const near=(data.items||[]).filter(i=>i.beforeMove&&i.status!=="הושלם").sort((a,b)=>(a.dueDate||"9999").localeCompare(b.dueDate||"9999")); const save=()=>{if(!editing?.name?.trim())return;setState(setData,d=>({milestones:d.milestones.some(x=>x.id===editing.id)?d.milestones.map(x=>x.id===editing.id?editing:x):[...d.milestones,{...editing,id:crypto.randomUUID()}]}));setEditing(null);};return <div style={{display:"grid",gap:12}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><h2 style={{margin:0}}>תוכנית ולוח זמנים</h2><span style={{color:"#63716A"}}>אבני דרך, חסמים ומה חייב להיסגר לפני המעבר</span></div><Btn onClick={()=>setEditing({id:"",name:"",date:"",status:"מתוכנן",blocker:""})}><Plus size={18}/>אבן דרך</Btn></div><Card className="renovation-timeline"><div className="renovation-timeline-title"><div><h3 style={{margin:0}}>ציר המעבר</h3><span>{nextMilestone?`התחנה הבאה: ${nextMilestone.name}`:"כל אבני הדרך הושלמו"}</span></div></div><div className="renovation-timeline-track">{timeline.map(m=><button key={m.id} onClick={()=>setEditing({...m})} className={`renovation-timeline-step ${m.status==="הושלם"?"is-done":m.status==="מעוכב"?"is-blocked":""}`}><span className="renovation-timeline-dot" aria-hidden="true"/><span><b>{m.name}</b><small>{m.date?new Date(m.date+"T12:00:00").toLocaleDateString("he-IL"):"תאריך לא נקבע"} · {m.status}</small></span></button>)}</div></Card><Card><h3 style={{marginTop:0}}>השבוע הקרוב</h3>{upcoming.length?upcoming.map(x=><div key={x.name+x.date} style={{padding:"10px 0",borderBottom:"1px solid #E5EAE6"}}><b>{x.name}</b><div style={{color:"#63716A",fontSize:14}}>{x.detail} · {new Date(x.date+"T12:00:00").toLocaleDateString("he-IL")}</div></div>):<p style={{color:"#63716A"}}>אין אירועי בית חדשים בשבעת הימים הקרובים.</p>}</Card><Card><h3 style={{marginTop:0}}>לפני המעבר</h3>{near.length?near.map(i=><button key={i.id} onClick={()=>{}} style={{width:"100%",textAlign:"start",padding:"10px 0",border:0,borderBottom:"1px solid #E5EAE6",background:"transparent",font:"inherit"}}><b>{i.name}</b><div style={{color:"#63716A",fontSize:14}}>{i.status} · יעד: {i.dueDate?new Date(i.dueDate+"T12:00:00").toLocaleDateString("he-IL"):"לא נקבע"}</div></button>):<p style={{color:"#63716A"}}>אין כרגע פריטי רכש פתוחים שחובה לסגור לפני הכניסה.</p>}</Card><Card><h3 style={{marginTop:0}}>אבני דרך</h3><p style={{marginTop:0,color:"#63716A"}}>לחיצה על אבן דרך פותחת עריכה של התאריך, הסטטוס והחסם.</p>{data.milestones.map(m=><button key={m.id} onClick={()=>setEditing({...m})} style={{width:"100%",textAlign:"start",padding:"13px 0",border:0,borderBottom:"1px solid #E5EAE6",background:"transparent",font:"inherit",cursor:"pointer"}}><div style={{display:"flex",justifyContent:"space-between",gap:8}}><b>{m.name}</b><span style={{color:m.status==="מעוכב"?"#B53A31":"#A66512"}}>{m.status}</span></div><div style={{color:"#63716A",fontSize:14,marginTop:4}}>{m.date?new Date(m.date+"T12:00:00").toLocaleDateString("he-IL"):"תאריך טרם נקבע"}{m.blocker&&<> · {m.blocker}</>}</div></button>)}{!data.milestones.length&&<p>אין עדיין אבני דרך. הוסיפו למשל קבלת מפתח, מדידות, התקנות וכניסה.</p>}</Card>{editing&&<Card><h3 style={{marginTop:0}}>{editing.id?"עריכת אבן דרך":"אבן דרך חדשה"}</h3><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="שם"><input value={editing.name} onChange={e=>setEditing(x=>({...x,name:e.target.value}))} style={input}/></Field><Field label="תאריך"><input type="date" value={editing.date||""} onChange={e=>setEditing(x=>({...x,date:e.target.value,status:e.target.value&&x.status==="דורש אימות"?"מתוכנן":x.status,blocker:e.target.value&&x.blocker==="יש לאמת שנה ומועד"?"":x.blocker}))} style={input}/></Field></div><div data-form-grid style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><Field label="מצב"><select value={editing.status||"מתוכנן"} onChange={e=>setEditing(x=>({...x,status:e.target.value}))} style={input}>{["מתוכנן","בתהליך","ממתין","מעוכב","הושלם","דורש אימות"].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="חסם / הערה"><input value={editing.blocker||""} onChange={e=>setEditing(x=>({...x,blocker:e.target.value}))} style={input}/></Field></div><div style={{display:"flex",justifyContent:"end",gap:8,marginTop:12}}><Btn secondary onClick={()=>setEditing(null)}>ביטול</Btn><Btn onClick={save}>שמירת אבן דרך</Btn></div></Card>}</div>; }function Docs({ data, setData }) {
-  const [busy,setBusy]=useState(false); const [error,setError]=useState(""); const [notice,setNotice]=useState("");
-  const upload=async e=>{const file=e.target.files?.[0];if(!file)return;setBusy(true);setError("");setNotice("");try{const {data:userData,error:userError}=await supabase.auth.getUser();if(userError||!userData?.user)throw new Error("כדי לשמור קבצים צריך להתחבר למערכת.");const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=userData.user.id+"/beit-hadash/"+Date.now()+"-"+safeName;const {error:uploadError}=await supabase.storage.from("home-documents").upload(path,file,{contentType:file.type||undefined,upsert:false});if(uploadError)throw uploadError;setState(setData,d=>({documents:[{id:crypto.randomUUID(),name:file.name,type:file.type||"מסמך",storagePath:path,size:file.size,createdAt:new Date().toISOString()},...d.documents]}));setNotice("הקובץ נשמר ומקושר לבית החדש.");e.target.value="";}catch(err){setError(err?.message||"העלאת הקובץ נכשלה. נסה שוב.");}finally{setBusy(false);}};
-  const open=async doc=>{setError("");if(doc.url){window.open(doc.url,"_blank","noopener,noreferrer");return;}if(!doc.storagePath)return;try{const {data,error:signError}=await supabase.storage.from("home-documents").createSignedUrl(doc.storagePath,60);if(signError)throw signError;window.open(data.signedUrl,"_blank","noopener,noreferrer");}catch(err){setError(err?.message||"לא ניתן לפתוח את הקובץ.");}};
-  const remove=async doc=>{if(!window.confirm('למחוק את "'+doc.name+'"? הקובץ יימחק גם מהאחסון.'))return;setError("");try{if(doc.storagePath){const {error:removeError}=await supabase.storage.from("home-documents").remove([doc.storagePath]);if(removeError)throw removeError;}setState(setData,d=>({documents:d.documents.filter(x=>x.id!==doc.id)}));}catch(err){setError(err?.message||"לא ניתן למחוק את הקובץ.");}};
-  return <div style={{display:"grid",gap:12}}><div><h2 style={{margin:0}}>מסמכים ובדק</h2><span style={{color:"#63716A"}}>חוזים, הצעות מחיר, חשבוניות וליקויים</span></div><Card><Upload size={22} color="#256B57"/><h3>העלאת קובץ מאובטחת</h3><p style={{color:"#63716A"}}>הקובץ נשמר בחשבון שלך בלבד ומקושר לבית החדש.</p><label style={{display:"inline-flex",minHeight:44,alignItems:"center",gap:7,padding:"0 14px",borderRadius:10,background:"#256B57",color:"#fff",cursor:busy?"wait":"pointer"}}>{busy?"מעלה קובץ…":"בחירת קובץ להעלאה"}<input type="file" onChange={upload} disabled={busy} style={{display:"none"}}/></label>{notice&&<p role="status" style={{color:"#176f7a",marginBottom:0}}>{notice}</p>}{error&&<p role="alert" style={{color:"#b42318",marginBottom:0}}>{error}</p>}</Card>{data.documents.length?<Card><h3 style={{marginTop:0}}>המסמכים שלך</h3>{data.documents.map(doc=><div key={doc.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #E5EAE6"}}><button onClick={()=>open(doc)} style={{textAlign:"start",border:0,background:"transparent",font:"inherit",cursor:"pointer",padding:0}}><b>{doc.name}</b><div style={{color:"#63716A",fontSize:14}}>{doc.type}{doc.size?" · "+Math.ceil(doc.size/1024)+" KB":""}</div></button><button onClick={()=>remove(doc)} aria-label={"מחיקת "+doc.name} style={{border:0,background:"transparent",color:"#B53A31",font:"inherit",cursor:"pointer"}}>מחיקה</button></div>)}</Card>:<Card><p style={{margin:0,color:"#63716A"}}>עדיין אין מסמכים. אפשר להעלות חוזה, חשבונית, הצעת מחיר או תמונת ליקוי.</p></Card>}<Card><h3 style={{marginTop:0}}>בדק ומסירה</h3><p>בעת מסירה תעדו ליקוי, תמונה, תאריך, אחראי ותאריך תיקון. עבודות חשמל ותשתיות יש לאשר מול בעל מקצוע מוסמך.</p></Card></div>;
+  const api = useMemo(() => createHomeDocuments(supabase), []);
+  const [ws, setWs] = useState({ status: "loading" }); // loading | ready | off
+  const [me, setMe] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+  const [draft, setDraft] = useState({ title: "", description: "", category: DOC_CATEGORIES[0], customCategory: "" });
+  const [file, setFile] = useState(null);
+  const [errors, setErrors] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [filter, setFilter] = useState("");
+  const fileRef = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    setWs({ status: "loading" });
+    api.resolveWorkspaceId().then(r => { if (alive) setWs(r.ok ? { status: "ready", workspaceId: r.workspaceId, ownerId: r.ownerId } : { status: "off", code: r.code }); });
+    supabase.auth.getSession().then(({ data: s }) => { if (alive) setMe(s?.session?.user?.id || null); }).catch(() => {});
+    return () => { alive = false; };
+  }, [api, attempt]);
+  const docs = data.documents || [];
+  const categories = [...new Set(docs.map(d => d.category || d.type).filter(Boolean))];
+  const shown = filter ? docs.filter(d => (d.category || d.type) === filter) : docs;
+  const patch = (key, value) => { setDraft(d => ({ ...d, [key]: value })); setErrors(list => list.filter(e => e.field !== (key === "customCategory" ? "category" : key))); setMessage(""); };
+  const errorOf = field => errors.find(e => e.field === field)?.message;
+  const submit = async e => {
+    e.preventDefault();
+    if (busy || ws.status !== "ready") return;
+    const v = validateUpload({ ...draft, file });
+    if (!v.ok) { setErrors(v.errors); return; }
+    setBusy(true); setMessage(""); setErrors([]);
+    const id = crypto.randomUUID();
+    const path = objectPath(ws.workspaceId, id, file.name);
+    const up = await api.upload(path, file, v.value.mime);
+    if (!up.ok) { setMessage(messageFor(up.code)); setBusy(false); return; }
+    const entry = { id, title: v.value.title, description: v.value.description, category: v.value.category, path, fileName: v.value.fileName, size: v.value.size, mime: v.value.mime, uploadedBy: me, uploadedAt: new Date().toISOString() };
+    setState(setData, d => ({ documents: [entry, ...(d.documents || [])] }));
+    setDraft({ title: "", description: "", category: draft.category, customCategory: "" });
+    setFile(null); if (fileRef.current) fileRef.current.value = "";
+    setBusy(false); setMessage("הקובץ הועלה");
+  };
+  const open = async doc => {
+    const w = window.open("", "_blank");
+    const r = await api.signedUrl(doc.path);
+    if (!r.ok) { w?.close(); setMessage(messageFor(r.code)); return; }
+    if (w) { w.opener = null; w.location.href = r.url; } else window.location.href = r.url;
+  };
+  const remove = async doc => {
+    if (!window.confirm(`למחוק את "${doc.title || doc.name}"? הפעולה אינה הפיכה.`)) return;
+    if (doc.path) {
+      const r = await api.remove(doc.path);
+      if (!r.ok) { setMessage(r.code === "forbidden" ? "אפשר למחוק רק קובץ שהעלית בעצמך, או אם את/ה הבעלים" : messageFor(r.code)); return; }
+    }
+    setState(setData, d => ({ documents: (d.documents || []).filter(x => x.id !== doc.id) }));
+    setMessage("נמחק");
+  };
+  const canDelete = doc => !doc.path || (me && (doc.uploadedBy === me || ws.ownerId === me));
+  const off = ws.status === "off";
+  return <div style={{ display: "grid", gap: 12 }}>
+    <div><h2 style={{ margin: 0 }}>מסמכים ובדק</h2><span style={{ color: "#63716A" }}>חשבוניות, תוכניות וקבצים של הבית החדש</span></div>
+    {ws.status === "loading" && <Card><p style={{ margin: 0, color: "#63716A" }}>בודק אם העלאת קבצים זמינה…</p></Card>}
+    {off && <Card>
+      <Upload size={22} color="#256B57" />
+      <h3 style={{ marginBottom: 6 }}>{ws.code === "network" ? "לא הצלחנו לבדוק אם העלאת קבצים זמינה" : "העלאת קבצים עדיין לא הופעלה"}</h3>
+      <p style={{ color: "#63716A", marginTop: 0 }}>{ws.code === "network" ? "בדקו חיבור ונסו שוב." : "היא תופעל אחרי שאחסון הקבצים המשותף יאושר. עד אז לא נשמרים כאן קבצים, כדי לא להבטיח משהו שלא קורה."}</p>
+      {ws.code === "network" && <Btn secondary onClick={() => setAttempt(n => n + 1)}>ניסיון נוסף</Btn>}
+    </Card>}
+    {ws.status === "ready" && <Card>
+      <form onSubmit={submit} style={{ display: "grid", gap: 10 }} aria-busy={busy}>
+        <h3 style={{ margin: 0 }}>העלאת מסמך</h3>
+        <Field label="כותרת"><input value={draft.title} onChange={e => patch("title", e.target.value)} placeholder="למשל: תוכנית נגרות מטבח, גרסה סופית" style={input} aria-invalid={!!errorOf("title")} />{errorOf("title") && <span role="alert" style={{ color: "#b42318" }}>{errorOf("title")}</span>}</Field>
+        <Field label="תיאור (לא חובה)"><textarea value={draft.description} onChange={e => patch("description", e.target.value)} style={{ ...input, minHeight: 76, paddingTop: 8 }} />{errorOf("description") && <span role="alert" style={{ color: "#b42318" }}>{errorOf("description")}</span>}</Field>
+        <Field label="קטגוריה">
+          <select value={draft.category} onChange={e => patch("category", e.target.value)} style={input}>{DOC_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}<option value={CUSTOM_CATEGORY}>כתיבה חופשית…</option></select>
+        </Field>
+        {draft.category === CUSTOM_CATEGORY && <Field label="שם הקטגוריה"><input value={draft.customCategory} onChange={e => patch("customCategory", e.target.value)} placeholder="למשל: חשמלאי, אינסטלציה" style={input} maxLength={60} /></Field>}
+        {errorOf("category") && <span role="alert" style={{ color: "#b42318" }}>{errorOf("category")}</span>}
+        <Field label="קובץ (PDF, תמונה, Word או Excel, עד 25MB)">
+          <input ref={fileRef} type="file" accept={ACCEPT_ATTR} onChange={e => { setFile(e.target.files?.[0] || null); setErrors(list => list.filter(x => x.field !== "file")); setMessage(""); }} style={{ ...input, padding: "9px 10px", minHeight: 44 }} />
+          {file && <span style={{ color: "#63716A" }}>{file.name} · {formatSize(file.size)}</span>}
+          {errorOf("file") && <span role="alert" style={{ color: "#b42318" }}>{errorOf("file")}</span>}
+        </Field>
+        <div style={{ display: "flex", justifyContent: "end" }}><Btn disabled={busy}>{busy ? "מעלה…" : <><Upload size={18} />העלאה</>}</Btn></div>
+      </form>
+    </Card>}
+    {message && <p role="status" style={{ margin: 0, color: message === "הקובץ הועלה" || message === "נמחק" ? "#1D5A48" : "#b42318" }}>{message}</p>}
+    {categories.length > 1 && <div><select value={filter} onChange={e => setFilter(e.target.value)} aria-label="סינון לפי קטגוריה" style={{ ...input, maxWidth: 260 }}><option value="">כל הקטגוריות</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select></div>}
+    {shown.map(doc => <Card key={doc.id}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
+        <div style={{ minWidth: 0 }}>
+          <h3 style={{ margin: 0, overflowWrap: "anywhere" }}>{doc.title || doc.name}</h3>
+          <span style={{ display: "inline-block", marginTop: 6, padding: "3px 10px", borderRadius: 999, background: "#E6F0EB", color: "#1D5A48", fontSize: 13 }}>{doc.category || doc.type || "ללא קטגוריה"}</span>
+        </div>
+        <div style={{ display: "flex", flex: "none" }}>
+          {doc.path && <button type="button" onClick={() => open(doc)} aria-label={`פתיחת ${doc.title}`} style={{ border: 0, background: "transparent", color: "#176f7a", minWidth: 44, minHeight: 44, cursor: "pointer" }}><ExternalLink size={18} /></button>}
+          {canDelete(doc) && <button type="button" onClick={() => remove(doc)} aria-label={`מחיקת ${doc.title || doc.name}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Trash2 size={17} /></button>}
+        </div>
+      </div>
+      {doc.description && <p style={{ margin: "8px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{doc.description}</p>}
+      {doc.path ? <p style={{ margin: "8px 0 0", color: "#63716A", fontSize: 14, overflowWrap: "anywhere" }}>{doc.fileName} · {formatSize(doc.size)} · {new Date(doc.uploadedAt).toLocaleDateString("he-IL")}</p> : <p style={{ margin: "8px 0 0", color: "#63716A", fontSize: 14 }}>רשומה ללא קובץ (נוצרה לפני שהעלאת קבצים הופעלה)</p>}
+    </Card>)}
+    {!docs.length && <Card><p style={{ margin: 0, color: "#63716A" }}>עדיין אין מסמכים.</p></Card>}
+    <Card><h3 style={{ marginTop: 0 }}>בדק ומסירה</h3><p style={{ marginBottom: 0 }}>בעת מסירה תעדו ליקוי, תמונה, תאריך, אחראי ותאריך תיקון. עבודות חשמל ותשתיות יש לאשר מול בעל מקצוע מוסמך.</p></Card>
+  </div>;
 }
 function Checklist({ data, setData }) {
   const items = data.checklist || [];
