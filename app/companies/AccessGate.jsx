@@ -1,21 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAccess } from "@/lib/useAccess";
 import { canViewCompany, isCompanyReadOnly } from "@/lib/workspace";
+import { applyReadOnly } from "@/lib/readonly-dom";
 
-// בקריאה בלבד: משבית שדות קלט (גם כאלה שנוצרים אחר כך). כתיבה נחסמת גם בשכבת ה-store וב-RLS, זה רק הצד הנראה.
-function useDisableInputs(ref, on) {
-  useEffect(() => {
-    const root = ref.current;
-    if (!on || !root) return;
-    const apply = () => root.querySelectorAll("input, textarea, select").forEach(el => { el.disabled = true; });
-    apply();
-    const obs = new MutationObserver(apply);
-    obs.observe(root, { childList: true, subtree: true });
-    return () => obs.disconnect();
-  }, [ref, on]);
+// בקריאה בלבד: משבית שדות קלט וכפתורי עריכה בצורה גלויה (גם כאלה שנוצרים אחר כך). ראה lib/readonly-dom.js.
+function useReadOnlyDom(ref, on) {
+  useEffect(() => (on && ref.current ? applyReadOnly(ref.current) : undefined), [ref, on]);
 }
 
 /** עוטף דף חברה: מסתיר חברה בלי יכולת קריאה, ומסמן קריאה בלבד. חברה אישית (בריאות, נפשי) מוסתרת ממי שהוא member. */
@@ -23,7 +16,13 @@ export default function AccessGate({ slug, children }) {
   const { ready, access } = useAccess();
   const ref = useRef(null);
   const readOnly = ready && canViewCompany(access, slug) && isCompanyReadOnly(access, slug);
-  useDisableInputs(ref, readOnly);
+  useReadOnlyDom(ref, readOnly);
+  const [conflict, setConflict] = useState("");
+  useEffect(() => {
+    const onConflict = e => setConflict(e.detail?.message || "עודכן על ידי מישהו אחר. הנתונים רועננו.");
+    window.addEventListener("hq:save-conflict", onConflict);
+    return () => window.removeEventListener("hq:save-conflict", onConflict);
+  }, []);
   if (!ready) return <div style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>טוען…</div>;
   if (!canViewCompany(access, slug)) {
     return <main style={{ maxWidth: 520, margin: "80px auto", padding: 24, textAlign: "center", lineHeight: 1.7 }}>
@@ -33,7 +32,8 @@ export default function AccessGate({ slug, children }) {
     </main>;
   }
   return <div ref={ref}>
-    {readOnly && <div role="status" style={{ background: "#FFFAEB", border: "1px solid #F7D98B", color: "#7A5B00", borderRadius: 10, padding: "8px 14px", margin: "0 auto 12px", maxWidth: 760, fontSize: 14, textAlign: "center" }}>מצב צפייה בלבד: אפשר לראות, אי אפשר לערוך. שינויים לא נשמרים.</div>}
+    {conflict && <div role="alert" style={{ background: "#FEF3F2", border: "1px solid #FDA29B", color: "#B42318", borderRadius: 10, padding: "8px 14px", margin: "0 auto 12px", maxWidth: 760, fontSize: 14, textAlign: "center" }}>{conflict} <button onClick={() => setConflict("")} style={{ border: 0, background: "transparent", color: "inherit", textDecoration: "underline", cursor: "pointer" }}>הבנתי</button></div>}
+    {readOnly && <div role="status" style={{ background: "#FFFAEB", border: "1px solid #F7D98B", color: "#7A5B00", borderRadius: 10, padding: "8px 14px", margin: "0 auto 12px", maxWidth: 760, fontSize: 14, textAlign: "center" }}>מצב צפייה בלבד: אפשר לראות, אי אפשר לערוך. כפתורי העריכה מושבתים.</div>}
     {children}
   </div>;
 }

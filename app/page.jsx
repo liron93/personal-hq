@@ -52,7 +52,7 @@ export default function Page() {
 }
 
 function CEO({ access }) {
-  const isMember = access?.mode === "member";
+  const isMember = access?.mode === "member" && !access.isOwner;
   // רק חברות שמותר לראות. הרשימה יציבה בין רינדורים כדי לא לטעון שוב.
   const visibleList = useMemo(() => { const ok = new Set(visibleCompanySlugs(access, COMPANIES.map(c => c.slug))); return COMPANIES.filter(c => ok.has(c.slug)); }, [access]);
   const summaries = useSummaries(visibleList);
