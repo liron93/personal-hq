@@ -4,7 +4,7 @@
 הסקריפטים ב-`supabase/proposed/rbac/`. מזהים אמיתיים (משתמשים, מרחב) מוחלפים רק בעותק פרטי, לעולם לא בריפו או ב-Issue.
 
 ## לפני הכול (בדיקה)
-1. הרץ את המטריצה על **Supabase branch/פרויקט בדיקה** (לא production): `rbac_matrix.sql`. כל השורות ב-`results` חייבות להיות `expected = actual`.
+1. הרץ את המטריצה על **Supabase branch/פרויקט בדיקה** (לא production): `rbac_matrix.sql`. על staging ריק: ראה `STAGING.md` (בסיס סינתטי + בדיקת qual ל-career + preflight ל-anon). כל השורות ב-`results` חייבות להיות `expected = actual`.
 2. הרץ `rollout/000_preflight_checks.sql` על ה-DB החי (קריאה בלבד). בדוק: אין טבלה בלי RLS; ל-`career_jobs` ול-`career_communications` יש RLS של `user_id = auth.uid()` לכל פעולה; אין policies עם `using (true)` בטעות; ל-anon אין הרשאות; ב-Dashboard שההרשמה החופשית כבויה.
 3. ה-PR של האפליקציה (`store.js` לפי מרחב, הפרדת ה-cache המקומי לפי משתמש, הצגה לפי יכולות) חייב להיות ממוזג ובדוק **לפני** שליאור מקבלת גישה. ראה DESIGN.
 
