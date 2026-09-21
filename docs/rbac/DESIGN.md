@@ -67,6 +67,9 @@ permission_audit (כל שינוי הרשאה)
 4. **אימות לפני מסירה:** מריצים את מטריצת ה-allow/deny על branch/DB מקומי (לא על production), ואז בודקים ידנית עם החשבון האמיתי: רואה מה שצריך, לא רואה מה שלא.
 5. **ביטול:** `rollout/040_remove_member.sql` סוגר הכול מיד. הנתונים שלה לא נמחקים.
 
+## סטטוס ה-PR של האפליקציה (`asaf/workspace-aware-app`)
+סעיפים 1-3 שלמטה מטופלים בקוד (ממתין ל-review ולבדיקה על Supabase test project): `lib/workspace.js` (זיהוי מרחב ויכולות, נופל חזרה להתנהגות של היום כשהטבלאות חסרות או כשהמשתמש הוא ה-owner), `lib/store.js` (מפתחות משותפים ל-`workspace_state`, קריאה בלבד לא כותבת), `app/companies/AccessGate.jsx`, `app/CompanyNavigator.jsx`, `app/page.jsx`, `app/MemberHome.jsx`. ה-cache המקומי כבר מופרד לפי משתמש. סעיף 4 (העלאת קבצים) נפרד. כלל הצגה ל-member: חברות משותפות לפי יכולת קריאה; קריירה אישית (ריקה) רק עם `hq.view`; בריאות ונפשי אף פעם.
+
 ## מה ה-patch הזה לא עושה (ולכן הגישה עוד לא "פעילה")
 ה-DB לבדו לא נותן לליאור כלום ב-UI. האפליקציה עדיין קוראת את `company_state` לפי משתמש. לפני מסירת גישה נדרש **PR נפרד** באפליקציה:
 1. `lib/store.js`: הפניית המפתחות המשותפים (`hq:beit-hadash:v2`, `hq:kesef:v1`, `hq:core:v1`) ל-`workspace_state` לפי מרחב החבר.
