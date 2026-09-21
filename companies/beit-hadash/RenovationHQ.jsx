@@ -173,7 +173,7 @@ function Suppliers({ data, setData }) { const [editing,setEditing]=useState(null
     {off && <Card>
       <Upload size={22} color="#256B57" />
       <h3 style={{ marginBottom: 6 }}>{ws.code === "network" ? "לא הצלחנו לבדוק אם העלאת קבצים זמינה" : "העלאת קבצים עדיין לא הופעלה"}</h3>
-      <p style={{ color: "#63716A", marginTop: 0 }}>{ws.code === "network" ? "בדקו חיבור ונסו שוב." : "היא תופעל אחרי שאחסון הקבצים המשותף יאושר. עד אז לא נשמרים כאן קבצים, כדי לא להבטיח משהו שלא קורה."}</p>
+      <p style={{ color: "#63716A", marginTop: 0 }}>{ws.code === "network" ? "בדקו חיבור ונסו שוב." : messageFor(ws.code) + ". ההעלאה תופעל אחרי שאחסון הקבצים המשותף יאושר. עד אז לא נשמרים כאן קבצים, כדי לא להבטיח משהו שלא קורה."}</p>
       {ws.code === "network" && <Btn secondary onClick={() => setAttempt(n => n + 1)}>ניסיון נוסף</Btn>}
     </Card>}
     {ws.status === "ready" && <Card>
