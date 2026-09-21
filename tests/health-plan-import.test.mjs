@@ -20,24 +20,24 @@ test("reps: range or single number; invalid rejected", () => {
 
 test("weight parsing: dot or comma decimal, zero and junk rejected", () => {
   assert.equal(parseWeight("22,5"), "22.5");
-  assert.equal(parseWeight("23.75"), "23.75");
-  assert.equal(parseWeight("70"), "70");
+  assert.equal(parseWeight("12.5"), "12.5");
+  assert.equal(parseWeight("20"), "20");
   assert.equal(parseWeight("0"), null);
   assert.equal(parseWeight(""), null);
   assert.equal(parseWeight(UNSET), null);
 });
 
 test("import: single weight applies to all sets", () => {
-  const r = one("תרגיל א | 3 | 8-12 | 70");
+  const r = one("תרגיל א | 3 | 8-12 | 20");
   assert.deepEqual(r.errors, []);
-  assert.deepEqual(r.sessions.A[0], { name: "תרגיל א", sets: 3, reps: "8-12", loads: ["70", "70", "70"] });
+  assert.deepEqual(r.sessions.A[0], { name: "תרגיל א", sets: 3, reps: "8-12", loads: ["20", "20", "20"] });
 });
 
 test("import: per-set list with / including decimals and 'טרם נקבע' element", () => {
-  let r = one("תרגיל א | 3 | 8-12 | 70/70/60");
-  assert.deepEqual(r.sessions.A[0].loads, ["70", "70", "60"]);
-  r = one("תרגיל ב | 3 | 12 | 23.75/21.25/טרם נקבע");
-  assert.deepEqual(r.sessions.A[0].loads, ["23.75", "21.25", null]);
+  let r = one("תרגיל א | 3 | 8-12 | 20/20/10");
+  assert.deepEqual(r.sessions.A[0].loads, ["20", "20", "10"]);
+  r = one("תרגיל ב | 3 | 12 | 12.5/10/טרם נקבע");
+  assert.deepEqual(r.sessions.A[0].loads, ["12.5", "10", null]);
   r = one("תרגיל ג | 3 | 12 | 22,5/ /20");
   assert.deepEqual(r.sessions.A[0].loads, ["22.5", null, "20"]);
   assert.equal(r.sessions.A[0].reps, "12");
@@ -50,7 +50,7 @@ test("import: unset weight (token or missing) means all sets unset", () => {
 });
 
 test("import: weight count must equal set count, otherwise the line is reported and not loaded", () => {
-  const r = parseProgramText("A\nתרגיל א | 3 | 8-12 | 70/70\nתרגיל ב | 2 | 8 | 10/10/10\nתרגיל ג | 2 | 8 | 10/10");
+  const r = parseProgramText("A\nתרגיל א | 3 | 8-12 | 20/20\nתרגיל ב | 2 | 8 | 10/10/10\nתרגיל ג | 2 | 8 | 10/10");
   assert.equal(r.errors.length, 2);
   assert.equal(r.errors[0].line, 2);
   assert.match(r.errors[0].message, /מספר המשקלים/);
@@ -79,14 +79,14 @@ test("import: line before any header is an error; empty text yields no program",
   const r = parseProgramText("תרגיל | 3 | 8 | 10\nA\nתרגיל | 3 | 8");
   assert.equal(r.errors.length, 1);
   assert.equal(importFromText("").program, null);
-  assert.equal(importFromText("A\nתרגיל | 3 | 8 | 70/70").program, null);
+  assert.equal(importFromText("A\nתרגיל | 3 | 8 | 20/20").program, null);
 });
 
 test("importFromText builds a program with per-set loads and never overwrites anything by itself", () => {
-  const { program, errors } = importFromText("A\nתרגיל א | 3 | 8-12 | 70/70/60\nB\nתרגיל ב | 2 | 10 | טרם נקבע\nשורה שבורה | 2 | 10 | 5/5/5", "t");
+  const { program, errors } = importFromText("A\nתרגיל א | 3 | 8-12 | 20/20/10\nB\nתרגיל ב | 2 | 10 | טרם נקבע\nשורה שבורה | 2 | 10 | 5/5/5", "t");
   assert.equal(errors.length, 1);
   assert.equal(program.source, "imported");
-  assert.deepEqual(program.sessions.A[0].loads, ["70", "70", "60"]);
+  assert.deepEqual(program.sessions.A[0].loads, ["20", "20", "10"]);
   assert.deepEqual(program.sessions.B[0].loads, [null, null]);
   assert.equal(program.sessions.B.length, 1);
 });
@@ -94,7 +94,7 @@ test("importFromText builds a program with per-set loads and never overwrites an
 test("formatLoads: Hebrew text, unset never invented", () => {
   assert.equal(formatLoads([null, null]), "טרם נקבע");
   assert.equal(formatLoads([]), "טרם נקבע");
-  assert.equal(formatLoads(["70", "70", "70"]), "70 ק״ג");
-  assert.equal(formatLoads(["70", "70", "60"]), "70 / 70 / 60 ק״ג");
-  assert.equal(formatLoads(["23.75", null]), "23.75 / טרם נקבע ק״ג");
+  assert.equal(formatLoads(["20", "20", "20"]), "20 ק״ג");
+  assert.equal(formatLoads(["20", "20", "10"]), "20 / 20 / 10 ק״ג");
+  assert.equal(formatLoads(["12.5", null]), "12.5 / טרם נקבע ק״ג");
 });

@@ -20,7 +20,7 @@ export default function PlanBuilder({ onLoad, onManual, onClose, hasExisting }) 
     <div className={css.sectionHead}><h2>בניית תוכנית</h2><button className={css.linkButton} onClick={onClose}>ביטול</button></div>
     <section className={css.card + " " + css.stack}>
       <h3>הזנה או ייבוא מהיר</h3>
-      <p className={css.subtle}>כותרת לכל אימון (A, B או C), ומתחתיה שורה לכל תרגיל: <bdi dir="ltr">שם | סטים | חזרות | משקל</bdi>. חזרות: 8-12 או 12. משקל: מספר אחד לכל הסטים, או רשימה עם / באורך מספר הסטים (למשל 70/70/60). ריק או "טרם נקבע" = לא נקבע, ולא מנחשים. שורה שגויה לא נטענת. אחרי הטעינה אפשר לערוך הכול.</p>
+      <p className={css.subtle}>כותרת לכל אימון (A, B או C), ומתחתיה שורה לכל תרגיל: <bdi dir="ltr">שם | סטים | חזרות | משקל</bdi>. חזרות: 8-12 או 12. משקל: מספר אחד לכל הסטים, או רשימה עם / באורך מספר הסטים (למשל 20/20/10). ריק או "טרם נקבע" = לא נקבע, ולא מנחשים. שורה שגויה לא נטענת. אחרי הטעינה אפשר לערוך הכול.</p>
       <label className={css.pbLabel}>התוכנית<textarea className={css.field + " " + css.pbText} rows={10} dir="rtl" value={text} onChange={e => setText(e.target.value)} placeholder={EXAMPLE} /></label>
       {result && result.errors.length > 0 && <div className={css.pbErrors} role="alert"><strong>{count ? "השורות האלה לא ייטענו:" : "אי אפשר לטעון עדיין:"}</strong><ul>{result.errors.map((e, i) => <li key={i}>{e.line ? `שורה ${e.line}: ` : ""}{e.message}</li>)}</ul></div>}
       {result?.program && <p className={css.subtle}>מוכן לטעינה: {Object.keys(result.program.sessions).length} אימונים, {count} תרגילים.</p>}
