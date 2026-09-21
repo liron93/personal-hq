@@ -10,6 +10,7 @@ import Dash from "./Dash";
 import Budget from "./Budget";
 import Assets from "./Assets";
 import Watchlist from "./Watchlist";
+import MarketConnection from "./MarketConnection";
 import Flow from "./Flow";
 import "@/app/finance-control-room.css";
 
@@ -20,6 +21,7 @@ const History = dynamic(() => import("./History"), {
 });
 
 const TABS = [
+  { id: "market", l: "חיבור שוק ארה״ב" },
   { id: "dash", l: "תמונת מצב" }, { id: "flow", l: "תזרים" }, { id: "budget", l: "תקציב" }, { id: "history", l: "היסטוריה" },
   { id: "assets", l: "נכסים" }, { id: "watchlist", l: "מעקב מניות" }, { id: "tasks", l: "משימות ועדכון" },
 ];
@@ -46,6 +48,7 @@ export default function Company() {
         <div className="finance-nav-status"><i />מערכת מקומית · Demo</div>
       </aside>
       <div className="finance-console-content">
+        {tab === "market" && <MarketConnection />}
         {tab === "dash" && <Dash d={d} core={core} onOpenBudget={() => setTab("budget")} />}
         {tab === "flow" && <Flow d={d} setD={setD} core={core} />}
         {tab === "history" && <History d={d} setD={setD} />}
