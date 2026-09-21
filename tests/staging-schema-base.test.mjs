@@ -107,3 +107,22 @@ test("anon grants preflight is read-only and lists anon grants (nothing revoked)
   assert.ok(defaults.length >= 1);
   assert.equal(await count(), before);
 });
+
+test("002 down never deletes home-documents: pre-existing empty, with objects, and fresh; up-down-up still works", opts, async () => {
+  const { buildStaging, read } = await runner();
+  const down = await read("supabase/proposed/rbac/002_home_documents_storage.down.sql");
+  const up = await read("supabase/proposed/rbac/002_home_documents_storage.sql");
+  const bucketRow = "insert into storage.buckets (id, name, public) values ('home-documents', 'home-documents', false);";
+  for (const [label, pre, objects] of [["empty pre-existing", bucketRow, 0], ["pre-existing with objects", bucketRow + "insert into storage.objects (bucket_id, name) values ('home-documents', 'x/a.pdf'), ('home-documents', 'x/b.pdf');", 2], ["created by 002", "", 0]]) {
+    const db = await buildStaging(PGlite, { preSql: pre });
+    await db.exec(down);
+    assert.equal((await db.query("select count(*)::int as n from storage.buckets where id = 'home-documents'")).rows[0].n, 1, `${label}: bucket survives down`);
+    assert.equal((await db.query("select count(*)::int as n from storage.objects where bucket_id = 'home-documents'")).rows[0].n, objects, `${label}: objects untouched`);
+    assert.equal((await db.query("select count(*)::int as n from pg_policies where schemaname='storage' and policyname like 'home\\_documents\\_%'")).rows[0].n, 0);
+    assert.equal((await db.query("select count(*)::int as n from pg_proc where proname in ('try_uuid','can_access_home_document')")).rows[0].n, 0);
+    await db.exec(down); // down פעמיים בטוח
+    await db.exec(up);
+    assert.equal((await db.query("select count(*)::int as n from pg_policies where schemaname='storage' and policyname like 'home\\_documents\\_%'")).rows[0].n, 4, `${label}: up after down`);
+    assert.equal((await bucket(db))[0].public, false);
+  }
+});

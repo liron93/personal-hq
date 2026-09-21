@@ -27,6 +27,8 @@
 ## `002` ו-bucket שכבר קיים ב-production
 `home-documents` קיים שם (פרטי, בלי מגבלות). `002` הוא idempotent (`create or replace`, `drop policy if exists`, upsert ל-bucket): מקשיח במכוון ל-private + 25MB + 7 סוגי קבצים, ומדפיס `NOTICE` עם המצב הקודם, כמה אובייקטים קיימים מחוץ לרשימת הסוגים (לא נמחקים, ההגבלה חלה על העלאות חדשות), ו-`WARNING` אם יש policies אחרות על `storage.objects` שמזכירות את ה-bucket (הן מתווספות ב-OR ולכן צריך לבדוק אותן ידנית לפני הפעלה).
 
+**`002` down:** מסיר רק policies ופונקציות ולעולם לא מוחק את ה-bucket (גם ריק, גם עם אובייקטים); מחיקה ידנית נפרדת מתועדת ב-`ROLLOUT.md`.
+
 ## אימות מקומי (בלי Supabase)
 ```
 npm i --no-save @electric-sql/pglite
