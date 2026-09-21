@@ -9,18 +9,23 @@ globalThis.window = { localStorage: { getItem: k => (ls.has(k) ? ls.get(k) : nul
 
 const { loadStateWithClient, loadWithClient, saveWithClient, localKey } = await import("../lib/store.js");
 const { resolveAccess, visibleCompanySlugs, isCompanyReadOnly, isHqVisible, canViewCompany, isMissingRelation } = await import("../lib/workspace.js");
-const { capabilitiesForTemplate } = await import("../lib/authz/capabilities.js");
+const { capabilitiesForTemplate, DEFAULT_PARTNER_TEMPLATE } = await import("../lib/authz/capabilities.js");
+const { isEditControl, applyReadOnly, READONLY_TITLE } = await import("../lib/readonly-dom.js");
 
 // כל המזהים כאן בדויים.
 const WS = "ws-shared-1";
 const OWNER = "user-owner", PARTNER = "user-partner", DESIGNER = "user-designer", STRANGER = "user-stranger";
 const SLUGS = ["beit-hadash", "kesef", "health", "avoda", "nefesh"];
 
-/** מסד מזויף בזיכרון. rbac:false = הטבלאות לא קיימות (PGRST205), כמו לפני הפריסה. */
-function fakeDb({ rbac = true, members = {}, workspaceOwner = OWNER, failWorkspaces = false } = {}) {
-  const tables = { company_state: new Map(), workspace_state: new Map() };
+/** מסד מזויף בזיכרון. rbac:false = הטבלאות לא קיימות (PGRST205), כמו לפני הפריסה. hasWorkspace:false = אין עדיין מרחב משותף. */
+function fakeDb({ rbac = true, members = {}, workspaceOwner = OWNER, failWorkspaces = false, hasWorkspace = true } = {}) {
+  const tables = { company_state: new Map() };
+  const ws = new Map(); // workspace_state: "<ws>|<key>" -> { data, at }
+  let tick = 0;
   const calls = [];
   const flags = { failWorkspaces };
+  const putWs = (key, data) => ws.set(`${WS}|${key}`, { data, at: `t${++tick}` }); // כתיבה של "מישהו אחר"
+  const wsData = key => ws.get(`${WS}|${key}`)?.data;
   const client = uid => ({
     auth: { getSession: async () => ({ data: { session: uid ? { user: { id: uid } } : null } }) },
     from(table) {
@@ -34,30 +39,50 @@ function fakeDb({ rbac = true, members = {}, workspaceOwner = OWNER, failWorkspa
             async maybeSingle() {
               calls.push({ table, op: "read", f: { ...f } });
               if (table === "company_state") { const r = tables.company_state.get(`${f.user_id}|${f.company_key}`); return { data: r === undefined ? null : { data: r }, error: null }; }
-              if (table === "workspace_state") { const r = tables.workspace_state.get(`${f.workspace_id}|${f.company_key}`); return { data: r === undefined ? null : { data: r }, error: null }; }
+              if (table === "workspace_state") { const r = ws.get(`${f.workspace_id}|${f.company_key}`); return { data: r ? { data: r.data, updated_at: r.at } : null, error: null }; }
               return { data: null, error: null };
             },
             then(res, rej) {
               if (!rbac) return Promise.resolve({ data: null, error: { code: "PGRST205", message: `Could not find the table 'public.${table}' in the schema cache` } }).then(res, rej);
               if (flags.failWorkspaces) return Promise.resolve({ data: null, error: { message: "fetch failed" } }).then(res, rej);
-              if (table === "workspaces") { const m = members[uid]; return Promise.resolve({ data: m || uid === workspaceOwner ? [{ id: WS, owner_id: workspaceOwner }] : [], error: null }).then(res, rej); }
+              if (table === "workspaces") { const m = members[uid]; return Promise.resolve({ data: hasWorkspace && (m || uid === workspaceOwner) ? [{ id: WS, owner_id: workspaceOwner }] : [], error: null }).then(res, rej); }
               if (table === "member_capabilities") return Promise.resolve({ data: (members[uid]?.caps || []).map(([capability, revoked_at]) => ({ capability, revoked_at: revoked_at || null })), error: null }).then(res, rej);
               return Promise.resolve({ data: [], error: null }).then(res, rej);
             },
           };
           return q;
         },
+        insert(row) {
+          calls.push({ table, op: "write", kind: "insert", row });
+          const k = `${row.workspace_id}|${row.company_key}`;
+          const exists = ws.has(k);
+          if (!exists) ws.set(k, { data: row.data, at: `t${++tick}` });
+          return { select: () => ({ maybeSingle: async () => exists ? { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } } : { data: { updated_at: ws.get(k).at }, error: null } }) };
+        },
+        update(patch) {
+          const f = {};
+          const q = {
+            eq(c, v) { f[c] = v; return q; },
+            select: async () => {
+              calls.push({ table, op: "write", kind: "update", row: { ...patch, ...f }, f: { ...f } });
+              const r = ws.get(`${f.workspace_id}|${f.company_key}`);
+              if (!r || r.at !== f.updated_at) return { data: [], error: null };
+              r.data = patch.data; r.at = `t${++tick}`;
+              return { data: [{ updated_at: r.at }], error: null };
+            },
+          };
+          return q;
+        },
         async upsert(row, opts) {
-          calls.push({ table, op: "write", row, opts });
+          calls.push({ table, op: "write", kind: "upsert", row, opts });
           if (table === "company_state") tables.company_state.set(`${row.user_id}|${row.company_key}`, row.data);
-          else if (table === "workspace_state") tables.workspace_state.set(`${row.workspace_id}|${row.company_key}`, row.data);
           return { error: null };
         },
       };
     },
   });
   const writes = () => calls.filter(c => c.op === "write");
-  return { client, tables, calls, writes, flags };
+  return { client, tables, calls, writes, flags, putWs, wsData, ws };
 }
 const caps = name => capabilitiesForTemplate(name).map(c => [c]);
 const reset = () => ls.clear();
@@ -70,7 +95,7 @@ test("RBAC not deployed (missing relation): behaves exactly as today, per user i
   assert.equal(access.mode, "personal"); assert.equal(access.reason, "not_enabled");
   assert.deepEqual(await saveWithClient(c, KESEF, { a: 1 }), { synced: true });
   assert.deepEqual(db.tables.company_state.get(`${PARTNER}|${KESEF}`), { a: 1 });
-  assert.equal(db.tables.workspace_state.size, 0);
+  assert.equal(db.ws.size, 0);
   assert.deepEqual(await loadWithClient(db.client(PARTNER), KESEF), { a: 1 });
   assert.deepEqual(visibleCompanySlugs(access, SLUGS), SLUGS);
 });
@@ -83,74 +108,124 @@ test("isMissingRelation recognises the common not-deployed errors and nothing el
   assert.equal(isMissingRelation(null), false);
 });
 
-test("owner: unchanged, shared keys stay in company_state, fully writable, sees everything", async () => {
-  reset(); const db = fakeDb(); const c = db.client(OWNER);
+
+test("owner without a shared workspace yet: exactly as today (company_state, everything visible)", async () => {
+  reset(); const db = fakeDb({ hasWorkspace: false }); const c = db.client(OWNER);
   const access = await resolveAccess(c);
-  assert.equal(access.mode, "personal"); assert.equal(access.reason, "owner");
-  const r = await loadStateWithClient(c, KESEF);
-  assert.deepEqual([r.canRead, r.canWrite, r.shared], [true, true, false]);
+  assert.equal(access.mode, "personal"); assert.equal(access.reason, "no_workspace");
   assert.deepEqual(await saveWithClient(c, KESEF, { net: 5 }), { synced: true });
   assert.equal(db.tables.company_state.has(`${OWNER}|${KESEF}`), true);
-  assert.equal(db.tables.workspace_state.size, 0);
+  assert.equal(db.ws.size, 0);
   assert.deepEqual(visibleCompanySlugs(access, SLUGS), SLUGS);
   assert.equal(isHqVisible(access), true);
 });
 
+test("owner WITH a shared workspace uses workspace_state for shared keys (one copy), full access, personal keys unchanged", async () => {
+  reset(); const db = fakeDb(); const c = db.client(OWNER);
+  const access = await resolveAccess(c);
+  assert.deepEqual([access.mode, access.isOwner, access.reason], ["member", true, "owner"]);
+  db.putWs(KESEF, { net: 1 });
+  const r = await loadStateWithClient(c, KESEF);
+  assert.deepEqual(r, { value: { net: 1 }, canRead: true, canWrite: true, shared: true });
+  assert.deepEqual(await saveWithClient(c, KESEF, { net: 2 }), { synced: true });
+  assert.deepEqual(db.wsData(KESEF), { net: 2 });
+  assert.equal(db.tables.company_state.has(`${OWNER}|${KESEF}`), false);
+  await saveWithClient(c, HEALTH, { h: 1 });
+  assert.equal(db.writes().at(-1).table, "company_state");
+  assert.deepEqual(visibleCompanySlugs(access, SLUGS), SLUGS);
+  assert.equal(isHqVisible(access), true);
+  assert.equal(isCompanyReadOnly(access, "kesef"), false);
+});
+
+test("owner data safety: an empty workspace row is seeded from the owner's company_state (insert only), never lost", async () => {
+  reset(); const db = fakeDb(); const c = db.client(OWNER);
+  db.tables.company_state.set(`${OWNER}|${KESEF}`, { net: 42 });
+  const r = await loadStateWithClient(c, KESEF);
+  assert.deepEqual(r.value, { net: 42 });
+  assert.deepEqual(db.wsData(KESEF), { net: 42 });
+  assert.equal(db.writes().at(-1).kind, "insert"); // לא upsert: אין דריסה אפשרית
+  assert.deepEqual(db.tables.company_state.get(`${OWNER}|${KESEF}`), { net: 42 }); // המקור שלם
+});
+
+test("owner data safety: an existing workspace row is never overwritten by company_state or the local copy", async () => {
+  reset(); const db = fakeDb(); const c = db.client(OWNER);
+  db.putWs(KESEF, { net: "shared-truth" });
+  db.tables.company_state.set(`${OWNER}|${KESEF}`, { net: "old personal" });
+  ls.set(localKey(KESEF, OWNER), JSON.stringify({ net: "old local" }));
+  assert.deepEqual((await loadStateWithClient(c, KESEF)).value, { net: "shared-truth" });
+  assert.equal(db.writes().length, 0);
+});
+
+test("owner data safety: when only an old local copy exists, it seeds the workspace row", async () => {
+  reset(); const db = fakeDb(); const c = db.client(OWNER);
+  ls.set(localKey(BEIT, OWNER), JSON.stringify({ items: ["local only"] }));
+  assert.deepEqual((await loadStateWithClient(c, BEIT)).value, { items: ["local only"] });
+  assert.deepEqual(db.wsData(BEIT), { items: ["local only"] });
+});
+
+test("a member never seeds the workspace from their own company_state", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
+  db.tables.company_state.set(`${PARTNER}|${KESEF}`, { leak: "personal row must not be used" });
+  assert.equal((await loadStateWithClient(db.client(PARTNER), KESEF)).value, null);
+  assert.equal(db.ws.size, 0);
+});
+
 test("user without a workspace membership: personal space as today (nothing shared)", async () => {
-  reset(); const db = fakeDb(); const c = db.client(STRANGER);
+  reset(); const db = fakeDb({ hasWorkspace: false }); const c = db.client(STRANGER);
   const access = await resolveAccess(c);
   assert.equal(access.mode, "personal"); assert.equal(access.reason, "no_workspace");
   await saveWithClient(c, BEIT, { x: 1 });
   assert.equal(db.writes()[0].table, "company_state");
 });
 
-test("partner_full_finance (Lior): shared keys come from workspace_state, finance is read-only, no writes attempted", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
-  db.tables.workspace_state.set(`${WS}|${KESEF}`, { netWorth: 100 });
-  db.tables.workspace_state.set(`${WS}|${CORE}`, { mySalary: 1 });
-  db.tables.company_state.set(`${PARTNER}|${KESEF}`, { leak: "personal row must not be used" });
+test("Lior on B+ (default template): edits finance, transactions, and Beit Hadash; sees core read-only", async () => {
+  assert.equal(DEFAULT_PARTNER_TEMPLATE, "partner_full_finance_edit");
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps(DEFAULT_PARTNER_TEMPLATE) } } });
+  db.putWs(KESEF, { netWorth: 100 }); db.putWs(CORE, { mySalary: 1 });
   const c = db.client(PARTNER);
-
-  const k = await loadStateWithClient(c, KESEF);
-  assert.deepEqual(k, { value: { netWorth: 100 }, canRead: true, canWrite: false, shared: true });
+  assert.deepEqual(await loadStateWithClient(c, KESEF), { value: { netWorth: 100 }, canRead: true, canWrite: true, shared: true });
+  assert.deepEqual(await saveWithClient(c, KESEF, { netWorth: 200 }), { synced: true });
+  assert.deepEqual(db.wsData(KESEF), { netWorth: 200 });
+  assert.deepEqual(await saveWithClient(c, TX, { rows: [1] }), { synced: true }); // תנועות: עריכה
+  assert.deepEqual(db.wsData(TX), { rows: [1] });
+  assert.deepEqual(await saveWithClient(c, BEIT, { items: [1] }), { synced: true });
+  assert.deepEqual(db.wsData(BEIT), { items: [1] });
   const core = await loadStateWithClient(c, CORE);
-  assert.deepEqual([core.canRead, core.canWrite], [true, false]);
-  const tx = await loadStateWithClient(c, TX);
-  assert.deepEqual([tx.canRead, tx.canWrite], [true, false]); // תנועות: קריאה כן, כתיבה לא (B ולא B+)
+  assert.deepEqual([core.canRead, core.canWrite], [true, false]); // אין core.write בחבילה
+  assert.equal(db.tables.company_state.size, 0);
+  const access = await resolveAccess(c);
+  assert.equal(isCompanyReadOnly(access, "kesef"), false); // אין באנר קריאה בלבד
+  assert.equal(isCompanyReadOnly(access, "beit-hadash"), false);
+});
 
+test("partner_full_finance (B, read-only package): no writes are attempted for finance", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
+  db.putWs(KESEF, { netWorth: 100 });
+  const c = db.client(PARTNER);
+  assert.deepEqual(await loadStateWithClient(c, KESEF), { value: { netWorth: 100 }, canRead: true, canWrite: false, shared: true });
+  const tx = await loadStateWithClient(c, TX);
+  assert.deepEqual([tx.canRead, tx.canWrite], [true, false]);
   const before = db.writes().length;
   assert.deepEqual(await saveWithClient(c, KESEF, { netWorth: 999 }), { synced: false, reason: "read-only" });
   assert.deepEqual(await saveWithClient(c, TX, { rows: [] }), { synced: false, reason: "read-only" });
   assert.equal(db.writes().length, before, "no write may be attempted for a read-only capability");
-  assert.deepEqual(db.tables.workspace_state.get(`${WS}|${KESEF}`), { netWorth: 100 });
-  assert.equal(ls.has(localKey(KESEF, PARTNER)), false); // גם לא נכתב cache מקומי שקרי
+  assert.deepEqual(db.wsData(KESEF), { netWorth: 100 });
+  assert.equal(ls.has(localKey(KESEF, PARTNER)), false);
+  const access = await resolveAccess(c);
+  assert.equal(isCompanyReadOnly(access, "kesef"), true);
+  assert.equal(isCompanyReadOnly(access, "beit-hadash"), false);
 });
 
-test("partner can edit Beit Hadash (write capability) and it goes to workspace_state with the composite conflict target", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
-  const c = db.client(PARTNER);
-  assert.deepEqual(await saveWithClient(c, BEIT, { items: [1] }), { synced: true });
-  const w = db.writes().at(-1);
-  assert.equal(w.table, "workspace_state");
-  assert.deepEqual([w.row.workspace_id, w.row.company_key], [WS, BEIT]);
-  assert.equal(w.opts.onConflict, "workspace_id,company_key");
-  assert.equal(db.tables.company_state.size, 0);
-});
-
-test("partner_full_finance_edit (B+) can write finance", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
-  const c = db.client(PARTNER);
-  assert.deepEqual(await saveWithClient(c, KESEF, { v: 2 }), { synced: true });
-  assert.deepEqual(db.tables.workspace_state.get(`${WS}|${KESEF}`), { v: 2 });
-});
-
-test("designer (Shaked): only Beit Hadash; finance and core are denied with no network read and no cache", async () => {
+test("designer (Shaked): edits Beit Hadash incl. documents end to end; finance and core denied with no read and no cache", async () => {
   reset(); const db = fakeDb({ members: { [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
-  db.tables.workspace_state.set(`${WS}|${KESEF}`, { secret: 1 });
-  db.tables.workspace_state.set(`${WS}|${BEIT}`, { items: ["a"] });
+  db.putWs(KESEF, { secret: 1 }); db.putWs(BEIT, { items: ["a"], documents: [] });
   const c = db.client(DESIGNER);
   const b = await loadStateWithClient(c, BEIT);
-  assert.deepEqual(b, { value: { items: ["a"] }, canRead: true, canWrite: true, shared: true });
+  assert.deepEqual(b, { value: { items: ["a"], documents: [] }, canRead: true, canWrite: true, shared: true });
+  const doc = { id: "d1", title: "תוכנית נגרות", path: `${WS}/uuid-plan.pdf`, uploadedBy: DESIGNER };
+  assert.deepEqual(await saveWithClient(c, BEIT, { items: ["a", "b"], documents: [doc] }), { synced: true });
+  assert.deepEqual(db.wsData(BEIT).documents, [doc]); // מטא-דאטה של מסמכים נשמרת במפתח המשותף
+  assert.deepEqual(await saveWithClient(c, BEIT, { items: ["a", "b"], documents: [] }), { synced: true }); // מחיקת מסמך שהעלתה
   for (const key of [KESEF, CORE, TX]) {
     const r = await loadStateWithClient(c, key);
     assert.deepEqual([r.value, r.canRead, r.canWrite], [null, false, false], key);
@@ -161,30 +236,29 @@ test("designer (Shaked): only Beit Hadash; finance and core are denied with no n
   const access = await resolveAccess(c);
   assert.deepEqual(visibleCompanySlugs(access, SLUGS), ["beit-hadash"]);
   assert.equal(isHqVisible(access), false);
+  assert.equal(isCompanyReadOnly(access, "beit-hadash"), false);
   assert.equal(canViewCompany(access, "health"), false);
   assert.equal(canViewCompany(access, "avoda"), false);
 });
 
 test("partner sees Beit Hadash, finance and her own (empty) career; never health or wellbeing", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
   const access = await resolveAccess(db.client(PARTNER));
   assert.deepEqual(visibleCompanySlugs(access, SLUGS), ["beit-hadash", "kesef", "avoda"]);
   assert.equal(isHqVisible(access), true);
-  assert.equal(isCompanyReadOnly(access, "kesef"), true);
-  assert.equal(isCompanyReadOnly(access, "beit-hadash"), false);
   assert.equal(isCompanyReadOnly(access, "avoda"), false);
 });
 
 test("personal keys of a member (health, career) stay in company_state per user and never touch workspace_state", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
   db.tables.company_state.set(`${OWNER}|${HEALTH}`, { owner: "private" });
   const c = db.client(PARTNER);
   const r = await loadStateWithClient(c, HEALTH);
-  assert.deepEqual([r.value, r.shared, r.canWrite], [null, false, true]); // ריק: לא יורש דבר מה-owner
+  assert.deepEqual([r.value, r.shared, r.canWrite], [null, false, true]);
   await saveWithClient(c, "hq:career:v1", { mine: 1 });
   const w = db.writes().at(-1);
   assert.equal(w.table, "company_state"); assert.equal(w.row.user_id, PARTNER);
-  assert.equal(db.tables.workspace_state.size, 0);
+  assert.equal(db.ws.size, 0);
   assert.equal(db.calls.some(x => x.table === "workspace_state"), false);
 });
 
@@ -196,25 +270,25 @@ test("a revoked capability is not a grant", async () => {
 });
 
 test("shared cache is scoped by workspace and user: a second user on the same browser never sees it", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
-  db.tables.workspace_state.set(`${WS}|${BEIT}`, { items: ["shared"] });
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
+  db.putWs(BEIT, { items: ["shared"] });
   await loadWithClient(db.client(PARTNER), BEIT);
   assert.equal(ls.has(localKey(`ws:${WS}:${BEIT}`, PARTNER)), true);
-  assert.equal(ls.has(localKey(BEIT, PARTNER)), false); // לא מזהם את מפתח ה-cache האישי
-  db.tables.workspace_state.delete(`${WS}|${BEIT}`);
-  assert.equal(await loadWithClient(db.client(DESIGNER), BEIT), null); // בלי שורה בענן וללא cache שלה
+  assert.equal(ls.has(localKey(BEIT, PARTNER)), false);
+  db.ws.clear();
+  assert.equal(await loadWithClient(db.client(DESIGNER), BEIT), null);
 });
 
 test("offline: a member falls back to the local copy of the shared key", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
-  db.tables.workspace_state.set(`${WS}|${KESEF}`, { v: 1 });
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
+  db.putWs(KESEF, { v: 1 });
   const c = db.client(PARTNER);
   await loadWithClient(c, KESEF);
   const orig = c.from; c.from = t => t === "workspace_state" ? { select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => { throw new Error("offline"); } }) }) }) } : orig(t);
   assert.deepEqual(await loadWithClient(c, KESEF), { v: 1 });
 });
 
-test("uploading a local copy when the cloud row is missing happens only for a writer", async () => {
+test("a local copy is uploaded when the row is missing only for a writer, and only as an insert", async () => {
   reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
   ls.set(localKey(`ws:${WS}:${KESEF}`, PARTNER), JSON.stringify({ stale: 1 }));
   ls.set(localKey(`ws:${WS}:${BEIT}`, PARTNER), JSON.stringify({ mine: 1 }));
@@ -222,7 +296,7 @@ test("uploading a local copy when the cloud row is missing happens only for a wr
   assert.deepEqual((await loadStateWithClient(c, KESEF)).value, { stale: 1 });
   assert.equal(db.writes().length, 0, "read-only: no upload");
   await loadStateWithClient(c, BEIT);
-  assert.equal(db.writes().length, 1, "writer: uploads the local copy");
+  assert.deepEqual(db.writes().map(w => w.kind), ["insert"]);
 });
 
 test("a transient failure while resolving access is not cached, and falls back to today's behavior meanwhile", async () => {
@@ -232,14 +306,12 @@ test("a transient failure while resolving access is not cached, and falls back t
   assert.equal(a1.mode, "personal"); assert.equal(a1.reason, "unavailable");
   await saveWithClient(c, KESEF, { x: 1 });
   assert.equal(bad.writes().at(-1).table, "company_state");
-  // אותו client, הרשת חזרה: הבירור הבא לא נתקע על התשובה הזמנית
-  bad.flags.failWorkspaces = false; bad.tables.company_state.clear();
-  const a2 = await resolveAccess(c);
-  assert.equal(a2.mode, "member");
+  bad.flags.failWorkspaces = false;
+  assert.equal((await resolveAccess(c)).mode, "member");
 });
 
 test("access resolution is cached per client so each load does not re-query the workspace", async () => {
-  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance") } } });
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
   const c = db.client(PARTNER);
   await loadWithClient(c, KESEF); await loadWithClient(c, BEIT); await saveWithClient(c, BEIT, {});
   assert.equal(db.calls.filter(x => x.table === "workspaces").length, 1);
@@ -250,4 +322,81 @@ test("no session: local-only, RBAC never queried", async () => {
   assert.deepEqual(await saveWithClient(c, KESEF, { a: 1 }), { synced: false, reason: "no-session" });
   assert.deepEqual(await loadWithClient(c, KESEF), { a: 1 });
   assert.equal(db.calls.length, 0);
+});
+
+// ---------- עורכים במקביל ----------
+
+test("two editors: a stale write is rejected as a conflict and never overwrites the other editor", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
+  db.putWs(BEIT, { items: ["base"] });
+  const lior = db.client(PARTNER), shaked = db.client(DESIGNER);
+  await loadWithClient(lior, BEIT); await loadWithClient(shaked, BEIT);
+  assert.deepEqual(await saveWithClient(shaked, BEIT, { items: ["base", "shaked"] }), { synced: true });
+  const r = await saveWithClient(lior, BEIT, { items: ["base", "lior"] }); // Lior עובדת על גרסה ישנה
+  assert.deepEqual([r.synced, r.reason], [false, "conflict"]);
+  assert.ok(r.message);
+  assert.deepEqual(db.wsData(BEIT), { items: ["base", "shaked"] }, "Shaked's edit survives");
+  // אחרי טעינה מחדש (מה ש-useStore עושה על conflict) Lior רואה את העדכון וכותבת עליו
+  assert.deepEqual(await loadWithClient(lior, BEIT), { items: ["base", "shaked"] });
+  assert.deepEqual(await saveWithClient(lior, BEIT, { items: ["base", "shaked", "lior"] }), { synced: true });
+  assert.deepEqual(db.wsData(BEIT).items, ["base", "shaked", "lior"]);
+});
+
+test("two editors: creating the same missing row concurrently is a conflict, not an overwrite", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
+  const c = db.client(PARTNER);
+  assert.equal(await loadWithClient(c, KESEF), null); // אין שורה
+  db.putWs(KESEF, { by: "someone else" });             // מישהו יצר בינתיים
+  const r = await saveWithClient(c, KESEF, { by: "me" });
+  assert.equal(r.reason, "conflict");
+  assert.deepEqual(db.wsData(KESEF), { by: "someone else" });
+});
+
+test("one editor's rapid saves are serialized and never conflict with themselves", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
+  db.putWs(BEIT, { n: 0 });
+  const c = db.client(PARTNER);
+  await loadWithClient(c, BEIT);
+  const results = await Promise.all([1, 2, 3, 4].map(n => saveWithClient(c, BEIT, { n })));
+  assert.deepEqual(results.map(r => r.synced), [true, true, true, true]);
+  assert.deepEqual(db.wsData(BEIT), { n: 4 });
+});
+
+test("saving unchanged data after a load writes nothing (no needless updated_at bump that would conflict others)", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
+  db.putWs(BEIT, { n: 1 });
+  const c = db.client(PARTNER);
+  const v = await loadWithClient(c, BEIT);
+  assert.deepEqual(await saveWithClient(c, BEIT, v), { synced: true });
+  assert.equal(db.writes().length, 0);
+});
+
+test("personal keys keep last-write-wins upsert exactly as before (no conflict logic)", async () => {
+  reset(); const db = fakeDb({ hasWorkspace: false }); const c = db.client(OWNER);
+  await saveWithClient(c, KESEF, { a: 1 });
+  assert.equal(db.writes()[0].kind, "upsert");
+});
+
+// ---------- מצב קריאה בלבד ב-UI ----------
+
+const fakeEl = ({ text = "", label = "", icons = [], edit } = {}) => ({
+  textContent: text,
+  getAttribute: n => (n === "aria-label" ? label || null : n === "data-hq-edit" ? edit || null : null),
+  querySelector: sel => (icons.some(i => sel === `svg.lucide-${i}`) ? {} : null),
+});
+
+test("read-only UI: edit controls are recognised, navigation and view controls are not", () => {
+  for (const el of [fakeEl({ text: "הוסף פריט" }), fakeEl({ text: "+ תשלום שבוצע" }), fakeEl({ text: "שמירה" }), fakeEl({ label: "מחיקה" }), fakeEl({ icons: ["trash-2"] }),
+    fakeEl({ icons: ["pencil"] }), fakeEl({ icons: ["upload"] }), fakeEl({ text: "מחק" }), fakeEl({ edit: "1" })]) assert.equal(isEditControl(el), true);
+  for (const el of [fakeEl({ text: "תמונת מצב" }), fakeEl({ text: "תזרים" }), fakeEl({ label: "סגירה", icons: ["x"] }), fakeEl({ label: "פתיחת קובץ" }), fakeEl({ text: "מסמכים ובדק" })]) assert.equal(isEditControl(el), false);
+});
+
+test("applyReadOnly disables inputs and edit buttons with a clear title, leaves navigation active", () => {
+  const mk = (props, tag = "button") => { const attrs = {}; return { tag, disabled: false, style: {}, textContent: props.text || "", setAttribute: (k, v) => { attrs[k] = v; }, getAttribute: k => (k in attrs ? attrs[k] : k === "aria-label" ? props.label || null : null), querySelector: () => null, attrs }; };
+  const input = mk({}, "input"), add = mk({ text: "הוסף" }), nav = mk({ text: "תזרים" });
+  const root = { querySelectorAll: sel => (sel === "button" ? [add, nav] : [input]) };
+  const off = applyReadOnly(root, null);
+  assert.equal(input.disabled, true); assert.equal(add.disabled, true); assert.equal(nav.disabled, false);
+  assert.equal(add.attrs.title, READONLY_TITLE);
+  off();
 });

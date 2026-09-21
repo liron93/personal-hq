@@ -37,9 +37,9 @@ test("personal companies are never part of the shared workspace", () => {
   for (const caps of Object.values(authz.ROLE_TEMPLATES)) for (const c of caps) assert.equal(/health|wellbeing|career|nefesh|avoda/.test(c), false, c);
 });
 
-test("option B is the default for the partner: sees all finance incl. transactions, read only; A and B+ differ as designed", () => {
-  assert.equal(authz.DEFAULT_PARTNER_TEMPLATE, "partner_full_finance");
-  const b = authz.capabilitiesForTemplate(authz.DEFAULT_PARTNER_TEMPLATE);
+test("B+ is the default for the partner (Liron, 21.9.2026: must be able to edit); B stays read-only; A differs as designed", () => {
+  assert.equal(authz.DEFAULT_PARTNER_TEMPLATE, "partner_full_finance_edit");
+  const b = authz.capabilitiesForTemplate("partner_full_finance");
   assert.equal(authz.financeLevel(b), "full");
   assert.equal(authz.canAccessStateKey(b, "hq:kesef:v1"), true);
   assert.equal(authz.canAccessStateKey(b, "hq:kesef-transactions:v1"), true);
