@@ -3,8 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, ExternalLink, AlertTriangle, Upload, X, Pencil } from "lucide-react";
 import { useStore, cp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
-import { supabase } from "@/lib/supabase";
-import { ACCEPT_ATTR, CUSTOM_CATEGORY, DOC_CATEGORIES, createHomeDocuments, formatSize, messageFor, objectPath, validateUpload } from "@/lib/home-documents";
 import { STORE_KEY, INIT, DEFAULT_CHECKLIST, CHECKLIST_GROUPS } from "./model";
 import "./renovation-v2.css";
 
