@@ -63,18 +63,38 @@ test('guard: unconfigured/unavailable auth fails closed with generic 503', async
   assert.equal((await thrower(req(bearer('t')), { scope: 't' })).response.status, 503);
 });
 
-test('guard: allowlist off = any authenticated user; on = only listed (403 generic)', async () => {
+test('guard: deny-by-default — missing/empty API_ALLOWED_USER_IDS denies every real (non-demo) authenticated user', async () => {
+  // זה בדיוק המקרה שסקירת עמית ביקשה לכסות: allowlist חסר/ריק + משתמש production אמיתי => 403.
+  const authenticate = authOf({ a: okUser(ID_A) });
+  for (const env of [{}, { API_ALLOWED_USER_IDS: '' }, { API_ALLOWED_USER_IDS: '   ' }, { NODE_ENV: 'production' }]) {
+    const guard = createApiGuard({ authenticate, env, log: quiet });
+    const gate = await guard(req(bearer('a')), { scope: 't' });
+    assert.equal(gate.ok, false);
+    assert.equal(gate.response.status, 403);
+    assert.doesNotMatch(await gate.response.text(), new RegExp(`${ID_A}|API_ALLOWED`));
+  }
+});
+
+test('guard: allowlist set = only listed users pass; others 403 generic; invalid list denies everyone', async () => {
   const authenticate = authOf({ a: okUser(ID_A), b: okUser(ID_B) });
-  const open = createApiGuard({ authenticate, env: {}, log: quiet });
-  assert.equal((await open(req(bearer('b')), { scope: 't' })).ok, true);
   const listed = createApiGuard({ authenticate, env: { API_ALLOWED_USER_IDS: ID_A }, log: quiet });
   assert.equal((await listed(req(bearer('a')), { scope: 't' })).ok, true);
   const denied = await listed(req(bearer('b')), { scope: 't' });
   assert.equal(denied.response.status, 403);
   assert.doesNotMatch(await denied.response.text(), new RegExp(`${ID_A}|${ID_B}|API_ALLOWED`));
-  // רשימה שהוגדרה אך לא תקינה נכשלת סגור
+  // רשימה שהוגדרה אך לא תקינה (לא UUID) נכשלת סגור לכולם, כולל מי שהתכוונו לרשום
   const broken = createApiGuard({ authenticate, env: { API_ALLOWED_USER_IDS: 'garbage' }, log: quiet });
   assert.equal((await broken(req(bearer('a')), { scope: 't' })).response.status, 403);
+});
+
+test('guard: skipAllowlist lets a route rely only on its own dedicated allowlist (used by eodhd)', async () => {
+  const authenticate = authOf({ a: okUser(ID_A) });
+  // בלי skipAllowlist: נכשל למרות אין allowlist ייעודי כאן (deny-by-default גנרי)
+  const strict = createApiGuard({ authenticate, env: {}, log: quiet });
+  assert.equal((await strict(req(bearer('a')), { scope: 't' })).response.status, 403);
+  // עם skipAllowlist: הבדיקה הגנרית מדולגת (route אחראי על ההרשאה שלו בעצמו)
+  const skipped = createApiGuard({ authenticate, env: {}, log: quiet });
+  assert.equal((await skipped(req(bearer('a')), { scope: 't', skipAllowlist: true })).ok, true);
 });
 
 test('demo bypass: only outside production AND with explicit flag; never with a bad token', async () => {
@@ -96,7 +116,7 @@ test('demo bypass: only outside production AND with explicit flag; never with a 
 test('guard: per-user rate limit 429 with Retry-After, isolated per user', async () => {
   let t = 0;
   const limiter = createRateLimiter({ now: () => t });
-  const guard = createApiGuard({ authenticate: authOf({ a: okUser(ID_A), b: okUser(ID_B) }), env: {}, limiter, log: quiet });
+  const guard = createApiGuard({ authenticate: authOf({ a: okUser(ID_A), b: okUser(ID_B) }), env: { API_ALLOWED_USER_IDS: `${ID_A},${ID_B}` }, limiter, log: quiet });
   const opt = { scope: 's', limit: 2, windowMs: 1000 };
   assert.equal((await guard(req(bearer('a')), opt)).ok, true);
   assert.equal((await guard(req(bearer('a')), opt)).ok, true);

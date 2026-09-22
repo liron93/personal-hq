@@ -7,7 +7,11 @@
 
 1. הלקוח שולח `Authorization: Bearer <access token של סשן Supabase>` (`lib/api-client.mjs`).
 2. השרת מאמת את הטוקן מול Supabase Auth (`auth.getUser`, לא פענוח מקומי בלבד). משתמש אנונימי נדחה.
-3. הרשאה: כל משתמש מאומת מותר, **אלא אם** הוגדר `API_ALLOWED_USER_IDS` (מזהי משתמש UUID מופרדים בפסיקים), ואז רק הם. רשימה שהוגדרה אך אינה תקינה נכשלת סגור (הכול 403).
+3. הרשאה: **deny-by-default**. משתמש אמיתי (לא דמו) מורשה רק אם מזהה שלו מופיע ב-`API_ALLOWED_USER_IDS`
+   (מזהי משתמש UUID מופרדים בפסיקים). `API_ALLOWED_USER_IDS` חסר, ריק או לא תקין = **אף משתמש אמיתי לא
+   מורשה** (403 לכולם) — לא "כל משתמש מאומת מותר". חובה להגדיר את המשתנה כדי שמישהו יוכל להשתמש ב-JARVIS
+   או בציטוטים. `/api/market/eodhd` יוצא מהכלל הזה: יש לו רשימת הרשאה ייעודית משלו,
+   `EODHD_ALLOWED_USER_IDS`, שגם היא fail-closed בפני עצמה, ואינה תלויה ב-`API_ALLOWED_USER_IDS`.
 4. הגבלת קצב לכל משתמש ולכל route (חלון של דקה).
 5. רק אחרי כל אלה: קריאת גוף (עם תקרת גודל), ולידציה, מפתחות צד שלישי ופנייה לספק, עם timeout.
 
@@ -17,10 +21,10 @@
 
 | Route | שיטה | דרישות | קצב לדקה | תקרת גוף |
 |---|---|---|---|---|
-| `/api/jarvis` | POST | משתמש מאומת ומורשה, `GEMINI_API_KEY` | 12 | 32KB |
+| `/api/jarvis` | POST | משתמש מאומת ובתוך `API_ALLOWED_USER_IDS` (deny-by-default אם חסר/ריק), `GEMINI_API_KEY` | 12 | 32KB |
 | `/api/jarvis/chat` | POST | כנ"ל | 20 | 64KB |
-| `/api/quote` | GET | משתמש מאומת ומורשה, `FINNHUB_API_KEY` (חסר = 503 גנרי) | 40 | ללא גוף |
-| `/api/market/eodhd` | GET/POST/PUT/DELETE | משתמש מאומת ומורשה **וגם** ב-`EODHD_ALLOWED_USER_IDS` (נכשל סגור), `EODHD_COOKIE_SECRET` | 30 | 1KB |
+| `/api/quote` | GET | כנ"ל, `FINNHUB_API_KEY` (חסר = 503 גנרי) | 40 | ללא גוף |
+| `/api/market/eodhd` | GET/POST/PUT/DELETE | משתמש מאומת ובתוך `EODHD_ALLOWED_USER_IDS` (נכשל סגור; **לא** תלוי ב-`API_ALLOWED_USER_IDS`), `EODHD_COOKIE_SECRET` | 30 | 1KB |
 
 מגבלות קלט JARVIS: הודעה עד 2000 תווים, עד 12 הודעות אחרונות נשלחות (עד 50 מתקבלות), הקשר עד 24KB (בתדריך: כל חלק עד 6KB). הודעה אחרונה חייבת להיות של המשתמש.
 timeouts: Gemini 9 שניות לניסיון (נשמר ניסיון חוזר אחד על 503/שגיאת רשת), Finnhub 8 שניות. מפתח Finnhub נשלח בכותרת ולא ב-URL.
@@ -28,7 +32,7 @@ timeouts: Gemini 9 שניות לניסיון (נשמר ניסיון חוזר א�
 ## משתני סביבה (שמות בלבד, בשרת בלבד)
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`: נדרשים לאימות. בלעדיהם ה-routes מחזירים 503 (נכשל סגור).
-- `API_ALLOWED_USER_IDS`: רשימת היתר אופציונלית לכל ה-routes. **מומלץ מאוד להגדיר בפרודקשן**; ערכים מ-Supabase, Authentication, Users, ולא ב-repo.
+- `API_ALLOWED_USER_IDS`: רשימת ההיתר ל-JARVIS ולציטוטים (`/api/quote`, `/api/jarvis`, `/api/jarvis/chat`). **חובה להגדיר** — בלעדיה אף משתמש אמיתי (deny-by-default) לא מורשה, גם אם מחובר כדין; ערכים מ-Supabase, Authentication, Users, ולא ב-repo. אינה חלה על `/api/market/eodhd`, שיש לו רשימה נפרדת.
 - `EODHD_ALLOWED_USER_IDS`, `EODHD_COOKIE_SECRET`: כמתועד ב-`docs/eodhd-connection.md`.
 - `GEMINI_API_KEY`, `FINNHUB_API_KEY`.
 - `ALLOW_DEMO_API`: פיתוח מקומי בלבד, ראה בהמשך. לא להגדיר ב-Vercel.
