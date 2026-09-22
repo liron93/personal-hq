@@ -1,6 +1,10 @@
 import { uid } from "@/lib/format";
+import { createGroceryState, ensureGroceryState } from "./grocery-model";
 
 export const STORE_KEY = "hq:kesef:v1";
+
+// תאימות אחורה: מוסיף שדה grocery תקין לנתוני חברה ישנים ששמורים בענן/מקומית בלי הפיצ'ר הזה.
+export const ensureGrocery = ensureGroceryState;
 
 // ששת האפיקים שמרכיבים את השווי הנקי — מפתח + תווית בעברית, בשימוש ב-Dash וב-Assets
 export const ASSET_KEYS = [
@@ -126,6 +130,9 @@ export const INIT = {
   history: [], // צילומי שווי נקי חודשיים: { id, month:"YYYY-MM", assets:{...}, total }
   watchlist: [], // מעקב מניות: פריטים מ-newWatchItem
   usdIls: DEFAULT_USD_ILS, // שער המרה קבוע USD→₪, ניתן לעריכה בטאב מעקב מניות
+  // "סופר": רשימת קניות משותפת + היסטוריית רכישות. חי כאן (לא כמפתח נפרד) כדי לרשת את אותה
+  // יכולת שיתוף/עריכה (finance.dashboard_budget.read/write) שכבר יש ל-hq:kesef:v1 כולו — ראה companies/kesef/grocery-model.js.
+  grocery: createGroceryState(),
 };
 
 // מה תת-החברה מדווחת למנכ"ל — מעט, קבוע, ומספיק כדי לכוון תשומת לב
