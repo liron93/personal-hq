@@ -225,12 +225,14 @@ function Checklist({ data, setData }) {
   const categories = data.checklistCategories || [];
   const [text, setText] = useState(""); const [group, setGroup] = useState("");
   const [newCategory, setNewCategory] = useState(""); const [categoryError, setCategoryError] = useState("");
+  const [open, setOpen] = useState(null); // id של המשימה שפתוחה כרגע לפירוט, אחת בכל פעם
+  const [subtaskText, setSubtaskText] = useState("");
   const activeGroup = categories.includes(group) ? group : categories[0] || "";
   const done = items.filter(i => i.done).length;
   const pct = items.length ? Math.round((done / items.length) * 100) : 0;
-  const add = e => { e.preventDefault(); const t = text.trim(); if (!t || !activeGroup) return; setState(setData, d => ({ checklist: [...(d.checklist || []), { id: crypto.randomUUID(), text: t, group: activeGroup, done: false }] })); setText(""); };
+  const add = e => { e.preventDefault(); const t = text.trim(); if (!t || !activeGroup) return; setState(setData, d => ({ checklist: [...(d.checklist || []), { id: crypto.randomUUID(), text: t, group: activeGroup, done: false, note: "", subtasks: [] }] })); setText(""); };
   const toggle = id => setState(setData, d => ({ checklist: d.checklist.map(i => i.id === id ? { ...i, done: !i.done } : i) }));
-  const remove = id => setState(setData, d => ({ checklist: d.checklist.filter(i => i.id !== id) }));
+  const remove = id => { setState(setData, d => ({ checklist: d.checklist.filter(i => i.id !== id) })); if (open === id) setOpen(null); };
   const addCategory = e => {
     e.preventDefault(); const name = newCategory.trim();
     if (!name) return;
@@ -239,6 +241,11 @@ function Checklist({ data, setData }) {
     setState(setData, d => ({ checklistCategories: [...d.checklistCategories, name] })); setNewCategory(""); setCategoryError(""); setGroup(name);
   };
   const removeCategory = name => setState(setData, d => ({ checklistCategories: d.checklistCategories.filter(c => c !== name) }));
+  // פירוט משימה: הערה חופשית ותת-משימות. שדות אופציונליים כדי שמשימות ישנות ימשיכו לעבוד בלי שינוי.
+  const setNote = (id, note) => setState(setData, d => ({ checklist: d.checklist.map(i => i.id === id ? { ...i, note } : i) }));
+  const addSubtask = (id, subtext) => { const t = subtext.trim(); if (!t) return; setState(setData, d => ({ checklist: d.checklist.map(i => i.id === id ? { ...i, subtasks: [...(i.subtasks || []), { id: crypto.randomUUID(), text: t, done: false }] } : i) })); setSubtaskText(""); };
+  const toggleSubtask = (id, subId) => setState(setData, d => ({ checklist: d.checklist.map(i => i.id === id ? { ...i, subtasks: (i.subtasks || []).map(s => s.id === subId ? { ...s, done: !s.done } : s) } : i) }));
+  const removeSubtask = (id, subId) => setState(setData, d => ({ checklist: d.checklist.map(i => i.id === id ? { ...i, subtasks: (i.subtasks || []).filter(s => s.id !== subId) } : i) }));
   const orphans = items.filter(i => !categories.includes(i.group));
   const sections = [...categories.map(c => [c, items.filter(i => i.group === c)]), ...(orphans.length ? [["ללא קטגוריה", orphans]] : [])];
   return <div style={{ display: "grid", gap: 12 }}>
@@ -257,10 +264,31 @@ function Checklist({ data, setData }) {
     </Card>
     {sections.map(([g, rows]) => rows.length ? <Card key={g}>
       <h3 style={{ marginTop: 0 }}>{g} <span style={{ color: "#63716A", fontWeight: 400, fontSize: 14 }}>({rows.filter(i => i.done).length}/{rows.length})</span></h3>
-      {rows.map(i => <div key={i.id} style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44, borderBottom: "1px solid #E5EAE6" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minHeight: 44, cursor: "pointer" }}><input type="checkbox" checked={!!i.done} onChange={() => toggle(i.id)} style={{ width: 20, height: 20, accentColor: "#238a67" }} /><span style={{ textDecoration: i.done ? "line-through" : "none", color: i.done ? "#63716A" : "inherit" }}>{i.text}</span></label>
-        <button type="button" onClick={() => remove(i.id)} aria-label={`מחיקת ${i.text}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Trash2 size={17} /></button>
-      </div>)}
+      {rows.map(i => { const subtasks = i.subtasks || []; const subDone = subtasks.filter(s => s.done).length; const isOpen = open === i.id; return <div key={i.id} style={{ borderBottom: "1px solid #E5EAE6" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44, cursor: "pointer" }}><input type="checkbox" checked={!!i.done} onChange={() => toggle(i.id)} aria-label={`סימון ${i.text} כהושלם`} style={{ width: 20, height: 20, accentColor: "#238a67" }} /></label>
+          <button type="button" onClick={() => setOpen(isOpen ? null : i.id)} aria-expanded={isOpen} style={{ flex: 1, minWidth: 0, textAlign: "start", border: 0, background: "transparent", font: "inherit", cursor: "pointer", padding: "10px 0", display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ textDecoration: i.done ? "line-through" : "none", color: i.done ? "#63716A" : "inherit", overflowWrap: "anywhere" }}>{i.text}</span>
+            {(i.note || subtasks.length > 0) && <span style={{ color: "#63716A", fontSize: 13, flexShrink: 0 }}>{subtasks.length > 0 ? `· ${subDone}/${subtasks.length}` : "· פירוט"}</span>}
+            <ChevronDown size={16} style={{ flexShrink: 0, marginInlineStart: "auto", transform: isOpen ? "rotate(180deg)" : "none", color: "#63716A" }} />
+          </button>
+          <button type="button" onClick={() => remove(i.id)} aria-label={`מחיקת ${i.text}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Trash2 size={17} /></button>
+        </div>
+        {isOpen && <div style={{ padding: "0 4px 14px 4px", display: "grid", gap: 10 }}>
+          <Field label="הערה"><textarea value={i.note || ""} onChange={e => setNote(i.id, e.target.value)} placeholder="פרטים נוספים על המשימה" style={{ ...input, minHeight: 60, paddingTop: 8 }} /></Field>
+          <div>
+            <strong style={{ fontSize: 14 }}>תת-משימות{subtasks.length > 0 ? ` (${subDone}/${subtasks.length})` : ""}</strong>
+            {subtasks.map(s => <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 40 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, minHeight: 40, cursor: "pointer" }}><input type="checkbox" checked={!!s.done} onChange={() => toggleSubtask(i.id, s.id)} aria-label={`סימון ${s.text} כהושלם`} style={{ width: 18, height: 18, accentColor: "#238a67", flexShrink: 0 }} /><span style={{ textDecoration: s.done ? "line-through" : "none", color: s.done ? "#63716A" : "inherit", overflowWrap: "anywhere" }}>{s.text}</span></label>
+              <button type="button" onClick={() => removeSubtask(i.id, s.id)} aria-label={`מחיקת ${s.text}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 36, minHeight: 36, cursor: "pointer" }}><X size={15} /></button>
+            </div>)}
+            <form onSubmit={e => { e.preventDefault(); addSubtask(i.id, subtaskText); }} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 8, marginTop: 8 }}>
+              <input value={isOpen ? subtaskText : ""} onChange={e => setSubtaskText(e.target.value)} placeholder="הוספת תת-משימה" aria-label={`תת-משימה חדשה עבור ${i.text}`} style={input} />
+              <Btn secondary><Plus size={16} />הוסף</Btn>
+            </form>
+          </div>
+        </div>}
+      </div>; })}
     </Card> : null)}
     {!items.length && <Card><p style={{ margin: 0, color: "#63716A" }}>הצ'ק ליסט ריק. אפשר להוסיף משימה למעלה.</p></Card>}
     <Card>
