@@ -7,8 +7,11 @@
 --   designer_beit_hadash  = מעצבת: בית חדש בלבד (וקבצי בית חדש), בלי HQ ובלי כספים
 -- שדרוג/הורדה: approve מוסיף יכולות ולא מסיר. להורדה: קודם 040_remove_member ואז approve מחדש (מדויק לחבילה).
 -- אחרי ההרצה: לבדוק allow/deny עם תבנית הבדיקה ב-docs/rbac/ROLLOUT.md.
+-- מריצים כ-postgres/service_role (ברירת המחדל ב-SQL Editor), בלי לעבור ל-role authenticated: אחרי
+-- הנעילה של Issue #7 (001_rbac_foundation.sql / 001b_rbac_rpc_lockdown.sql) לתפקיד authenticated
+-- אין יותר EXECUTE על rbac_approve_member -- זו בדיוק הכוונה (לא RPC ללקוח). ה-set_config עדיין קובע
+-- מי ה-owner לצורך auth.uid() בתוך הפונקציה; זה לא תלוי ב-role.
 begin;
 select set_config('request.jwt.claim.sub', '<OWNER_USER_UUID>', true);
-set local role authenticated;
 select public.rbac_approve_member('<WORKSPACE_ID>'::uuid, '<MEMBER_USER_UUID>'::uuid, '<TEMPLATE>');
 commit;
