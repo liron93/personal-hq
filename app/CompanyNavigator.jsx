@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, BriefcaseBusiness, Dumbbell, HeartPulse, Home, LayoutDashboard, WalletCards } from "lucide-react";
+import { Building2, BriefcaseBusiness, Dumbbell, HeartPulse, Home, LayoutDashboard, ShoppingBasket, WalletCards } from "lucide-react";
 import styles from "./company-navigator.module.css";
 
 const destinations = [
@@ -12,6 +12,10 @@ const destinations = [
   { href: "/companies/avoda", label: "קריירה", Icon: BriefcaseBusiness },
   { href: "/companies/health", label: "בריאות", Icon: Dumbbell },
   { href: "/companies/nefesh", label: "רווחה", Icon: HeartPulse },
+  // הרשימה כאן עדיין לא מסוננת לפי יכולות (לא רק עבור החברה הזו — כך גם שאר החברות היום,
+  // לפני ש-#79/lib/workspace.js פעיל). כשזה יינתן: לסנן גם יעד זה לפי company.household.read
+  // (partner_household), בדיוק כמו visibleCompanySlugs לשאר החברות המשותפות.
+  { href: "/companies/household", label: "משק בית", Icon: ShoppingBasket },
 ];
 
 export default function CompanyNavigator() {
