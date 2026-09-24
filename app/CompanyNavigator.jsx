@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, BriefcaseBusiness, Dumbbell, HeartPulse, Home, LayoutDashboard, WalletCards } from "lucide-react";
+import { Building2, BriefcaseBusiness, Dumbbell, HeartPulse, Home, LayoutDashboard, ShoppingBasket, WalletCards } from "lucide-react";
 import { useAccess } from "@/lib/useAccess";
 import { isHqVisible, visibleCompanySlugs } from "@/lib/workspace";
 import styles from "./company-navigator.module.css";
@@ -14,6 +14,9 @@ const destinations = [
   { href: "/companies/avoda", label: "קריירה", Icon: BriefcaseBusiness },
   { href: "/companies/health", label: "בריאות", Icon: Dumbbell },
   { href: "/companies/nefesh", label: "רווחה", Icon: HeartPulse },
+  // "משק בית" עובר דרך אותו visibleCompanySlugs כמו שאר החברות המשותפות (SHARED_COMPANY_READ_CAPABILITY.household
+  // ב-lib/authz/capabilities.js → company.household.read, partner_household). שקד לא מקבלת יכולת זו, ולכן לא רואה יעד זה.
+  { href: "/companies/household", label: "משק בית", Icon: ShoppingBasket },
 ];
 
 const slugOf = href => href.split("/")[2];
