@@ -4,7 +4,7 @@
 הסקריפטים ב-`supabase/proposed/rbac/`. מזהים אמיתיים (משתמשים, מרחב) מוחלפים רק בעותק פרטי, לעולם לא בריפו או ב-Issue.
 
 ## לפני הכול (בדיקה)
-1. הרץ את המטריצה על **Supabase branch/פרויקט בדיקה** (לא production): `rbac_matrix.sql`. כל השורות ב-`results` חייבות להיות `expected = actual`.
+1. הרץ את המטריצה על **Supabase branch/פרויקט בדיקה** (לא production): `rbac_matrix.sql`. על staging ריק: ראה `STAGING.md` (בסיס סינתטי + בדיקת qual ל-career + preflight ל-anon). כל השורות ב-`results` חייבות להיות `expected = actual`.
 2. הרץ `rollout/000_preflight_checks.sql` על ה-DB החי (קריאה בלבד). בדוק: אין טבלה בלי RLS; ל-`career_jobs` ול-`career_communications` יש RLS של `user_id = auth.uid()` לכל פעולה; אין policies עם `using (true)` בטעות; ל-anon אין הרשאות; ב-Dashboard שההרשמה החופשית כבויה.
 3. ה-PR של האפליקציה (`store.js` לפי מרחב, הפרדת ה-cache המקומי לפי משתמש, הצגה לפי יכולות) חייב להיות ממוזג ובדוק **לפני** שליאור מקבלת גישה. ראה DESIGN.
 
@@ -33,7 +33,7 @@
 ## החזרה מיידית (חירום)
 1. **לסגור גישה למשתמש:** `rollout/040_remove_member.sql`. פועל מיד (נבדק). הנתונים שלו לא נמחקים.
 2. **לבטל את ההעתקה:** `rollout/090_revert_copy.sql`. המקור ב-`company_state` שלם, והאפליקציה חוזרת לקרוא ממנו.
-3. **להסיר את כל המנגנון:** `002_..down.sql` ואז `001_..down.sql` (סדר חשוב). לא נוגעים ב-`company_state`, ב-`career_*` או ב-`career-documents`. אם כבר הועלו קבצים ל-`home-documents`, ה-bucket לא יימחק אוטומטית (Supabase לא מאפשר). מייצאים/מוחקים אותם קודם ב-Dashboard. מעגל up, down, up נבדק.
+3. **להסיר את כל המנגנון:** `002_..down.sql` ואז `001_..down.sql` (סדר חשוב). לא נוגעים ב-`company_state`, ב-`career_*` או ב-`career-documents`. `002_..down.sql` **לעולם לא מוחק את ה-bucket `home-documents`** (הוא היה קיים ב-production לפני 002 ואולי מכיל קבצים); הוא מסיר רק policies ופונקציות, וה-bucket נשאר פרטי עם המגבלות. אם באמת רוצים למחוק אותו: ניקוי ידני נפרד, אחרי ייצוא הקבצים, ב-Dashboard > Storage (מוחקים קבצים ואז Delete bucket). מעגל up, down, up נבדק.
 
 ## מה נשאר בעדיפות אחרי המסירה
 מחזור בדיקות על Supabase branch, סקירה של `permission_audit`, והחלטה אם לפצל את `hq:kesef:v1` כך שנכסים/מעקב מניות לא יחשפו בחבילה A.

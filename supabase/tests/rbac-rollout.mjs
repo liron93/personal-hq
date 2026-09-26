@@ -68,7 +68,7 @@ export async function runRolloutChecks(PGlite) {
   await db.exec(down2); await db.exec(down1);
   check("down removes every RBAC table and function", await count(`select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname in ('workspaces','workspace_state','workspace_members','member_capabilities','capabilities','role_templates','company_capability_map','permission_audit')`) === 0
     && await count(`select count(*)::int n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and (p.proname like 'rbac\\_%' or p.proname in ('has_capability','is_workspace_owner','is_workspace_member','can_access_state','can_access_home_document','try_uuid'))`) === 0);
-  check("down removes the home-documents bucket and policies", await count(`select count(*)::int n from storage.buckets where id='home-documents'`) === 0
+  check("down removes the home-documents policies but never the bucket", await count(`select count(*)::int n from storage.buckets where id='home-documents'`) === 1
     && await count(`select count(*)::int n from pg_policies where schemaname='storage' and policyname like 'home\\_documents%'`) === 0);
   check("down leaves personal data and career-documents policies intact", await count(`select count(*)::int n from public.company_state`) === 6
     && await count(`select count(*)::int n from pg_policies where schemaname='storage' and policyname like 'career\\_documents%'`) === 4);
