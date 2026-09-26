@@ -3,6 +3,9 @@ export const STORE_KEY = "hq:beit-hadash:v2";
 // קטגוריות ברירת מחדל של הצ'ק ליסט (אחרי זה המשתמש מנהל אותן בעצמו).
 export const CHECKLIST_GROUPS = ["בקבלת המפתח", "לפני הכניסה", "אחרי הכניסה"];
 
+// קטגוריות ברירת מחדל של ההשראות (אחרי זה המשתמש מנהל אותן בעצמו, כמו קטגוריות הצ'ק ליסט).
+export const INSPIRATION_GROUPS = ["מטבח", "סלון", "חדרי שינה", "חדרי רחצה", "חוץ וגינה", "כללי"];
+
 // רשימת התחלה כללית למעבר לדירה חדשה — מזהים קבועים (לא אקראיים), כדי שלא ישתנו בין רינדורים לפני השמירה הראשונה. אפשר למחוק ולהוסיף חופשי.
 export const DEFAULT_CHECKLIST = [
   ["בדק בית מקצועי ורישום ליקויים", 0], ["קריאת מונים (מים, חשמל, גז) וצילום", 0], ["קבלת כל המפתחות, השלטים והשלט־רחוק", 0],
@@ -26,7 +29,8 @@ export const INIT = {
   documents: [],
   checklist: DEFAULT_CHECKLIST,
   checklistCategories: CHECKLIST_GROUPS, // קטגוריות הצ'ק ליסט; המשתמש מוסיף/מוחק (רק ריקות)
-  inspirations: [], // { id, title, description, link }
+  inspirations: [], // { id, title, description, link, category }
+  inspirationCategories: INSPIRATION_GROUPS, // קטגוריות ההשראות; המשתמש מוסיף/מוחק (רק ריקות)
 };
 
 // פירוט של רכישה: שורות (דגם, כמות, מחיר, קישור). שורה שנפסלה לא נספרת. רכישה בלי שורות ממשיכה לעבוד כמו קודם.
