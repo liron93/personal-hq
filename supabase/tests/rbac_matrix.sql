@@ -41,14 +41,38 @@ begin
   return res;
 end $$;
 
--- מריץ פקודת setup כמשתמש (בלי ביטול). נכשל בקול אם נדחתה.
+-- מריץ פקודת ניהול (rbac_*) "כמו ב-SQL Editor" (בלי ביטול): קובע רק את ה-JWT claim, לצורך auth.uid()
+-- בתוך הפונקציה, ולא עובר ל-role authenticated -- אחרי הנעילה (Issue #7) לתפקיד הזה כבר אין EXECUTE
+-- על פונקציות הניהול, בדיוק כמו rollout/030_approve_member.sql ו-rollout/040_remove_member.sql בפועל.
+-- נכשל בקול אם נדחתה.
 create function pg_temp.do_as(u uuid, stmt text) returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claim.sub', u::text, true);
-  execute 'set local role authenticated';
   execute stmt;
-  execute 'reset role';
   perform set_config('request.jwt.claim.sub', '', true);
+end $$;
+
+-- כמו run_as, אבל בלי לעבור ל-role authenticated: מדמה קריאה ל-rbac_* ישירות ב-SQL Editor/service_role
+-- (owner, לא דרך ה-Data API). משמש רק כדי לבדוק את הלוגיקה הפנימית של פונקציות הניהול אחרי שהן ננעלו
+-- מול authenticated -- ראו הבדיקות "manage: owner ..." למטה, וגם "privilege:" ליד ה-revoke עצמו.
+create function pg_temp.call_as_owner(u uuid, stmt text, kind text default 'call') returns text
+language plpgsql as $$
+declare res text := 'denied'; n bigint; v text;
+begin
+  begin
+    perform set_config('request.jwt.claim.sub', coalesce(u::text, ''), true);
+    if kind = 'rows' then execute stmt; get diagnostics n = row_count; res := case when n > 0 then 'allowed' else 'denied' end;
+    elsif kind = 'value' then execute stmt into v; res := coalesce(v, 'null');
+    else execute stmt; res := 'allowed'; end if;
+    raise exception 'undo' using errcode = 'P9001';
+  exception
+    when sqlstate 'P9001' then null;
+    when insufficient_privilege then res := 'denied';
+    when unique_violation then res := 'allowed';
+    when others then res := 'error:' || sqlstate;
+  end;
+  perform set_config('request.jwt.claim.sub', '', true);
+  return res;
 end $$;
 
 create function pg_temp.expect(n text, e text, a text) returns void language sql as $$ insert into results values (n, e, a) $$;
@@ -173,16 +197,59 @@ select pg_temp.expect('manage: ' || who || ' ' || fn, 'denied',
     when 'revoke' then format($q$select public.rbac_revoke(%L, %L, 'hq.view')$q$, pg_temp.home_ws(), pg_temp.designer_id())
     else format($q$select public.rbac_remove_member(%L, %L)$q$, pg_temp.home_ws(), pg_temp.designer_id()) end, 'call'))
 from (values ('partner'), ('designer'), ('stranger')) a(who) cross join (values ('grant'), ('revoke'), ('remove_member')) f(fn);
+-- הבדיקות הבאות (unknown template / catalog FK / non-member / self-approve / owner-on-own-other-ws)
+-- בודקות את הלוגיקה הפנימית של פונקציות הניהול, לא את שכבת ה-EXECUTE -- ולכן רצות דרך call_as_owner
+-- (כמו SQL Editor/service_role), לא דרך run_as (role authenticated). מאז הנעילה (Issue #7), run_as
+-- על הפונקציות האלה תמיד יחזיר 'denied' עוד לפני שהלוגיקה הפנימית מורצת בכלל -- זה כבר מכוסה למעלה
+-- ובבדיקות ה-"rpc lockdown:" למטה.
 select pg_temp.expect('manage: owner approve unknown template', 'error:22023',
-  pg_temp.run_as(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'nope')$q$, pg_temp.home_ws(), pg_temp.stranger_id()), 'call'));
+  pg_temp.call_as_owner(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'nope')$q$, pg_temp.home_ws(), pg_temp.stranger_id())));
 select pg_temp.expect('manage: owner cannot grant a capability outside the catalog', 'error:23503',
-  pg_temp.run_as(pg_temp.owner_id(), format($q$select public.rbac_grant(%L, %L, 'finance.everything')$q$, pg_temp.home_ws(), pg_temp.partner_id()), 'call'));
+  pg_temp.call_as_owner(pg_temp.owner_id(), format($q$select public.rbac_grant(%L, %L, 'finance.everything')$q$, pg_temp.home_ws(), pg_temp.partner_id())));
 select pg_temp.expect('manage: owner cannot grant to a non-member', 'error:22023',
-  pg_temp.run_as(pg_temp.owner_id(), format($q$select public.rbac_grant(%L, %L, 'hq.view')$q$, pg_temp.home_ws(), pg_temp.stranger_id()), 'call'));
+  pg_temp.call_as_owner(pg_temp.owner_id(), format($q$select public.rbac_grant(%L, %L, 'hq.view')$q$, pg_temp.home_ws(), pg_temp.stranger_id())));
 select pg_temp.expect('manage: owner cannot approve themself', 'error:22023',
-  pg_temp.run_as(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'partner_budget_view')$q$, pg_temp.home_ws(), pg_temp.owner_id()), 'call'));
+  pg_temp.call_as_owner(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'partner_budget_view')$q$, pg_temp.home_ws(), pg_temp.owner_id())));
 select pg_temp.expect('manage: workspace owner can manage their own workspace (stranger on other)', 'allowed',
-  pg_temp.run_as(pg_temp.stranger_id(), format($q$select public.rbac_approve_member(%L, %L, 'designer_beit_hadash')$q$, pg_temp.other_ws(), pg_temp.designer_id()), 'call'));
+  pg_temp.call_as_owner(pg_temp.stranger_id(), format($q$select public.rbac_approve_member(%L, %L, 'designer_beit_hadash')$q$, pg_temp.other_ws(), pg_temp.designer_id())));
+
+-- ---------- Issue #7: משטח ה-RPC ננעל. authenticated (כולל ה-owner עצמו!) לא יכול לקרוא לפונקציות
+-- הניהול ולפונקציות העזר הפנימיות דרך ה-Data API בכלל -- לא משנה מי, ולא משנה מה היה קורה בתוך
+-- הפונקציה. רק SQL Editor/service_role (call_as_owner למעלה) יכולים. ----------
+select pg_temp.expect('rpc lockdown: ' || who || ' cannot call ' || fn || ' via the Data API (authenticated)', 'denied',
+  pg_temp.run_as(pg_temp.who(who), case fn
+    when 'rbac_approve_member' then format($q$select public.rbac_approve_member(%L, %L, 'partner_budget_view')$q$, pg_temp.home_ws(), pg_temp.stranger_id())
+    when 'rbac_grant' then format($q$select public.rbac_grant(%L, %L, 'hq.view')$q$, pg_temp.home_ws(), pg_temp.partner_id())
+    when 'rbac_revoke' then format($q$select public.rbac_revoke(%L, %L, 'hq.view')$q$, pg_temp.home_ws(), pg_temp.partner_id())
+    else format($q$select public.rbac_remove_member(%L, %L)$q$, pg_temp.home_ws(), pg_temp.partner_id()) end, 'call'))
+from (values ('owner'), ('partner'), ('designer'), ('stranger')) a(who)
+cross join (values ('rbac_approve_member'), ('rbac_grant'), ('rbac_revoke'), ('rbac_remove_member')) f(fn);
+select pg_temp.expect('rpc lockdown: ' || who || ' cannot call internal helper ' || fn || ' via the Data API', 'denied',
+  pg_temp.run_as(pg_temp.who(who), case fn
+    when 'has_capability' then format($q$select public.has_capability(%L, 'hq.view')$q$, pg_temp.home_ws())
+    else format($q$select public.rbac_require_owner(%L)$q$, pg_temp.home_ws()) end, 'call'))
+from (values ('owner'), ('partner'), ('designer'), ('stranger')) a(who)
+cross join (values ('has_capability'), ('rbac_require_owner')) f(fn);
+
+-- ---------- Issue #7: EXECUTE ברמת information_schema/has_function_privilege, ל-3 התפקידים ----------
+-- is_workspace_owner/is_workspace_member/can_access_state נשארות ל-authenticated (נדרש ל-RLS, ראו
+-- ההסבר ב-001_rbac_foundation.sql). כל השאר -- לא, לאף תפקיד (public/anon/authenticated).
+select pg_temp.expect('privilege: authenticated has execute on ' || fn, 'true',
+  has_function_privilege('authenticated', fn, 'execute')::text)
+from (values ('public.is_workspace_owner(uuid)'), ('public.is_workspace_member(uuid)'), ('public.can_access_state(uuid,text,boolean)')) f(fn);
+select pg_temp.expect('privilege: ' || role || ' has NO execute on ' || fn, 'false',
+  has_function_privilege(role, fn, 'execute')::text)
+from (values ('public'), ('anon'), ('authenticated')) r(role)
+cross join (values
+  ('public.has_capability(uuid,text)'), ('public.rbac_require_owner(uuid)'),
+  ('public.rbac_approve_member(uuid,uuid,text)'), ('public.rbac_grant(uuid,uuid,text)'),
+  ('public.rbac_revoke(uuid,uuid,text)'), ('public.rbac_remove_member(uuid,uuid)'),
+  ('public.workspace_state_guard()')
+) f(fn);
+select pg_temp.expect('privilege: ' || role || ' has NO execute on is_workspace_owner/is_workspace_member/can_access_state', 'false',
+  has_function_privilege(role, fn, 'execute')::text)
+from (values ('public'), ('anon')) r(role)
+cross join (values ('public.is_workspace_owner(uuid)'), ('public.is_workspace_member(uuid)'), ('public.can_access_state(uuid,text,boolean)')) f(fn);
 
 -- ---------- שדות RBAC לא ניתנים לכתיבה ישירה מהלקוח, גם לא ל-owner ----------
 select pg_temp.expect('direct write: ' || who || ' ' || t, 'denied', pg_temp.run_as(pg_temp.who(who), stmt))
