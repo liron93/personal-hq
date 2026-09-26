@@ -4,7 +4,7 @@ import { Plus, Trash2, ExternalLink, AlertTriangle, Upload, X, Pencil, ChevronDo
 import { useStore, cp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { ACCEPT_ATTR, CUSTOM_CATEGORY, DOC_CATEGORIES, createHomeDocuments, formatSize, messageFor, objectPath, validateUpload } from "@/lib/home-documents";
-import { STORE_KEY, INIT, DEFAULT_CHECKLIST, CHECKLIST_GROUPS, LINE_STATUSES, itemTotal, linesTotal } from "./model";
+import { STORE_KEY, INIT, DEFAULT_CHECKLIST, CHECKLIST_GROUPS, INSPIRATION_GROUPS, LINE_STATUSES, itemTotal, linesTotal } from "./model";
 import ImageAttachments, { ImageBadge, ImageStrip, purgeImages, useImageTracker } from "./ImageAttachments";
 import { imagesOf } from "./images";
 import "./renovation-v2.css";
@@ -26,7 +26,9 @@ function complete(data) {
   const checklist = Array.isArray(data.checklist) ? data.checklist : cp(DEFAULT_CHECKLIST);
   const categories = Array.isArray(data.checklistCategories) ? data.checklistCategories : cp(CHECKLIST_GROUPS);
   const inspirations = Array.isArray(data.inspirations) ? data.inspirations : [];
-  return checklist === data.checklist && categories === data.checklistCategories && inspirations === data.inspirations ? data : { ...data, checklist, checklistCategories: categories, inspirations };
+  const inspirationCategories = Array.isArray(data.inspirationCategories) ? data.inspirationCategories : cp(INSPIRATION_GROUPS);
+  return checklist === data.checklist && categories === data.checklistCategories && inspirations === data.inspirations && inspirationCategories === data.inspirationCategories
+    ? data : { ...data, checklist, checklistCategories: categories, inspirations, inspirationCategories };
 }
 function ensure(data) {
   if (data?.renovationV2) return complete(data);
@@ -310,10 +312,12 @@ const safeLink = v => {
   const t = String(v || "").trim(); if (!t) return "";
   try { const u = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`); return u.protocol === "http:" || u.protocol === "https:" ? u.href : null; } catch { return null; }
 };
-const emptyInspiration = () => ({ id: "", title: "", description: "", link: "", images: [] });
+const emptyInspiration = category => ({ id: "", title: "", description: "", link: "", images: [], category: category || "", isCustomCategory: false });
 function Inspirations({ data, setData }) {
   const items = data.inspirations || [];
-  const [draft, setDraft] = useState(emptyInspiration()); const [error, setError] = useState("");
+  const categories = data.inspirationCategories || [];
+  const [draft, setDraft] = useState(emptyInspiration(categories[0])); const [error, setError] = useState("");
+  const [newCategory, setNewCategory] = useState(""); const [categoryError, setCategoryError] = useState("");
   const tracker = useImageTracker([]);
   const startDraft = next => { tracker.settle(draft.images, false); tracker.reset(next.images); setDraft(next); setError(""); }; // מעבר טיוטה: מנקה העלאות שלא נשמרו
   const patch = (key, value) => { setDraft(d => ({ ...d, [key]: value })); setError(""); };
@@ -321,38 +325,71 @@ function Inspirations({ data, setData }) {
     e.preventDefault();
     const title = draft.title.trim(); if (!title) { setError("צריך כותרת"); return; }
     const link = safeLink(draft.link); if (link === null) { setError("הקישור לא תקין. אפשר להדביק כתובת רגילה, למשל example.com/עמוד"); return; }
-    const entry = { id: draft.id || crypto.randomUUID(), title, description: draft.description.trim(), link, images: draft.images || [] };
-    setState(setData, d => ({ inspirations: d.inspirations.some(x => x.id === entry.id) ? d.inspirations.map(x => x.id === entry.id ? entry : x) : [entry, ...d.inspirations] }));
-    tracker.settle(entry.images, true); tracker.reset([]); setDraft(emptyInspiration()); setError("");
+    const category = draft.isCustomCategory ? draft.category.trim() : draft.category;
+    if (!category) { setError("בחרו קטגוריה"); return; }
+    const entry = { id: draft.id || crypto.randomUUID(), title, description: draft.description.trim(), link, images: draft.images || [], category };
+    setState(setData, d => ({
+      inspirations: d.inspirations.some(x => x.id === entry.id) ? d.inspirations.map(x => x.id === entry.id ? entry : x) : [entry, ...d.inspirations],
+      inspirationCategories: d.inspirationCategories.includes(category) ? d.inspirationCategories : [...d.inspirationCategories, category],
+    }));
+    tracker.settle(entry.images, true); tracker.reset([]); setDraft(emptyInspiration(category)); setError("");
   };
-  const remove = item => { if (!window.confirm(`למחוק את "${item.title}"? הפעולה אינה הפיכה.`)) return; purgeImages(item.images); setState(setData, d => ({ inspirations: d.inspirations.filter(x => x.id !== item.id) })); if (draft.id === item.id) startDraft(emptyInspiration()); };
+  const remove = item => { if (!window.confirm(`למחוק את "${item.title}"? הפעולה אינה הפיכה.`)) return; purgeImages(item.images); setState(setData, d => ({ inspirations: d.inspirations.filter(x => x.id !== item.id) })); if (draft.id === item.id) startDraft(emptyInspiration(categories[0])); };
+  const addCategory = e => {
+    e.preventDefault(); const name = newCategory.trim();
+    if (!name) return;
+    if (name.length > 40) { setCategoryError("שם קטגוריה עד 40 תווים"); return; }
+    if (categories.some(c => c.toLocaleLowerCase() === name.toLocaleLowerCase())) { setCategoryError("קטגוריה כזו כבר קיימת"); return; }
+    setState(setData, d => ({ inspirationCategories: [...d.inspirationCategories, name] })); setNewCategory(""); setCategoryError("");
+  };
+  const removeCategory = name => setState(setData, d => ({ inspirationCategories: d.inspirationCategories.filter(c => c !== name) }));
   const editing = !!draft.id;
+  const orphans = items.filter(i => !categories.includes(i.category));
+  const sections = [...categories.map(c => [c, items.filter(i => i.category === c)]), ...(orphans.length ? [["ללא קטגוריה", orphans]] : [])];
+  const card = item => <Card key={item.id}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
+      <h3 style={{ margin: 0, overflowWrap: "anywhere" }}>{item.title}</h3>
+      <div style={{ display: "flex", flex: "none" }}>
+        <button type="button" onClick={() => { startDraft({ ...emptyInspiration(categories[0]), ...item, isCustomCategory: false }); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} aria-label={`עריכת ${item.title}`} style={{ border: 0, background: "transparent", color: "#44514A", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Pencil size={17} /></button>
+        <button type="button" onClick={() => remove(item)} aria-label={`מחיקת ${item.title}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Trash2 size={17} /></button>
+      </div>
+    </div>
+    {item.description && <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.description}</p>}
+    {imagesOf(item).length > 0 && <div style={{ marginTop: 8 }}><ImageStrip entry={item} /></div>}
+    {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, minHeight: 44, color: "#176f7a", overflowWrap: "anywhere" }}><ExternalLink size={15} />{(() => { try { return new URL(item.link).hostname.replace(/^www\./, ""); } catch { return item.link; } })()}</a>}
+  </Card>;
   return <div style={{ display: "grid", gap: 12 }}>
     <div><h2 style={{ margin: 0 }}>השראות</h2><span style={{ color: "#63716A" }}>רעיונות, תמונות וקישורים לבית החדש</span></div>
     <Card>
       <form onSubmit={save} style={{ display: "grid", gap: 10 }}>
         <h3 style={{ margin: 0 }}>{editing ? "עריכת השראה" : "השראה חדשה"}</h3>
         <Field label="כותרת"><input value={draft.title} onChange={e => patch("title", e.target.value)} style={input} /></Field>
+        <Field label="קטגוריה"><select value={draft.isCustomCategory ? "__custom__" : draft.category} onChange={e => { const value = e.target.value; if (value === "__custom__") setDraft(d => ({ ...d, category: "", isCustomCategory: true })); else patch("category", value); }} disabled={!categories.length} style={input}>{categories.map(c => <option key={c} value={c}>{c}</option>)}<option value="__custom__">קטגוריה אחרת — הזנה חופשית</option></select></Field>
+        {draft.isCustomCategory && <Field label="קטגוריה חדשה"><input value={draft.category} onChange={e => patch("category", e.target.value)} placeholder="לדוגמה: מרפסת" style={input} /></Field>}
         <Field label="תיאור"><textarea value={draft.description} onChange={e => patch("description", e.target.value)} style={{ ...input, minHeight: 76, paddingTop: 8 }} /></Field>
         <Field label="קישור"><input dir="ltr" inputMode="url" value={draft.link} onChange={e => patch("link", e.target.value)} placeholder="https://..." style={input} /></Field>
         <ImageAttachments images={draft.images} onChange={v => patch("images", v)} tracker={tracker} label="תמונות" />
         {error && <p role="alert" style={{ margin: 0, color: "#b42318" }}>{error}</p>}
-        <div style={{ display: "flex", justifyContent: "end", gap: 8 }}>{(editing || (draft.images || []).length > 0) && <Btn secondary onClick={() => startDraft(emptyInspiration())}>ביטול</Btn>}<Btn>{editing ? "שמירה" : <><Plus size={18} />הוספה</>}</Btn></div>
+        <div style={{ display: "flex", justifyContent: "end", gap: 8 }}>{(editing || (draft.images || []).length > 0) && <Btn secondary onClick={() => startDraft(emptyInspiration(categories[0]))}>ביטול</Btn>}<Btn>{editing ? "שמירה" : <><Plus size={18} />הוספה</>}</Btn></div>
       </form>
     </Card>
-    {items.map(item => <Card key={item.id}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
-        <h3 style={{ margin: 0, overflowWrap: "anywhere" }}>{item.title}</h3>
-        <div style={{ display: "flex", flex: "none" }}>
-          <button type="button" onClick={() => { startDraft({ ...emptyInspiration(), ...item }); window.scrollTo?.({ top: 0, behavior: "smooth" }); }} aria-label={`עריכת ${item.title}`} style={{ border: 0, background: "transparent", color: "#44514A", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Pencil size={17} /></button>
-          <button type="button" onClick={() => remove(item)} aria-label={`מחיקת ${item.title}`} style={{ border: 0, background: "transparent", color: "#8a6a64", minWidth: 44, minHeight: 44, cursor: "pointer" }}><Trash2 size={17} /></button>
-        </div>
-      </div>
-      {item.description && <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.description}</p>}
-      {imagesOf(item).length > 0 && <div style={{ marginTop: 8 }}><ImageStrip entry={item} /></div>}
-      {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, minHeight: 44, color: "#176f7a", overflowWrap: "anywhere" }}><ExternalLink size={15} />{(() => { try { return new URL(item.link).hostname.replace(/^www\./, ""); } catch { return item.link; } })()}</a>}
-    </Card>)}
+    {sections.map(([g, rows]) => rows.length ? <div key={g} style={{ display: "grid", gap: 12 }}>
+      <h3 style={{ margin: 0 }}>{g} <span style={{ color: "#63716A", fontWeight: 400, fontSize: 14 }}>({rows.length})</span></h3>
+      {rows.map(card)}
+    </div> : null)}
     {!items.length && <Card><p style={{ margin: 0, color: "#63716A" }}>עדיין אין השראות. הוסף כותרת, תיאור וקישור למעלה.</p></Card>}
+    <Card>
+      <h3 style={{ marginTop: 0 }}>קטגוריות</h3>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        {categories.map(c => { const count = items.filter(i => i.category === c).length; return <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 999, background: "#E6F0EB", color: "#1D5A48" }}>{c} · {count}{count === 0 && <button type="button" onClick={() => removeCategory(c)} aria-label={`מחיקת הקטגוריה ${c}`} style={{ border: 0, background: "transparent", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", minWidth: 32, minHeight: 32, margin: "-6px", color: "#1D5A48" }}><X size={15} /></button>}</span>; })}
+      </div>
+      <form onSubmit={addCategory} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 8 }}>
+        <input value={newCategory} onChange={e => { setNewCategory(e.target.value); setCategoryError(""); }} placeholder="קטגוריה חדשה (למשל: מרפסת, חדר עבודה)" aria-label="קטגוריה חדשה" style={input} />
+        <Btn secondary><Plus size={18} />הוסף</Btn>
+      </form>
+      {categoryError && <p role="alert" style={{ margin: "8px 0 0", color: "#b42318" }}>{categoryError}</p>}
+      <p style={{ margin: "10px 0 0", color: "#63716A", fontSize: 14 }}>קטגוריה נמחקת רק כשאין בה השראות (יש לה ‏X‏ כשהיא ריקה).</p>
+    </Card>
   </div>;
 }
 export default function RenovationHQ() {
