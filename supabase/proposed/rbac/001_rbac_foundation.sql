@@ -281,6 +281,12 @@ grant execute on function
 
 -- ---------- זריעה: קטלוג יכולות, מפה, וחבילות ----------
 -- (lib/authz/capabilities.js משקף בדיוק את הבלוקים האלה, ובדיקה מוודאת שהם זהים.)
+--
+-- תוספת "משק בית" (Issue #7, asaf/household-grocery): שורות company.household.* /
+-- hq:household:v1 / partner_household להלן נוספו על גבי העיצוב שאושר על ידי לירון
+-- ב-bcf6623. עדיין **לא הורצו** על שום Supabase (הקובץ כולו ב-proposed/, לא ב-migrations/),
+-- ועדיין דורשות review של עמית + אישור מפורש של לירון לפני שמישהו מריץ אותן, בדיוק כמו
+-- שאר הקובץ. שקד (designer_beit_hadash) לא מקבלת את היכולות האלה בשום מקום למטה.
 
 -- BEGIN SEED capabilities
 insert into public.capabilities (key, description) values
@@ -292,7 +298,9 @@ insert into public.capabilities (key, description) values
   ('finance.transactions.read',     'תנועות גולמיות וייבוא (רייזאפ) - קריאה'),
   ('finance.transactions.write',    'תנועות גולמיות וייבוא (רייזאפ) - כתיבה'),
   ('core.read',                     'נתוני ליבה משותפים של משק הבית (הכנסות, משכנתא) - קריאה'),
-  ('core.write',                    'נתוני ליבה משותפים - עריכה');
+  ('core.write',                    'נתוני ליבה משותפים - עריכה'),
+  ('company.household.read',        'קריאת חברת משק בית (רשימת קניות משותפת, היסטוריה, חיסכון)'),
+  ('company.household.write',       'עריכת חברת משק בית');
 -- END SEED capabilities
 
 -- BEGIN SEED company_capability_map
@@ -300,7 +308,8 @@ insert into public.company_capability_map (company_key, read_capability, write_c
   ('hq:beit-hadash:v2',        'company.beit-hadash.read',       'company.beit-hadash.write'),
   ('hq:kesef:v1',              'finance.dashboard_budget.read',  'finance.dashboard_budget.write'),
   ('hq:kesef-transactions:v1', 'finance.transactions.read',      'finance.transactions.write'),
-  ('hq:core:v1',               'core.read',                      'core.write');
+  ('hq:core:v1',               'core.read',                      'core.write'),
+  ('hq:household:v1',          'company.household.read',         'company.household.write');
 -- END SEED company_capability_map
 
 -- BEGIN SEED role_templates
@@ -337,7 +346,13 @@ insert into public.role_templates (role, capability) values
   ('partner_full_finance_edit', 'core.read'),
   -- מעצבת: בית חדש בלבד, בלי HQ ובלי כספים.
   ('designer_beit_hadash', 'company.beit-hadash.read'),
-  ('designer_beit_hadash', 'company.beit-hadash.write');
+  ('designer_beit_hadash', 'company.beit-hadash.write'),
+  -- משק בית (Issue #7): מרחב עצמאי לליאור, בלי תלות בחבילת הכספים שלה. אפשר להעניק את
+  -- החבילה הזו בנפרד או בנוסף לכל חבילת כספים קיימת (approve_member עם שתי חבילות
+  -- ברצף, או grant של יכולת בודדת). שקד לא מקבלת את זה בשום מקום.
+  ('partner_household', 'hq.view'),
+  ('partner_household', 'company.household.read'),
+  ('partner_household', 'company.household.write');
 -- END SEED role_templates
 
 commit;

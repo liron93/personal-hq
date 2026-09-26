@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowUpLeft, BellRing, Bot, BriefcaseBusiness, Building2, ChevronLeft, CircleAlert, CircleCheck, Dumbbell, HeartPulse, Home, Landmark, MessageCircle, MoreHorizontal, Plus, Send, Sparkles, WalletCards, X } from "lucide-react";
+import { ArrowLeft, ArrowUpLeft, BellRing, Bot, BriefcaseBusiness, Building2, ChevronLeft, CircleAlert, CircleCheck, Dumbbell, HeartPulse, Home, Landmark, MessageCircle, MoreHorizontal, Plus, Send, ShoppingBasket, Sparkles, WalletCards, X } from "lucide-react";
 import { COMPANIES } from "@/companies/registry";
 import { load, useStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
@@ -36,6 +36,7 @@ function useSummaries() {
 const meta = {
   "beit-hadash": { icon: Home, tone: "orange", manager: "שקד" }, kesef: { icon: WalletCards, tone: "purple", manager: "שבתאי ואופק" },
   health: { icon: Dumbbell, tone: "green", manager: "גל" }, avoda: { icon: BriefcaseBusiness, tone: "blue", manager: "רועי" }, nefesh: { icon: HeartPulse, tone: "pink", manager: "אוריה" },
+  household: { icon: ShoppingBasket, tone: "teal", manager: "מאיה" },
 };
 const money = value => new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(value || 0);
 function Flag({ flag }) { return <span className={`${styles.dot} ${flag === "amber" ? styles.dotAmber : flag === "green" ? styles.dotGreen : styles.dotNeutral}`} />; }
