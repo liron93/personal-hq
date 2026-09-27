@@ -112,9 +112,8 @@ export default function ImageAttachments({ images, onChange, tracker, label = "�
   const listRef = useRef(list); listRef.current = list;
   useEffect(() => { let alive = true; resolveWorkspaceCached(api).then(r => { if (alive) setEnabled(r.ok ? "on" : r.code === "not_enabled" ? "off" : "loading"); }); return () => { alive = false; }; }, []);
   const start = ref => { setMessage(""); if (enabled === "off") { setMessage(NOT_ENABLED_TEXT); return; } if (remainingSlots(list) <= 0) { setMessage(MAX_TEXT); return; } ref.current?.click(); };
-  const onFiles = async e => {
-    const files = [...(e.target.files || [])]; e.target.value = "";
-    if (!files.length || busy) return;
+  const processFiles = async files => {
+    if (!files.length || busyRef.current) return;
     setBusy(true); setMessage("");
     let current = listRef.current, note = "";
     for (const file of files) {
@@ -124,6 +123,23 @@ export default function ImageAttachments({ images, onChange, tracker, label = "�
     }
     setBusy(false); setMessage(note);
   };
+  const onFiles = e => { const files = [...(e.target.files || [])]; e.target.value = ""; processFiles(files); };
+  const busyRef = useRef(false); busyRef.current = busy;
+  const enabledRef = useRef(enabled); enabledRef.current = enabled;
+  // הדבקת תמונה מהלוח (Ctrl/Cmd+V) בכל מקום בעמוד, כל עוד הרכיב הזה מותקן. יש רכיב אחד פעיל בכל רגע (טופס עריכה אחד).
+  useEffect(() => {
+    const onPaste = e => {
+      const files = [...(e.clipboardData?.items || [])].filter(i => i.kind === "file" && i.type.startsWith("image/")).map(i => i.getAsFile()).filter(Boolean);
+      if (!files.length) return;
+      e.preventDefault();
+      setMessage("");
+      if (enabledRef.current === "off") { setMessage(NOT_ENABLED_TEXT); return; }
+      if (remainingSlots(listRef.current) <= 0) { setMessage(MAX_TEXT); return; }
+      processFiles(files);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []); // eslint-disable-line
   const del = image => {
     if (!window.confirm("למחוק את התמונה?")) return;
     // תמונה שהועלתה בסשן הזה ועוד לא נשמרה: נמחקת מיד. תמונה שמורה: יוצאת מהרשימה, והאובייקט נמחק רק בשמירה.
@@ -145,6 +161,7 @@ export default function ImageAttachments({ images, onChange, tracker, label = "�
       <input ref={pick} type="file" accept={IMAGE_ACCEPT_ATTR} multiple hidden onChange={onFiles} />
       <input ref={cam} type="file" accept={IMAGE_ACCEPT_ATTR} capture="environment" hidden onChange={onFiles} />
     </div>
+    {enabled !== "off" && <p style={{ margin: 0, color: "#63716A", fontSize: 13 }}>אפשר גם להדביק תמונה שהעתקת (Ctrl/Cmd+V).</p>}
     {message && <p role="alert" style={{ margin: 0, color: enabled === "off" ? "#63716A" : "#b42318", fontSize: 14 }}>{message}</p>}
     {open && <Lightbox image={open} onClose={() => setOpen(null)} />}
   </div>;
