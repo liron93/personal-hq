@@ -33,7 +33,7 @@ export default function CompanyTasks({ d, setD }) {
       <div style={cardStyle}>
         {d.tasks.map((t, i) => (
           <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i === d.tasks.length - 1 ? "none" : `1px solid ${LINE}` }}>
-            <button onClick={() => toggleTask(t.id)} style={{ border: `1px solid ${t.done ? GREEN : MUTED}`, background: t.done ? GREEN : "transparent", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><span aria-hidden style={{ position: "absolute", inset: -10 }} />
+            <button data-hq-edit="1" onClick={() => toggleTask(t.id)} style={{ border: `1px solid ${t.done ? GREEN : MUTED}`, background: t.done ? GREEN : "transparent", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}><span aria-hidden style={{ position: "absolute", inset: -10 }} />
               {t.done && <Check size={12} color="#fff" />}
             </button>
             <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere", fontSize: 15, textDecoration: t.done ? "line-through" : "none", color: t.done ? MUTED : INK }}>{t.text}</span>

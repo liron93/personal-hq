@@ -14,7 +14,7 @@ function PaymentRow({ label, amount, due, done, onAmount, onDue, onToggle }) {
         <input type="date" className="hq-field" value={due ? due.slice(0, 10) : ""} onChange={e => onDue(e.target.value)}
           style={{ fontSize: 12, background: "transparent", color: MUTED, width: 110 }} />
         <EditableNum value={amount} onChange={onAmount} />
-        <button onClick={onToggle} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${done ? GREEN : (urgent ? RUST : MUTED)}`, background: done ? GREEN : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <button data-hq-edit="1" onClick={onToggle} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${done ? GREEN : (urgent ? RUST : MUTED)}`, background: done ? GREEN : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {done && <Check size={13} color="#fff" />}
         </button>
       </div>
@@ -34,7 +34,7 @@ function SalePayRow({ p, onChange, onRemove }) {
         <input type="date" className="hq-field" value={p.due ? p.due.slice(0, 10) : ""} onChange={e => onChange({ ...p, due: e.target.value })}
           style={{ fontSize: 12, background: "transparent", color: MUTED, width: 110 }} />
         <EditableNum value={p.amount} onChange={v => onChange({ ...p, amount: v })} />
-        <button onClick={() => onChange({ ...p, done: !p.done })} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${p.done ? GREEN : (urgent ? RUST : MUTED)}`, background: p.done ? GREEN : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <button data-hq-edit="1" onClick={() => onChange({ ...p, done: !p.done })} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${p.done ? GREEN : (urgent ? RUST : MUTED)}`, background: p.done ? GREEN : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           {p.done && <Check size={13} color="#fff" />}
         </button>
         <span onClick={onRemove} style={{ fontSize: 12, color: RUST, cursor: "pointer", flexShrink: 0 }}>הסר</span>

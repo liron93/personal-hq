@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, BriefcaseBusiness, Dumbbell, HeartPulse, Home, LayoutDashboard, WalletCards } from "lucide-react";
+import { useAccess } from "@/lib/useAccess";
+import { isHqVisible, visibleCompanySlugs } from "@/lib/workspace";
 import styles from "./company-navigator.module.css";
 
 const destinations = [
@@ -14,11 +16,16 @@ const destinations = [
   { href: "/companies/nefesh", label: "רווחה", Icon: HeartPulse },
 ];
 
+const slugOf = href => href.split("/")[2];
+
 export default function CompanyNavigator() {
   const pathname = usePathname();
+  const { ready, access } = useAccess();
+  // עד שהיכולות נבדקו לא מציגים יעדים שעלולים להיות מוסתרים. member רואה רק מה שמותר לו, בלי מרכז שליטה אם אין לו hq.view.
+  const shown = !ready ? [] : destinations.filter(d => d.href === "/" ? isHqVisible(access) : visibleCompanySlugs(access, [slugOf(d.href)]).length === 1);
   return <nav className={styles.navigator} aria-label="ניווט מהיר בין החברות">
     <Link href="/" className={styles.core} aria-label="Personal HQ — מרכז שליטה"><Building2 size={18} /></Link>
-    <div className={styles.destinations}>{destinations.map(({ href, label, Icon }) => {
+    <div className={styles.destinations}>{shown.map(({ href, label, Icon }) => {
       const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
       return <Link href={href} className={`${styles.destination} ${active ? styles.active : ""}`} key={href} aria-current={active ? "page" : undefined}>
         <Icon size={18} /><span>{label}</span>
