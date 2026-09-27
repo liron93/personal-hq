@@ -267,17 +267,57 @@ grant select on public.workspaces, public.capabilities, public.role_templates, p
   public.workspace_members, public.member_capabilities, public.permission_audit to authenticated;
 grant select, insert, update, delete on public.workspace_state to authenticated;
 
-revoke all on function
+-- Issue #7 (ממצא של עמית, Security Advisor על staging): כל הפונקציות האלה היו EXECUTE-granted ל-
+-- authenticated, כלומר קריאות דרך ה-Data API (POST /rest/v1/rpc/<שם>) -- גם פונקציות עזר פנימיות
+-- וגם פונקציות ניהול. שוללים הכול קודם (ברירת המחדל של Postgres לפונקציה חדשה היא EXECUTE ל-PUBLIC,
+-- ומשם גם ל-anon/authenticated), ואז מעניקים בחזרה רק את המינימום שבאמת נדרש -- כדי שמשטח ה-RPC
+-- הציבורי יצטמצם לפונקציות שהלקוח חייב לקרוא להן ישירות.
+revoke execute on function
   public.is_workspace_owner(uuid), public.is_workspace_member(uuid), public.has_capability(uuid, text),
   public.can_access_state(uuid, text, boolean), public.rbac_require_owner(uuid),
   public.rbac_approve_member(uuid, uuid, text), public.rbac_grant(uuid, uuid, text),
   public.rbac_revoke(uuid, uuid, text), public.rbac_remove_member(uuid, uuid)
-  from public, anon;
+  from public, anon, authenticated;
+-- workspace_state_guard() היא פונקציית טריגר בלבד ולא הייתה לה שום revoke/grant מפורש למעלה, כך
+-- שקיבלה EXECUTE ל-PUBLIC (ומכאן ל-anon/authenticated) כברירת המחדל -- חשיפה מיותרת: טריגר לא
+-- נקרא ישירות ולא צריך הרשאת EXECUTE כדי לפעול (אומת אמפירית: אחרי revoke מלא, insert/update על
+-- workspace_state עדיין מפעילים אותה כרגיל ומעדכנים updated_by/updated_at).
+revoke execute on function public.workspace_state_guard() from public, anon, authenticated;
+
+-- ---- נשארות פתוחות ל-authenticated: is_workspace_owner, is_workspace_member, can_access_state ----
+-- מדיניות ה-RLS למעלה (workspaces_select, workspace_members_select, member_capabilities_select,
+-- permission_audit_select, כל ה-policies של workspace_state) קוראות לפונקציות האלה *ישירות* מתוך
+-- USING/WITH CHECK. כשה-role שמריץ את השאילתה הוא authenticated, הוא זה שחייב EXECUTE על הפונקציה
+-- כדי שהמדיניות בכלל תיבדק -- SECURITY DEFINER קובע באיזו זהות *גוף* הפונקציה רץ (ולכן היא יכולה
+-- לקרוא לטבלאות ההרשאה בלי RLS), אבל לא פוטר את הקורא המקורי מהרשאת EXECUTE. זה לא הנחה: אומת
+-- אמפירית ב-PGlite (ראו supabase/tests/rbac_matrix.sql, "privilege:") -- revoke execute מ-authenticated
+-- על is_workspace_owner/is_workspace_member/can_access_state שבר מיד select פשוט על workspaces
+-- ו-workspace_state עם "permission denied for function ...". לכן שלוש אלה חייבות EXECUTE ל-authenticated,
+-- והן היחידות ששוברות RLS אם ננעלות -- כל שאר הפונקציות למטה (has_capability, rbac_require_owner,
+-- וארבע פונקציות הניהול) נבדקו באותו אופן ו-revoke עליהן לא הפיל אף אחת מ-377+ הבדיקות במטריצה.
 grant execute on function
-  public.is_workspace_owner(uuid), public.is_workspace_member(uuid), public.has_capability(uuid, text),
-  public.can_access_state(uuid, text, boolean), public.rbac_approve_member(uuid, uuid, text),
-  public.rbac_grant(uuid, uuid, text), public.rbac_revoke(uuid, uuid, text), public.rbac_remove_member(uuid, uuid)
+  public.is_workspace_owner(uuid), public.is_workspace_member(uuid), public.can_access_state(uuid, text, boolean)
   to authenticated;
+
+-- ---- לא נשארות ל-authenticated: has_capability, rbac_require_owner ----
+-- שתיהן פונקציות עזר "פנימיות בתוך פנימיות": has_capability נקראת רק מתוך גוף can_access_state (שורה
+-- 124 למעלה), ו-rbac_require_owner נקראת רק מתוך גוף ארבע פונקציות הניהול. קריאה כזו, מתוך גוף של
+-- פונקציית SECURITY DEFINER אחרת באותה בעלות, רצה כבר תחת ה-DEFINER ולא בודקת שוב EXECUTE של הקורא
+-- המקורי -- כך שאין שום צורך במענק EXECUTE ל-authenticated כדי שה-RLS או פונקציות הניהול ימשיכו לעבוד,
+-- ואין סיבה לחשוף אותן כ-RPC נפרד. אומת: revoke עליהן (כמו למעלה) לא שינה אף תוצאה במטריצה.
+
+-- ---- לא נשארות ל-authenticated בכלל: rbac_approve_member, rbac_grant, rbac_revoke, rbac_remove_member ----
+-- ארבע פונקציות הניהול מוגנות פנימית (rbac_require_owner בודק auth.uid() = owner), אבל עמית ביקש
+-- לצמצם את משטח ה-RPC לפני production ולא להסתמך רק על הבדיקה הפנימית: אין עדיין ראוט שרת ייעודי
+-- (docs/rbac/ROLLOUT.md), ולכן הבחירה הבטוחה ביותר היא לא לחשוף אותן כ-RPC ללקוח בכלל -- רק
+-- SQL Editor/service_role יכולים לקרוא להן (שם ההרצה היא כ-postgres, לא כ-authenticated, ולכן לא
+-- מושפעת מה-revoke). זה בדיוק תהליך העבודה הקיים היום ב-ROLLOUT.md (עמית מריץ 030/040 ידנית כ-owner
+-- ב-SQL Editor) -- הסקריפטים rollout/030_approve_member.sql ו-rollout/040_remove_member.sql עודכנו
+-- בהתאם (כבר לא עוברים ל-`set local role authenticated` לפני הקריאה, כי לתפקיד הזה כבר אין EXECUTE).
+-- grep על lib/, companies/, app/ -- כולל הענפים הפתוחים asaf/workspace-aware-app ו-
+-- asaf/kesef-grocery-super -- לא מצא אף קריאת supabase.rpc('rbac_...') מצד הלקוח, כך שה-revoke הזה
+-- בטוח ולא שובר שום קוד אפליקציה קיים. אם בעתיד ייבנה ראוט שרת לניהול -- הוא ירוץ עם service_role
+-- משלו ולא יזדקק ל-EXECUTE ל-authenticated.
 
 -- ---------- זריעה: קטלוג יכולות, מפה, וחבילות ----------
 -- (lib/authz/capabilities.js משקף בדיוק את הבלוקים האלה, ובדיקה מוודאת שהם זהים.)

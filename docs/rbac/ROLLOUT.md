@@ -20,6 +20,51 @@
 בחירת החבילה בשלב 5 היא ההחלטה על כספים. **לליאור: `partner_full_finance` (B, החלטת לירון 21.9.2026: רואה את כל הכספים כולל תנועות, קריאה בלבד).** אפשרויות נוספות: `partner_full_finance_edit` (B+, גם עריכה), `partner_budget_view` (A), `partner_budget_edit` (A+). לשקד: `designer_beit_hadash`.
 בריאות, נפשי וקריירה **לא** מועתקים ולא משותפים לעולם.
 
+## עדכון אבטחה (Issue #7): נעילת ה-RPC של פונקציות עזר וניהול
+
+עמית מצא ב-Security Advisor של staging ש-10 פונקציות SECURITY DEFINER קיבלו EXECUTE ל-`authenticated`
+(ומכאן קריאות דרך ה-Data API, `POST /rest/v1/rpc/<שם>`) -- גם פונקציות עזר פנימיות
+(`is_workspace_owner`, `is_workspace_member`, `has_capability`, `can_access_state`, `rbac_require_owner`)
+וגם פונקציות ניהול (`rbac_approve_member`, `rbac_grant`, `rbac_revoke`, `rbac_remove_member`). הבדיקה
+הפנימית בפונקציות הניהול (owner בלבד) עדיין מגנה על הפעולה, אבל צמצמנו את משטח ה-RPC לפני production:
+
+* **`is_workspace_owner`, `is_workspace_member`, `can_access_state`** -- נשארות עם EXECUTE ל-`authenticated`.
+  חובה: מדיניות ה-RLS קוראת להן ישירות מתוך ה-policies, ואומת אמפירית ב-PGlite ש-revoke עליהן שובר
+  select רגיל על `workspaces`/`workspace_state` ("permission denied for function").
+* **`has_capability`, `rbac_require_owner`** -- EXECUTE נשלל מ-`authenticated`. הן נקראות רק מתוך גוף
+  פונקציה אחרת (לא RPC ישיר, ולא מדיניות RLS), אז אין בכך צורך, ואומת שזה לא שובר אף בדיקה.
+* **ארבע פונקציות הניהול** (`rbac_approve_member`/`rbac_grant`/`rbac_revoke`/`rbac_remove_member`) --
+  EXECUTE נשלל מ-`authenticated` לגמרי. אין עדיין ראוט שרת ייעודי, אז הן זמינות **רק** דרך SQL Editor
+  (כפי שכבר מתואר למעלה) -- זהו בדיוק תהליך העבודה הקיים, ולא משתנה בפועל. ה-grep על קוד האפליקציה
+  (כולל הענפים הפתוחים `asaf/workspace-aware-app` ו-`asaf/kesef-grocery-super`) לא מצא אף קריאת
+  `supabase.rpc('rbac_...')` מהלקוח.
+* **`workspace_state_guard`** (טריגר) -- לא היה לה revoke/grant מפורש ב-`001` המקורי (חשיפה ל-PUBLIC
+  כברירת המחדל של Postgres). נשללה עכשיו לגמרי; טריגר לא צריך EXECUTE ישיר כדי לפעול.
+
+### מה בדיוק להריץ על ה-staging הקיים (שכבר יש עליו `001`+`002`+`rollout/010-030`)
+
+**לא** להריץ down+up מלא. מספיק סקריפט הנעילה החדש, שהוא revoke-בלבד ואידמפוטנטי (אפשר להריץ כמה
+פעמים בלי נזק):
+
+```
+supabase/proposed/rbac/001b_rbac_rpc_lockdown.sql
+```
+
+להריץ ב-SQL Editor כ-owner, בדיוק כמו `001`/`002`. אחריו: `002` לא צריך שינוי, וגם `rollout/010`-`020`
+(מרחב + העתקת מצב) לא צריכים לרוץ שוב -- הם כבר רצו. אם עמית ירצה להריץ שוב `rollout/030_approve_member.sql`
+או `rollout/040_remove_member.sql` (למשל כדי לאשר את ליאור/שקד מחדש), חשוב לקחת את הגרסה המעודכנת
+מהריפו: היא כבר לא עוברת ל-`set local role authenticated` (כי אחרי הנעילה לתפקיד הזה אין יותר EXECUTE
+על הפונקציות, אז הגרסה הישנה של 030/040 תיכשל עם "permission denied").
+
+אחרי ההרצה: להריץ שוב Security Advisor על ה-staging project ולוודא שה-10 אזהרות נעלמו (או שנשארה רק
+האזהרה על שלוש הפונקציות שבכוונה נשארות RPC-accessible -- `is_workspace_owner`/`is_workspace_member`/
+`can_access_state` -- ואם Advisor עדיין מסמן אותן, זו אזהרה ידועה ומוצדקת: הן חייבות EXECUTE כדי ש-RLS
+יעבוד, ראו ההסבר למעלה ובקובץ `001b_rbac_rpc_lockdown.sql` עצמו).
+
+נבדק: PGlite עם `001` הישן (staging) + `002` + `001b` מגיע לאותו מצב הרשאות בדיוק כמו `001` המעודכן
+לבד -- כל 431 הבדיקות ב-`rbac_matrix.sql` (377 המקוריות + 54 בדיקות הרשאה/נעילה חדשות) עוברות בשני
+הנתיבים.
+
 ## אימות אחרי כל אישור (allow/deny עם החשבון האמיתי)
 * ליאור (חבילה B): רואה בית חדש וקבצי בית חדש, ואת כל הכספים **כולל תנועות**, בקריאה בלבד (אין עריכה בכספים). לא רואה נפשי, בריאות, קריירה של לירון. הקריירה שלה ריקה.
 * שקד: רואה **רק** בית חדש. לא רואה HQ, כספים, נפשי, בריאות, קריירה.
