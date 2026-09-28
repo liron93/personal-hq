@@ -1,4 +1,5 @@
-import { Home, Wallet, Dumbbell, Briefcase, Brain } from "lucide-react";
+import { Home, Wallet, Dumbbell, Briefcase, Brain, TrendingUp } from "lucide-react";
+import * as investments from './investments/model.mjs';
 import * as beit from "./beit-hadash/model";
 import * as kesef from "./kesef/model";
 import * as career from "./avoda/model";
@@ -18,6 +19,7 @@ import * as wellbeing from "./nefesh/model";
   ה-model.js של אותה תת-חברה בלבד.
 */
 export const COMPANIES = [
+  { slug: "investments", name: "השקעות", icon: TrendingUp, active: true, storeKey: investments.STORE_KEY, init: investments.INIT, summarize: investments.summarize },
   { slug: "beit-hadash", name: "בית חדש", icon: Home, active: true, storeKey: beit.STORE_KEY, init: beit.INIT, summarize: beit.summarize },
   { slug: "kesef", name: "כלכלה והשקעות", icon: Wallet, active: true, storeKey: kesef.STORE_KEY, init: kesef.INIT, summarize: kesef.summarize },
   { slug: "health", name: "אימון ותזונה", icon: Dumbbell, active: true, storeKey: health.STORE_KEY, init: health.INIT, summarize: health.summarize },
