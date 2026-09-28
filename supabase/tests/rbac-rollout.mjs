@@ -73,6 +73,7 @@ export async function runRolloutChecks(PGlite) {
   check("down leaves personal data and career-documents policies intact", await count(`select count(*)::int n from public.company_state`) === 6
     && await count(`select count(*)::int n from pg_policies where schemaname='storage' and policyname like 'career\\_documents%'`) === 4);
   await db.exec(up1); await db.exec(up2);
-  check("up again after down works (round trip)", await count(`select count(*)::int n from public.capabilities`) === 9);
+  // 9 מקוריות + company.household.read/write (asaf/household-grocery, Issue #7) = 11.
+  check("up again after down works (round trip)", await count(`select count(*)::int n from public.capabilities`) === 11);
   return results;
 }
