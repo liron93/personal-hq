@@ -5,12 +5,14 @@ const { visibleCompanySlugs, canViewCompany, isCompanyReadOnly, isHqVisible } = 
 const { capabilitiesForTemplate, DEFAULT_PARTNER_TEMPLATE } = await import("../lib/authz/capabilities.js");
 
 // כל החברות ברישום (companies/registry.js) ועוד השלד imun. מזהים בדויים בלבד.
-const COMPANIES = ["beit-hadash", "kesef", "health", "avoda", "nefesh", "imun"];
+const COMPANIES = ["beit-hadash", "kesef", "health", "avoda", "nefesh", "household", "imun"];
 const member = template => ({ mode: "member", userId: "u", isOwner: false, workspaceId: "ws", grants: capabilitiesForTemplate(template), reason: "member" });
+const memberWith = (...templates) => ({ mode: "member", userId: "u", isOwner: false, workspaceId: "ws", grants: templates.flatMap(capabilitiesForTemplate), reason: "member" });
 const ACCESS = {
   owner: { mode: "member", userId: "u", isOwner: true, workspaceId: "ws", grants: [], reason: "owner" },
   "lior B+ (default)": member(DEFAULT_PARTNER_TEMPLATE),
   "lior B (read-only finance)": member("partner_full_finance"),
+  "lior B+ + household": memberWith(DEFAULT_PARTNER_TEMPLATE, "partner_household"),
   "shaked designer": member("designer_beit_hadash"),
   "unapproved (no_workspace)": { mode: "restricted", userId: "u", isOwner: false, workspaceId: null, grants: [], reason: "no_workspace" },
   "unavailable": { mode: "restricted", userId: "u", isOwner: false, workspaceId: null, grants: [], reason: "unavailable" },
@@ -22,6 +24,8 @@ const EXPECTED = {
   owner: [COMPANIES, [], true],
   "lior B+ (default)": [["beit-hadash", "kesef", "health", "avoda"], [], true],
   "lior B (read-only finance)": [["beit-hadash", "kesef", "health", "avoda"], ["kesef"], true],
+  // household (Issue #7): יכולת עצמאית לגמרי, לא כלולה בשום חבילת כספים — ליאור צריכה partner_household בנפרד.
+  "lior B+ + household": [["beit-hadash", "kesef", "health", "avoda", "household"], [], true],
   "shaked designer": [["beit-hadash"], [], false],
   "unapproved (no_workspace)": [[], [], false],
   unavailable: [[], [], false],
@@ -52,4 +56,21 @@ test("Lior sees everything in the registry except nefesh (Uria), which is hidden
     assert.equal(visibleCompanySlugs(a, ["beit-hadash", "kesef", "health", "avoda", "nefesh"]).includes("nefesh"), false);
     for (const slug of ["beit-hadash", "kesef", "health", "avoda"]) assert.equal(canViewCompany(a, slug), true, slug);
   }
+});
+
+test("household (משק בית, Issue #7): owner always full access; Lior needs partner_household explicitly (her finance package alone is not enough); Shaked never sees it", () => {
+  const owner = ACCESS.owner;
+  assert.equal(canViewCompany(owner, "household"), true);
+  assert.equal(isCompanyReadOnly(owner, "household"), false);
+
+  for (const key of ["lior B+ (default)", "lior B (read-only finance)"]) {
+    assert.equal(canViewCompany(ACCESS[key], "household"), false, key);
+  }
+  const liorWithHousehold = ACCESS["lior B+ + household"];
+  assert.equal(canViewCompany(liorWithHousehold, "household"), true);
+  assert.equal(isCompanyReadOnly(liorWithHousehold, "household"), false); // partner_household כולל write
+
+  const shaked = ACCESS["shaked designer"];
+  assert.equal(canViewCompany(shaked, "household"), false);
+  assert.equal(visibleCompanySlugs(shaked, COMPANIES).includes("household"), false);
 });

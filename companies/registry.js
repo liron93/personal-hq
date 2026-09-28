@@ -25,7 +25,9 @@ export const COMPANIES = [
   { slug: "avoda", name: "קריירה", icon: Briefcase, active: true, storeKey: career.STORE_KEY, init: career.INIT, summarize: career.summarize },
   { slug: "nefesh", name: "רווחה נפשית", icon: Brain, active: true, storeKey: wellbeing.STORE_KEY, init: wellbeing.INIT, summarize: wellbeing.summarize },
   // משק בית: מרחב משותף ללירון וליאור בלבד (לא שקד — ראה lib/authz/capabilities.js,
-  // company.household.read/write ו-partner_household). כרגע (לפני שה-RBAC פעיל) מתנהגת
-  // כמו כל תת-חברה אחרת: owner יחיד, בלי הבחנה בין משתמשים בפועל.
+  // company.household.read/write ו-partner_household; hq:household:v1 מנותב כמפתח משותף
+  // ב-lib/workspace.js SHARED_COMPANY_KEY ו-lib/authz/capabilities.js COMPANY_STATE_CAPABILITIES).
+  // כל עוד ה-SQL המוצע לא הופעל בפועל על Supabase, RBAC לא פעיל, ולכן זו מתנהגת כמו כל תת-חברה
+  // אחרת: owner יחיד, בלי הבחנה בין משתמשים בפועל (ראה lib/workspace.js "not_enabled").
   { slug: "household", name: "משק בית", icon: ShoppingBasket, active: true, storeKey: household.STORE_KEY, init: household.INIT, summarize: household.summarize },
 ];
