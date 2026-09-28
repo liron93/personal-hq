@@ -13,6 +13,9 @@ const ACCESS = {
   "lior B+ (default)": member(DEFAULT_PARTNER_TEMPLATE),
   "lior B (read-only finance)": member("partner_full_finance"),
   "lior B+ + household": memberWith(DEFAULT_PARTNER_TEMPLATE, "partner_household"),
+  // partner_lior (Issue #7, P0): אותו איחוד יכולות כמו "lior B+ + household" למעלה, אבל דרך חבילה
+  // מפורשת אחת (אישור יחיד ב-rbac_approve_member) במקום שתי חבילות ברצף.
+  "lior partner_lior (single template)": member("partner_lior"),
   "shaked designer": member("designer_beit_hadash"),
   "unapproved (no_workspace)": { mode: "restricted", userId: "u", isOwner: false, workspaceId: null, grants: [], reason: "no_workspace" },
   "unavailable": { mode: "restricted", userId: "u", isOwner: false, workspaceId: null, grants: [], reason: "unavailable" },
@@ -26,6 +29,7 @@ const EXPECTED = {
   "lior B (read-only finance)": [["beit-hadash", "kesef", "health", "avoda"], ["kesef"], true],
   // household (Issue #7): יכולת עצמאית לגמרי, לא כלולה בשום חבילת כספים — ליאור צריכה partner_household בנפרד.
   "lior B+ + household": [["beit-hadash", "kesef", "health", "avoda", "household"], [], true],
+  "lior partner_lior (single template)": [["beit-hadash", "kesef", "health", "avoda", "household"], [], true],
   "shaked designer": [["beit-hadash"], [], false],
   "unapproved (no_workspace)": [[], [], false],
   unavailable: [[], [], false],
@@ -73,4 +77,32 @@ test("household (משק בית, Issue #7): owner always full access; Lior needs 
   const shaked = ACCESS["shaked designer"];
   assert.equal(canViewCompany(shaked, "household"), false);
   assert.equal(visibleCompanySlugs(shaked, COMPANIES).includes("household"), false);
+});
+
+test("partner_lior (Issue #7, P0): one explicit composite template grants exactly the union of partner_full_finance_edit + partner_household, in a single approve_member call", () => {
+  const single = ACCESS["lior partner_lior (single template)"];
+  const composite = ACCESS["lior B+ + household"];
+
+  // אותה תוצאה בדיוק כמו שתי חבילות ברצף (רק שם הענקה בשתי החבילות, "hq.view", מופיע פעמיים כשמצרפים אותן — מכאן ה-dedup):
+  // בית חדש (עריכה), כספים דשבורד+תנועות (עריכה), משק בית (עריכה), ליבה קריאה בלבד, HQ.
+  assert.deepEqual([...capabilitiesForTemplate("partner_lior")].sort(), [...new Set(composite.grants)].sort());
+  for (const slug of ["beit-hadash", "kesef", "health", "avoda", "household"]) {
+    assert.equal(canViewCompany(single, slug), true, slug);
+    assert.equal(isCompanyReadOnly(single, slug), isCompanyReadOnly(composite, slug), slug);
+  }
+  assert.equal(canViewCompany(single, "nefesh"), false); // לעולם לא, גם עם החבילה המאוחדת
+  assert.deepEqual(visibleCompanySlugs(single, COMPANIES).sort(), visibleCompanySlugs(composite, COMPANIES).sort());
+  assert.equal(isHqVisible(single), true);
+
+  // ה"בריאות" וה"עבודה" שלה נשארות מרחב אישי ריק משלה, כמו בחבילת B+ הרגילה — לא של לירון, ולא משהו נוסף שקיבלה מ-partner_lior.
+  for (const slug of ["health", "avoda"]) assert.equal(isCompanyReadOnly(single, slug), false, slug);
+
+  // שקד לא מקבלת שום דבר מ-partner_lior, בשום נסיבות.
+  const shaked = ACCESS["shaked designer"];
+  for (const cap of capabilitiesForTemplate("partner_lior")) {
+    assert.equal(capabilitiesForTemplate("designer_beit_hadash").includes(cap), cap === "company.beit-hadash.read" || cap === "company.beit-hadash.write", cap);
+  }
+  assert.equal(canViewCompany(shaked, "household"), false);
+  assert.equal(canViewCompany(shaked, "kesef"), false);
+  assert.equal(isHqVisible(shaked), false);
 });

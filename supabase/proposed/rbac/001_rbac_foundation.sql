@@ -327,6 +327,14 @@ grant execute on function
 -- ב-bcf6623. עדיין **לא הורצו** על שום Supabase (הקובץ כולו ב-proposed/, לא ב-migrations/),
 -- ועדיין דורשות review של עמית + אישור מפורש של לירון לפני שמישהו מריץ אותן, בדיוק כמו
 -- שאר הקובץ. שקד (designer_beit_hadash) לא מקבלת את היכולות האלה בשום מקום למטה.
+--
+-- תוספת נוספת, אותו P0 (Issue #7, asaf/lior-household-role, אישור עמית + לירון): שורות
+-- partner_lior בבלוק role_templates למטה הן חבילה מפורשת אחת שהיא האיחוד של
+-- partner_full_finance_edit + partner_household -- אין כאן שום יכולת חדשה ואין שינוי ל-
+-- capabilities או ל-company_capability_map, רק צירוף שתי חבילות קיימות תחת שם אחד כדי
+-- שאפשר יהיה לאשר את ליאור בהרצת rollout/030_approve_member.sql אחת במקום שתיים.
+-- partner_household נשארת חבילה עצמאית תקפה (לחברה עתידית שרק צריכה משק בית). גם כאן:
+-- לא הורץ על שום Supabase, ושקד לא מקבלת מזה כלום.
 
 -- BEGIN SEED capabilities
 insert into public.capabilities (key, description) values
@@ -392,7 +400,21 @@ insert into public.role_templates (role, capability) values
   -- ברצף, או grant של יכולת בודדת). שקד לא מקבלת את זה בשום מקום.
   ('partner_household', 'hq.view'),
   ('partner_household', 'company.household.read'),
-  ('partner_household', 'company.household.write');
+  ('partner_household', 'company.household.write'),
+  -- partner_lior (Issue #7, P0, בקשת עמית, אישור לירון): חבילה מפורשת אחת = האיחוד המדויק של
+  -- partner_full_finance_edit + partner_household (בלי כפילויות), כדי לאשר את ליאור בקריאת
+  -- rbac_approve_member אחת במקום שתיים. אין כאן שום יכולת חדשה, רק צירוף חבילות קיימות תחת
+  -- שם אחד. שקד (designer_beit_hadash) לא מקבלת אף אחת מהיכולות האלה.
+  ('partner_lior', 'hq.view'),
+  ('partner_lior', 'company.beit-hadash.read'),
+  ('partner_lior', 'company.beit-hadash.write'),
+  ('partner_lior', 'finance.dashboard_budget.read'),
+  ('partner_lior', 'finance.dashboard_budget.write'),
+  ('partner_lior', 'finance.transactions.read'),
+  ('partner_lior', 'finance.transactions.write'),
+  ('partner_lior', 'core.read'),
+  ('partner_lior', 'company.household.read'),
+  ('partner_lior', 'company.household.write');
 -- END SEED role_templates
 
 commit;

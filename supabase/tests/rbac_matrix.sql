@@ -87,6 +87,7 @@ insert into public.workspace_state (workspace_id, company_key, data) values
   (pg_temp.home_ws(), 'hq:kesef-transactions:v1', '{"a":1}'), (pg_temp.home_ws(), 'hq:core:v1', '{"a":1}'),
   (pg_temp.home_ws(), 'hq:unmapped:v1', '{"a":1}'),
   (pg_temp.home_ws(), 'hq:wellbeing:v3', '{"copied_by_mistake":true}'),   -- מפתח אישי שהועתק בטעות: חייב להישאר owner בלבד
+  (pg_temp.home_ws(), 'hq:household:v1', '{"a":1}'),   -- "משק בית" (Issue #7): מפתח משותף נפרד, לא חלק מאף חבילת כספים
   (pg_temp.other_ws(), 'hq:beit-hadash:v2', '{"a":1}');
 -- נתונים אישיים קיימים (לפי משתמש), כמו שהאפליקציה שומרת היום
 insert into public.company_state (user_id, company_key, data) values
@@ -393,3 +394,33 @@ select pg_temp.expect('read-only designer: file replace', 'denied', pg_temp.run_
 select pg_temp.expect('read-only designer: cannot delete even their own earlier upload', 'denied', pg_temp.run_as(pg_temp.designer_id(), format($q$delete from storage.objects where bucket_id='home-documents' and name=%L$q$, pg_temp.obj('designer-file'))));
 select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'designer_beit_hadash')$q$, pg_temp.home_ws(), pg_temp.designer_id()));
 select pg_temp.expect('restored designer: file insert works again', 'allowed', pg_temp.run_as(pg_temp.designer_id(), format($q$insert into storage.objects(bucket_id, name, owner_id) values ('home-documents', %L, %L)$q$, pg_temp.home_ws()::text || '/ro.pdf', pg_temp.designer_id()::text)));
+
+-- ---------- שלב 8 (Issue #7, P0): partner_lior — חבילה מפורשת אחת = איחוד partner_full_finance_edit +
+-- partner_household, מוענקת באישור יחיד (approve מוסיף יכולות ולא מסיר, ולכן מסירים קודם כדי לקבל
+-- בדיוק את החבילה, כמו בשלבים הקודמים). בודקים: עריכה בבית חדש, בדשבורד/תקציב הכספים ובתנועות
+-- הגולמיות, עריכה במשק בית (חדש כאן, Issue #7), קריאה בלבד בליבה, וסגור לגמרי במפתחות שלא ממופים
+-- או אישיים (עמדה זהה ל"נפשי", שאף פעם לא בחברת אחזקות משותפת) -- בלי קשר לחבילה. שקד וזר לא מקבלים
+-- כלום מהחבילה הזו, כולל לא משק בית.
+select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_remove_member(%L, %L)$q$, pg_temp.home_ws(), pg_temp.partner_id()));
+select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'partner_lior')$q$, pg_temp.home_ws(), pg_temp.partner_id()));
+truncate spec;
+insert into spec values
+  ('partner hq', 'hq:beit-hadash:v2', 'siu'), ('partner hq', 'hq:kesef:v1', 'siu'), ('partner hq', 'hq:kesef-transactions:v1', 'siu'),
+  ('partner hq', 'hq:household:v1', 'siu'), ('partner hq', 'hq:core:v1', 's'),
+  ('partner hq', 'hq:unmapped:v1', ''), ('partner hq', 'hq:wellbeing:v3', ''),
+  ('designer hq', 'hq:household:v1', ''), ('designer hq', 'hq:kesef:v1', ''), ('designer hq', 'hq:kesef-transactions:v1', ''), ('designer hq', 'hq:core:v1', ''),
+  ('stranger hq', 'hq:household:v1', ''), ('stranger hq', 'hq:beit-hadash:v2', ''), ('stranger hq', 'hq:kesef:v1', ''), ('stranger hq', 'hq:kesef-transactions:v1', ''), ('stranger hq', 'hq:core:v1', '');
+select pg_temp.run_matrix('P8 partner_lior (single-template union: finance edit + household)');
+
+select pg_temp.expect('P8: single approve_member call granted exactly the union (10 capabilities, no more, no less)', '10',
+  pg_temp.run_as(pg_temp.partner_id(), format($q$select count(*)::text from public.member_capabilities where workspace_id=%L and user_id=%L and revoked_at is null$q$, pg_temp.home_ws(), pg_temp.partner_id()), 'value'));
+select pg_temp.expect('P8: isolation — partner_lior still cannot read another workspace', 'denied',
+  pg_temp.run_as(pg_temp.partner_id(), format($q$select 1 from public.workspace_state where workspace_id=%L$q$, pg_temp.other_ws())));
+select pg_temp.expect('P8: isolation — partner_lior still cannot write into another workspace', 'denied',
+  pg_temp.run_as(pg_temp.partner_id(), format($q$insert into public.workspace_state(workspace_id, company_key, data) values (%L,'hq:household:v1','{}')$q$, pg_temp.other_ws())));
+select pg_temp.expect('P8: partner_lior does not reach nefesh-like personal keys (never shared, regardless of template)', 'denied',
+  pg_temp.run_as(pg_temp.partner_id(), format($q$select 1 from public.workspace_state where workspace_id=%L and company_key='hq:wellbeing:v3'$q$, pg_temp.home_ws())));
+
+-- מחזירים את ליאור למצב הקודם (A, ברירת המחדל של שלב 6) כדי שהקובץ יישאר תקין להרחבה עתידית.
+select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_remove_member(%L, %L)$q$, pg_temp.home_ws(), pg_temp.partner_id()));
+select pg_temp.do_as(pg_temp.owner_id(), format($q$select public.rbac_approve_member(%L, %L, 'partner_budget_view')$q$, pg_temp.home_ws(), pg_temp.partner_id()));
