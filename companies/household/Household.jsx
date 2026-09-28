@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingBasket, Check, ChevronDown, Plus } from "lucide-react";
+import { ShoppingBasket, Check, ChevronDown, Plus, Receipt, Store, X } from "lucide-react";
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
@@ -12,7 +12,13 @@ import {
   groupByRoute, filterEntries, detectCategory, addCategoryKeyword,
   budgetVsActual, budgetTrend, repeatProducts, repeatCategories, pricePerUnit,
   groceryAlerts, INSUFFICIENT_DATA,
+  knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
 } from "./grocery-model";
+// רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
+// אין fallback ל-base64, ו"לא מופעל" הוא ההתנהגות הצפויה כל עוד Storage לא הופעל בפרודקשן.
+// ייבוא חוצה-חברות מקובל כאן כי זה widget UI גנרי, לא לוגיקת דומיין; הזזה ל-lib/ תיעשה בנפרד בעתיד.
+import ImageAttachments, { ImageStrip, useImageTracker } from "@/companies/beit-hadash/ImageAttachments";
+import { imagesOf } from "@/companies/beit-hadash/images";
 
 /*
   משק בית — v1: "סופר" בלבד (רשימת קניות משותפת + היסטוריית רכישות + חיסכון).
@@ -36,6 +42,7 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, purchased }) {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [price, setPrice] = useState(item.price ?? "");
+  const [store, setStore] = useState(item.store ?? "");
 
   return (
     <div style={{ borderBottom: `1px solid ${LINE}`, padding: "10px 0" }}>
@@ -49,6 +56,7 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, purchased }) {
             <Pill color={INK}>{item.category}</Pill>
             {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
             {purchased && item.price != null && <Pill color={GREEN}>{ils(item.price)}</Pill>}
+            {purchased && item.store && <Pill color={MUTED}>{item.store}</Pill>}
           </div>
           {item.note && <div style={{ fontSize: 12, color: MUTED, marginTop: 4, overflowWrap: "anywhere" }}>{item.note}</div>}
         </div>
@@ -99,8 +107,14 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, purchased }) {
       )}
 
       {open && purchased && (
-        <div style={{ marginTop: 10, marginRight: 4, display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ marginTop: 10, marginRight: 4, display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", minWidth: 0 }}>
           <LabeledInput label="מחיר בפועל (₪)" value={price} onBlur={v => { setPrice(v); onUpdate(item.id, { price: toN(v) || null }); }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>חנות</div>
+            <input className="hq-field" list="household-known-stores" value={store} onChange={e => setStore(e.target.value)}
+              onBlur={e => onUpdate(item.id, { store: e.target.value })} placeholder="איפה קניתם?"
+              style={{ ...inputStyle, minWidth: 0, width: 140 }} />
+          </div>
           <span style={{ fontSize: 11, color: MUTED, paddingBottom: 8 }}>
             {new Date(item.purchasedAt).toLocaleDateString("he-IL")}
           </span>
@@ -201,6 +215,7 @@ function ShoppingList({ g, setGrocery }) {
 
       <QuickAdd onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
       {showFullForm && <FullAddForm dict={g.categoryDict} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
+      <datalist id="household-known-stores">{knownStores(g).map(s => <option key={s} value={s} />)}</datalist>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
         {FILTERS.map(f => (
@@ -302,9 +317,211 @@ function Savings({ g, setGrocery }) {
   );
 }
 
+/** שורת פריט אד-הוק בטופס הקבלה: דבר שלא היה ברשימה (קבלות אמיתיות כוללות תמיד גם כאלה). */
+function AdHocRow({ row, onChange, onRemove }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto", gap: 6, alignItems: "center" }}>
+      <input className="hq-field" placeholder="שם פריט" value={row.name} onChange={e => onChange({ ...row, name: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
+      <input className="hq-field" placeholder="מחיר ₪" value={row.price} onChange={e => onChange({ ...row, price: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
+      <input className="hq-field" placeholder="כמות" value={row.qty} onChange={e => onChange({ ...row, qty: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
+      <button type="button" aria-label="הסרת שורה" onClick={onRemove} style={{ border: "none", background: "transparent", color: MUTED, cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><X size={15} /></button>
+    </div>
+  );
+}
+
+/** טופס "קבלה": שם חנות + תאריך, בחירה ממה שברשימה (עם מחיר לכל פריט) ושורות אד-הוק, ותמונה אופציונלית. */
+function ReceiptForm({ g, setGrocery }) {
+  const stores = knownStores(g);
+  const [store, setStore] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [prices, setPrices] = useState({}); // itemId -> price string, נוכח = נבחר
+  const [adHoc, setAdHoc] = useState([]);
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState("");
+  const [savedMsg, setSavedMsg] = useState("");
+  const tracker = useImageTracker([]);
+
+  const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
+  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]); setSavedMsg(""); };
+
+  const submit = () => {
+    setError(""); setSavedMsg("");
+    const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null }));
+    const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null }));
+    if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
+    if (listItems.length === 0 && adHocItems.length === 0) { setError("בחרו לפחות פריט אחד מהרשימה, או הוסיפו שורה ידנית."); return; }
+    const { state: next, receiptId } = logReceipt(g, { store, date, listItems, adHocItems });
+    if (!receiptId) { setError("לא הצלחנו לרשום את הקבלה — בדקו את הפרטים."); return; }
+    const withImages = images.length ? updateReceiptImages(next, receiptId, images) : next;
+    tracker.settle(images, true);
+    setGrocery(withImages);
+    tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]);
+    setSavedMsg("הקבלה נשמרה, ועברה להיסטוריית הרכישות.");
+  };
+
+  const activeItems = g.items;
+
+  return (
+    <div>
+      <h3 style={{ margin: "0 0 4px", fontSize: 18 }}>רישום קבלה</h3>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>אחרי קנייה: מי החנות, מתי, ומה נקנה בפועל (מהרשימה ו/או דברים שלא תוכננו) — כדי לדעת איפה כדאי לקנות.</p>
+
+      <div style={{ ...cardStyle, padding: 14, marginBottom: 14, display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>חנות</div>
+            <input className="hq-field" list="household-known-stores" placeholder="למשל שופרסל, רמי לוי…" value={store} onChange={e => setStore(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+            <datalist id="household-known-stores">{stores.map(s => <option key={s} value={s} />)}</datalist>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>תאריך</div>
+            <input type="date" className="hq-field" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>מתוך הרשימה שצריך לקנות ({activeItems.length})</div>
+          {activeItems.length === 0 ? (
+            <div style={{ fontSize: 13, color: MUTED }}>אין כרגע פריטים פעילים ברשימה — אפשר עדיין להוסיף שורות ידניות למטה.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 6 }}>
+              {activeItems.map(item => {
+                const checked = item.id in prices;
+                return (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, fontSize: 13, cursor: "pointer" }}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
+                      <span style={{ overflowWrap: "anywhere" }}>{item.name}{item.qty != null && ` (${item.qty} ${item.unit})`}</span>
+                    </label>
+                    {checked && <input className="hq-field" placeholder="מחיר ₪" value={prices[item.id]} onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 90, flexShrink: 0 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>שורות נוספות (דברים שלא היו ברשימה)</div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {adHoc.map((row, i) => (
+              <AdHocRow key={i} row={row} onChange={r => setAdHoc(rows => rows.map((x, idx) => (idx === i ? r : x)))} onRemove={() => setAdHoc(rows => rows.filter((_, idx) => idx !== i))} />
+            ))}
+          </div>
+          <button type="button" onClick={() => setAdHoc(rows => [...rows, { name: "", price: "", qty: "" }])}
+            style={{ marginTop: 8, fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <Plus size={13} /> הוספת שורה
+          </button>
+        </div>
+
+        <ImageAttachments images={images} onChange={setImages} tracker={tracker} label="תמונת קבלה" />
+
+        {error && <p role="alert" style={{ color: RUST, fontSize: 13, margin: 0 }}>{error}</p>}
+        {savedMsg && <p role="status" style={{ color: GREEN, fontSize: 13, margin: 0 }}>{savedMsg}</p>}
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={submit} style={{ flex: 1, border: "none", background: INK, color: BG, borderRadius: 2, padding: "10px 0", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <Receipt size={15} /> שמירת קבלה
+          </button>
+          <button onClick={reset} style={{ border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}>איפוס</button>
+        </div>
+      </div>
+
+      <Sec title="קבלות אחרונות" />
+      <div style={cardStyle}>
+        {g.receipts.length === 0 && <div style={{ padding: "10px 0", fontSize: 13, color: MUTED }}>עדיין לא נרשמה שום קבלה.</div>}
+        {[...g.receipts].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 10).map(r => {
+          const lines = g.history.filter(h => h.receiptId === r.id);
+          const total = lines.filter(h => h.price != null).reduce((s, h) => s + h.price, 0);
+          return (
+            <div key={r.id} style={{ padding: "8px 0", borderBottom: `1px solid ${LINE}`, display: "grid", gap: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
+                <span><b>{r.store}</b> · {new Date(r.date).toLocaleDateString("he-IL")} · {lines.length} פריטים</span>
+                <span style={{ color: MUTED, flexShrink: 0 }}>{total > 0 ? ils(total) : ""}</span>
+              </div>
+              {imagesOf(r).length > 0 && <ImageStrip entry={r} size={56} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ByStore({ g }) {
+  const totals = storeTotals(g.history);
+  const products = mostPurchasedProducts(g.history);
+  const cats = mostPurchasedCategories(g.history);
+  const cheapest = cheapestStoreSeen(g.history);
+
+  return (
+    <div>
+      <h3 style={{ margin: "0 0 10px", fontSize: 18 }}>לפי חנות</h3>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>איפה קונים הכי הרבה, ומה עולה יותר או פחות בכל חנות — לפי מה שתועד בפועל, בלי נתוני מחירים חיצוניים.</p>
+
+      <Sec title="סך הוצאה לפי חנות" />
+      <div style={cardStyle}>
+        {totals.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — עדיין אין רכישות עם חנות ומחיר.</div>}
+        {totals.map(t => (
+          <div key={t.store} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
+            <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{t.store}</span>
+            <span style={{ color: MUTED, flexShrink: 0 }}>{ils(t.total)} · {t.count} פריטים · ממוצע {ils(t.avgItemPrice)}</span>
+          </div>
+        ))}
+      </div>
+
+      <Sec title="הכי נקנה (לפי תדירות)" />
+      <div style={cardStyle}>
+        {products.byFrequency.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA}</div>}
+        {products.byFrequency.slice(0, 8).map(p => (
+          <div key={p.key} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
+            <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.key}</span><span style={{ color: MUTED, flexShrink: 0 }}>{p.count} פעמים</span>
+          </div>
+        ))}
+      </div>
+
+      <Sec title="הכי הרבה כסף (לפי סך הוצאה)" />
+      <div style={cardStyle}>
+        {products.bySpend.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — עדיין אין רכישות עם מחיר תקין.</div>}
+        {products.bySpend.slice(0, 8).map(p => (
+          <div key={p.key} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
+            <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.key}</span><span style={{ color: MUTED, flexShrink: 0 }}>{ils(p.total)}</span>
+          </div>
+        ))}
+      </div>
+
+      <Sec title="קטגוריות מובילות" />
+      <div style={cardStyle}>
+        {cats.byFrequency.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA}</div>}
+        {cats.byFrequency.slice(0, 6).map(c => (
+          <div key={c.key} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
+            <span>{c.key}</span><span style={{ color: MUTED, flexShrink: 0 }}>{c.count} פעמים</span>
+          </div>
+        ))}
+      </div>
+
+      <Sec title="החנות הזולה ביותר שראינו (עובדתי, לא המלצה)" />
+      <div style={cardStyle}>
+        {cheapest.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{INSUFFICIENT_DATA} — נדרש מחיר לאותו מוצר מ-2 חנויות שונות לפחות כדי להשוות.</div>}
+        {cheapest.slice(0, 10).map(f => (
+          <div key={f.name} style={{ padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{f.name}</span>
+              <span style={{ color: GREEN, flexShrink: 0 }}>{f.cheapestStore} · {ils(f.cheapestPrice)}</span>
+            </div>
+            <div style={{ color: MUTED, fontSize: 12, marginTop: 2 }}>
+              {f.stores.map(s => `${s.store} ${ils(s.minPrice)}`).join(" · ")}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Household() {
   const { data: d, setData: setD, ready } = useStore(STORE_KEY, INIT);
-  const [sub, setSub] = useState("list"); // list | savings
+  const [sub, setSub] = useState("list"); // list | receipt | byStore | savings
 
   // תאימות אחורה: משלים שדות חסרים בנתונים ישנים בלי לדרוס שום דבר קיים.
   useEffect(() => {
@@ -318,12 +535,17 @@ export default function Household() {
 
   return (
     <div style={{ minWidth: 0 }}>
-      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, מסלול קנייה וניתוח חיסכון — v1: סופר בלבד.</p>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, קבלות עם חנות ותמונה, ניתוח חיסכון ולפי חנות — v1: סופר בלבד.</p>
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => setSub("list")} style={tabBtn(sub === "list")}><ShoppingBasket size={13} style={{ marginLeft: 5 }} />רשימת קניות</button>
+        <button onClick={() => setSub("receipt")} style={tabBtn(sub === "receipt")}><Receipt size={13} style={{ marginLeft: 5 }} />קבלה</button>
+        <button onClick={() => setSub("byStore")} style={tabBtn(sub === "byStore")}><Store size={13} style={{ marginLeft: 5 }} />לפי חנות</button>
         <button onClick={() => setSub("savings")} style={tabBtn(sub === "savings")}>חיסכון</button>
       </div>
-      {sub === "list" ? <ShoppingList g={g} setGrocery={setD} /> : <Savings g={g} setGrocery={setD} />}
+      {sub === "list" && <ShoppingList g={g} setGrocery={setD} />}
+      {sub === "receipt" && <ReceiptForm g={g} setGrocery={setD} />}
+      {sub === "byStore" && <ByStore g={g} />}
+      {sub === "savings" && <Savings g={g} setGrocery={setD} />}
     </div>
   );
 }

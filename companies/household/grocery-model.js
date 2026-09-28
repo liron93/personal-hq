@@ -46,14 +46,17 @@ export const DEFAULT_CATEGORY_DICT = Object.freeze({
 });
 
 export function createGroceryState() {
-  return { items: [], history: [], categoryDict: { ...DEFAULT_CATEGORY_DICT }, monthlyBudget: null };
+  return { items: [], history: [], categoryDict: { ...DEFAULT_CATEGORY_DICT }, monthlyBudget: null, receipts: [] };
 }
 
-/** מבטיח שדות רשימת-קניות תקינים גם אם חסרים בנתונים ישנים (תאימות אחורה). */
+/**
+ * מבטיח שדות רשימת-קניות תקינים גם אם חסרים בנתונים ישנים (תאימות אחורה).
+ * receipts: נוסף בפיצ'ר הקבלות — נתונים ישנים בלי השדה מקבלים מערך ריק, לא נדרס שום דבר קיים.
+ */
 export function ensureGroceryState(d) {
   const base = d && typeof d === "object" ? d : {};
-  if (Array.isArray(base.items) && Array.isArray(base.history) && base.categoryDict) return base;
-  return { ...createGroceryState(), ...base };
+  if (Array.isArray(base.items) && Array.isArray(base.history) && base.categoryDict && Array.isArray(base.receipts)) return base;
+  return { ...createGroceryState(), ...base, receipts: Array.isArray(base.receipts) ? base.receipts : [] };
 }
 
 const norm = s => String(s || "").trim();
@@ -135,14 +138,17 @@ export function removeItem(state, id) {
   return { ...state, items: state.items.filter(i => i.id !== id) };
 }
 
-/** סימון כנרכש: מעביר את הפריט מ-items להיסטוריה (לא נמחק לעולם). מחיר אופציונלי, לחישובי חיסכון. */
-export function markPurchased(state, id, { price = null, purchasedAt = new Date().toISOString() } = {}) {
+/** נורמליזציה של שם חנות: טקסט חופשי, נשמר null כשריק (בדיוק כמו price). לעולם לא בודים שם. */
+const normStore = store => { const s = norm(store); return s || null; };
+
+/** סימון כנרכש: מעביר את הפריט מ-items להיסטוריה (לא נמחק לעולם). מחיר וחנות אופציונליים, לחישובי חיסכון/ניתוח לפי חנות. */
+export function markPurchased(state, id, { price = null, purchasedAt = new Date().toISOString(), store = null } = {}) {
   const idx = (state.items || []).findIndex(i => i.id === id);
   if (idx === -1) return state;
   const item = state.items[idx];
   const entry = {
     id: item.id, name: item.name, qty: item.qty, unit: item.unit, category: item.category, priority: item.priority,
-    note: item.note, price: isValidNonNegativeNumber(price) ? price : null, purchasedAt,
+    note: item.note, price: isValidNonNegativeNumber(price) ? price : null, purchasedAt, store: normStore(store), receiptId: null,
   };
   return {
     ...state,
@@ -151,13 +157,81 @@ export function markPurchased(state, id, { price = null, purchasedAt = new Date(
   };
 }
 
-/** עדכון רשומת היסטוריה (בעיקר תיקון מחיר בדיעבד). ההיסטוריה עצמה אף פעם לא נמחקת. */
+/** עדכון רשומת היסטוריה (בעיקר תיקון מחיר/חנות בדיעבד). ההיסטוריה עצמה אף פעם לא נמחקת. */
 export function updateHistoryEntry(state, id, patch) {
   const idx = (state.history || []).findIndex(h => h.id === id);
   if (idx === -1) return state;
   const history = state.history.slice();
-  history[idx] = { ...history[idx], ...patch };
+  const next = { ...history[idx], ...patch };
+  if (Object.prototype.hasOwnProperty.call(patch, "store")) next.store = normStore(patch.store);
+  history[idx] = next;
   return { ...state, history };
+}
+
+/** רשימת שמות חנויות שהוזנו בעבר (מהיסטוריה + מקבלות), למיון/הצעה בטופס — רשימה מקומית פשוטה, בלי API חיצוני. */
+export function knownStores(state) {
+  const names = new Set();
+  for (const h of state?.history || []) if (h.store) names.add(h.store);
+  for (const r of state?.receipts || []) if (r.store) names.add(r.store);
+  return [...names].sort((a, b) => heCompare(a, b));
+}
+
+// ---------- קבלה (receipt): רישום קנייה שלמה בבת אחת ----------
+// state.receipts = [{ id, store, date (YYYY-MM-DD), images: [], createdAt }] — מטא-דאטה של הקבלה עצמה
+// (כולל תמונה, ראה ImageAttachments), בנפרד משורות ההיסטוריה כדי לא לשכפל תמונה לכל שורה.
+// כל רשומת היסטוריה שנוצרת מקבלה מקבלת receiptId (נולל'בילי) שמצביע לכאן, לצורך ניתוח עתידי —
+// הבחירה הזו (ולא שכפול store/date/images על כל שורה) שומרת על מקור אמת יחיד לפרטי הקבלה.
+export function createReceiptRecord({ store, date = new Date().toISOString().slice(0, 10) } = {}) {
+  const s = normStore(store);
+  if (!s) return null;
+  return { id: uid(), store: s, date, images: [], createdAt: new Date().toISOString() };
+}
+
+/**
+ * רישום קבלה: גם פריטים שנבחרו מהרשימה הפעילה (listItems: [{id, price, qty?}]) וגם שורות אד-הוק
+ * שלא היו ברשימה (adHocItems: [{name, price, qty, unit, category}]) — קבלות אמיתיות כוללות תמיד
+ * גם דברים שלא תוכננו. price/qty אופציונליים בכל שורה (בדיוק כמו markPurchased) — לעולם לא בודים מחיר.
+ * לא עושה כלום אם אין שם חנות תקין או ששתי הרשימות ריקות (אין מה לרשום).
+ * @returns {{state:object, receiptId:string|null}}
+ */
+export function logReceipt(state, { store, date = new Date().toISOString().slice(0, 10), listItems = [], adHocItems = [] } = {}) {
+  const receipt = createReceiptRecord({ store, date });
+  const validList = (listItems || []).filter(li => li && typeof li.id === "string" && (state.items || []).some(i => i.id === li.id));
+  const validAdHoc = (adHocItems || []).filter(a => isValidName(a?.name));
+  if (!receipt || (validList.length === 0 && validAdHoc.length === 0)) return { state, receiptId: null };
+  const purchasedAt = `${date}T12:00:00.000Z`;
+  const pickedIds = new Set(validList.map(li => li.id));
+  const fromList = validList.map(li => {
+    const item = state.items.find(i => i.id === li.id);
+    return {
+      id: item.id, name: item.name, qty: isValidPositiveNumber(li.qty) ? li.qty : item.qty, unit: item.unit,
+      category: item.category, priority: item.priority, note: item.note,
+      price: isValidNonNegativeNumber(li.price) ? li.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
+    };
+  });
+  const fromAdHoc = validAdHoc.map(a => ({
+    id: uid(), name: norm(a.name), qty: isValidPositiveNumber(a.qty) ? a.qty : null, unit: norm(a.unit),
+    category: CATEGORIES.includes(a.category) ? a.category : detectCategory(a.name, state.categoryDict), priority: DEFAULT_PRIORITY,
+    note: norm(a.note), price: isValidNonNegativeNumber(a.price) ? a.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
+  }));
+  return {
+    state: {
+      ...state,
+      items: state.items.filter(i => !pickedIds.has(i.id)),
+      history: [...state.history, ...fromList, ...fromAdHoc],
+      receipts: [...(state.receipts || []), receipt],
+    },
+    receiptId: receipt.id,
+  };
+}
+
+/** עדכון תמונות של קבלה קיימת (ImageAttachments onChange). */
+export function updateReceiptImages(state, receiptId, images) {
+  const idx = (state.receipts || []).findIndex(r => r.id === receiptId);
+  if (idx === -1) return state;
+  const receipts = state.receipts.slice();
+  receipts[idx] = { ...receipts[idx], images: Array.isArray(images) ? images : [] };
+  return { ...state, receipts };
 }
 
 // ---------- מיון / קיבוץ ----------
@@ -278,6 +352,69 @@ export function repeatCategories(history, { minMonths = 2 } = {}) {
 /** פריטים פעילים שקיבלו "אחר" רק כי שום מילת מפתח לא תאמה — מועמדים לסיווג ידני. */
 export function missingCategorizationItems(items) {
   return (items || []).filter(i => i.category === FALLBACK_CATEGORY && i.categoryAuto);
+}
+
+// ---------- ניתוח לפי חנות (מסך "לפי חנות") ----------
+// כל הפונקציות כאן: לוגיקה טהורה בלבד, אך ורק מרשומות עם מחיר תקין (hasValidPrice) וחנות ידועה, בדיוק
+// כמו pricePerUnit ו-monthlySpend הקיימים. לעולם לא ממציאות מספר — כשאין מספיק נתונים, מחזירות רשימה
+// ריקה / available:false, וה-UI מציג "אין מספיק נתונים" בדיוק כמו מסך החיסכון הקיים.
+
+/** סך הוצאה ומחיר הזמנה ממוצע לכל חנות, מרשומות עם מחיר תקין וחנות ידועה בלבד. ממוין מהגבוה לנמוך. */
+export function storeTotals(history) {
+  const byStore = new Map();
+  for (const h of history || []) {
+    if (!h.store || !hasValidPrice(h)) continue;
+    const s = byStore.get(h.store) || { store: h.store, total: 0, count: 0 };
+    s.total = round2(s.total + h.price); s.count += 1;
+    byStore.set(h.store, s);
+  }
+  return [...byStore.values()].map(s => ({ ...s, avgItemPrice: round2(s.total / s.count) })).sort((a, b) => b.total - a.total || heCompare(a.store, b.store));
+}
+
+/**
+ * המוצרים/הקטגוריות שנרכשים הכי הרבה — לפי תדירות (מספר רכישות, בלי תלות במחיר) ולפי סך הוצאה
+ * (רק מרשומות עם מחיר תקין). שתי רשימות נפרדות כי הן עונות על שאלות שונות ("מה קונים הכי הרבה"
+ * מול "על מה מוציאים הכי הרבה כסף") ולא תמיד אותו מוצר מוביל בשתיהן.
+ */
+function mostPurchasedBy(history, keyOf, { limit = 10 } = {}) {
+  const freq = new Map(), spend = new Map();
+  for (const h of history || []) {
+    const key = keyOf(h);
+    if (!key) continue;
+    freq.set(key, (freq.get(key) || 0) + 1);
+    if (hasValidPrice(h)) spend.set(key, round2((spend.get(key) || 0) + h.price));
+  }
+  const byFrequency = [...freq.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count || heCompare(a.key, b.key)).slice(0, limit);
+  const bySpend = [...spend.entries()].map(([key, total]) => ({ key, total })).sort((a, b) => b.total - a.total || heCompare(a.key, b.key)).slice(0, limit);
+  return { byFrequency, bySpend };
+}
+
+export const mostPurchasedProducts = (history, opts) => mostPurchasedBy(history, h => norm(h.name).toLowerCase() ? h.name : "", opts);
+export const mostPurchasedCategories = (history, opts) => mostPurchasedBy(history, h => h.category || "", opts);
+
+/**
+ * "החנות הזולה ביותר שראינו" למוצר X: קריאה עובדתית טהורה מתוך היסטוריית מחירים — לא המלצה, לא
+ * השוואת מחירים חיה. מופיע רק כשיש נתוני מחיר מ-2 חנויות שונות לפחות לאותו מוצר (אחרת אין בסיס
+ * להשוואה, ולא בודים "הכי זול" משחנות אחת).
+ */
+export function cheapestStoreSeen(history) {
+  const byProduct = new Map(); // name(lower) -> Map(store -> minPrice)
+  for (const h of history || []) {
+    if (!h.store || !hasValidPrice(h)) continue;
+    const key = norm(h.name).toLowerCase();
+    if (!key) continue;
+    const stores = byProduct.get(key) || new Map();
+    stores.set(h.store, Math.min(stores.get(h.store) ?? Infinity, h.price));
+    byProduct.set(key, stores);
+  }
+  const out = [];
+  for (const [key, stores] of byProduct) {
+    if (stores.size < 2) continue; // פחות מ-2 חנויות: אין מספיק נתונים להשוואה
+    const ranked = [...stores.entries()].map(([store, minPrice]) => ({ store, minPrice: round2(minPrice) })).sort((a, b) => a.minPrice - b.minPrice || heCompare(a.store, b.store));
+    const displayName = (history.find(h => norm(h.name).toLowerCase() === key) || {}).name || key;
+    out.push({ name: displayName, cheapestStore: ranked[0].store, cheapestPrice: ranked[0].minPrice, stores: ranked });
+  }
+  return out.sort((a, b) => heCompare(a.name, b.name));
 }
 
 const ils = v => "₪" + Math.round(v || 0).toLocaleString("he-IL");

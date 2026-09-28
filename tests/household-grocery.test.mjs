@@ -16,6 +16,7 @@ const {
   sortItems, groupByRoute, filterEntries,
   monthlySpend, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
+  knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
 } = grocery;
 
 // ---------- זיהוי קטגוריה ----------
@@ -273,8 +274,18 @@ test("ensureGroceryState: תאימות אחורה לנתונים ישנים/חל
   assert.ok(Array.isArray(fixed.items));
   assert.ok(Array.isArray(fixed.history));
   assert.ok(fixed.categoryDict);
+  assert.ok(Array.isArray(fixed.receipts));
   const already = createGroceryState();
   assert.equal(ensureGroceryState(already), already);
+});
+
+test("ensureGroceryState: נתונים ישנים בלי receipts (מלפני פיצ'ר הקבלות) מקבלים מערך ריק, שאר השדות נשארים", () => {
+  const legacy = { items: [{ id: "1", name: "חלב" }], history: [{ id: "2", name: "לחם", price: 10 }], categoryDict: { "חלב": "קירור" }, monthlyBudget: 500 };
+  const fixed = ensureGroceryState(legacy);
+  assert.deepEqual(fixed.receipts, []);
+  assert.equal(fixed.items.length, 1);
+  assert.equal(fixed.history[0].price, 10); // רשומת היסטוריה ישנה בלי store — לא נשברת
+  assert.equal(fixed.monthlyBudget, 500);
 });
 
 // ---------- model.js: summarize() ----------
@@ -314,9 +325,9 @@ test("summarize: קלט חסר/undefined לא קורס — נופל ל-INIT", ()
 });
 
 // ---------- הרשאות/נראות: household עצמאית מ-beit-hadash/כספים, שקד מוחרגת ----------
-// מקביל ברוחו ל-tests/company-visibility-matrix.test.mjs (שאינו קיים עדיין ב-main, כי #79 לא
-// מוזג נכון לרגע כתיבת ה-PR הזה) — כאן ברמת שכבת היכולות (lib/authz/capabilities.js) בלבד,
-// כי זו השכבה שכבר קיימת ב-main ושה-PR הזה מרחיב.
+// #79 מוזג ל-main (b37a65c) ותוסף tests/company-visibility-matrix.test.mjs שם כבר כולל "household"
+// ברמת lib/workspace.js (visibleCompanySlugs/canViewCompany/isHqVisible/isCompanyReadOnly) —
+// הבדיקות כאן משלימות אותו ברמת שכבת היכולות הגולמית (lib/authz/capabilities.js) בלבד.
 test("owner: גישה מלאה לחברת משק בית תמיד, גם בלי שום grant מפורש", () => {
   assert.equal(canAccessStateKey([], HOUSEHOLD_KEY, { isOwner: true }), true);
   assert.equal(canAccessStateKey([], HOUSEHOLD_KEY, { isOwner: true, write: true }), true);
@@ -352,4 +363,183 @@ test("שקד (designer_beit_hadash): אין לה שום גישה למשק בית
 test("זר (בלי שום grant): אין גישה למשק בית", () => {
   assert.equal(canAccessStateKey([], HOUSEHOLD_KEY), false);
   assert.deepEqual(visibleSharedCompanies([]), []);
+});
+
+// ================= קבלות: שדה חנות, רישום קבלה, ניתוח לפי חנות =================
+
+// ---------- שדה store: תאימות אחורה ----------
+test("markPurchased: שדה store אופציונלי, נשמר null כברירת מחדל (תאימות אחורה עם היסטוריה ישנה)", () => {
+  const s1 = quickAddItem(createGroceryState(), "חלב");
+  const s2 = markPurchased(s1, s1.items[0].id, { price: 6.9 });
+  assert.equal(s2.history[0].store, null);
+  assert.equal(s2.history[0].receiptId, null);
+});
+
+test("markPurchased: אפשר להעביר שם חנות, מנורמל (טרים), ריק => null", () => {
+  const s1 = quickAddItem(createGroceryState(), "חלב");
+  const s2 = markPurchased(s1, s1.items[0].id, { price: 6.9, store: "  שופרסל  " });
+  assert.equal(s2.history[0].store, "שופרסל");
+  const s3 = markPurchased(s1, s1.items[0].id, { price: 6.9, store: "   " });
+  assert.equal(s3.history[0].store, null);
+});
+
+test("updateHistoryEntry: אפשר לעדכן/לתקן חנות בדיעבד, מנורמל בדיוק כמו ב-markPurchased", () => {
+  const s1 = quickAddItem(createGroceryState(), "חלב");
+  const s2 = markPurchased(s1, s1.items[0].id);
+  const s3 = updateHistoryEntry(s2, s2.history[0].id, { store: " רמי לוי " });
+  assert.equal(s3.history[0].store, "רמי לוי");
+});
+
+test("knownStores: רשימת שמות חנויות ייחודיים, ממוינים, מהיסטוריה ומקבלות, בלי כפילויות", () => {
+  let s = createGroceryState();
+  s = { ...s, history: [{ name: "א", store: "שופרסל" }, { name: "ב", store: "רמי לוי" }, { name: "ג", store: "שופרסל" }, { name: "ד", store: null }] };
+  assert.deepEqual(knownStores(s), ["רמי לוי", "שופרסל"]);
+});
+
+// ---------- רישום קבלה (receipt) ----------
+test("logReceipt: מתוך פריטי הרשימה — עוברים ל-history עם store/receiptId/date משותפים, יורדים מ-items", () => {
+  let s = quickAddItem(createGroceryState(), "חלב");
+  s = quickAddItem(s, "לחם");
+  const [milk, bread] = s.items;
+  const { state: next, receiptId } = logReceipt(s, {
+    store: "שופרסל", date: "2026-09-20",
+    listItems: [{ id: milk.id, price: 7 }, { id: bread.id, price: 12 }],
+  });
+  assert.ok(receiptId);
+  assert.equal(next.items.length, 0);
+  assert.equal(next.history.length, 2);
+  assert.ok(next.history.every(h => h.store === "שופרסל" && h.receiptId === receiptId));
+  assert.equal(next.receipts.length, 1);
+  assert.equal(next.receipts[0].store, "שופרסל");
+  assert.equal(next.receipts[0].date, "2026-09-20");
+  assert.deepEqual(next.receipts[0].images, []);
+});
+
+test("logReceipt: שורות אד-הוק (לא מהרשימה בכלל) — קטגוריה מזוהה אוטומטית, מחיר/כמות אופציונליים", () => {
+  const s = createGroceryState();
+  const { state: next, receiptId } = logReceipt(s, {
+    store: "רמי לוי", date: "2026-09-21",
+    adHocItems: [{ name: "שוקולד", price: 8.5, qty: 2 }, { name: "דבר בלי מחיר" }],
+  });
+  assert.equal(next.history.length, 2);
+  const choc = next.history.find(h => h.name === "שוקולד");
+  assert.equal(choc.price, 8.5);
+  assert.equal(choc.qty, 2);
+  assert.equal(choc.store, "רמי לוי");
+  assert.equal(choc.receiptId, receiptId);
+  assert.equal(choc.category, FALLBACK_CATEGORY); // "שוקולד" לא במילון ברירת המחדל
+  const noPrice = next.history.find(h => h.name === "דבר בלי מחיר");
+  assert.equal(noPrice.price, null); // לא מומצא
+});
+
+test("logReceipt: משלב פריטי רשימה ואד-הוק תחת אותה קבלה (receiptId משותף)", () => {
+  let s = quickAddItem(createGroceryState(), "ביצים");
+  const egg = s.items[0];
+  const { state: next, receiptId } = logReceipt(s, {
+    store: "יינות ביתן",
+    listItems: [{ id: egg.id, price: 15 }],
+    adHocItems: [{ name: "מגבונים", price: 20 }],
+  });
+  assert.equal(next.history.length, 2);
+  assert.ok(next.history.every(h => h.receiptId === receiptId));
+  assert.equal(next.receipts[0].store, "יינות ביתן");
+});
+
+test("logReceipt: בלי שם חנות תקין — לא עושה כלום ולא זורק", () => {
+  let s = quickAddItem(createGroceryState(), "חלב");
+  const { state: next, receiptId } = logReceipt(s, { store: "   ", listItems: [{ id: s.items[0].id, price: 5 }] });
+  assert.equal(receiptId, null);
+  assert.equal(next, s);
+});
+
+test("logReceipt: חנות תקינה אבל שתי הרשימות ריקות — לא עושה כלום", () => {
+  const s = createGroceryState();
+  const { state: next, receiptId } = logReceipt(s, { store: "שופרסל", listItems: [], adHocItems: [] });
+  assert.equal(receiptId, null);
+  assert.equal(next, s);
+});
+
+test("logReceipt: מזהה פריט רשימה שלא קיים (id זר) מתעלם ממנו בשקט, לא קורס", () => {
+  const s = quickAddItem(createGroceryState(), "חלב");
+  const { state: next } = logReceipt(s, { store: "שופרסל", listItems: [{ id: "לא-קיים", price: 5 }], adHocItems: [{ name: "לחם", price: 10 }] });
+  assert.equal(next.history.length, 1); // רק האד-הוק נקלט
+  assert.equal(next.items.length, 1); // הפריט המקורי לא נגע בו
+});
+
+test("updateReceiptImages: מעדכן את מערך התמונות של קבלה קיימת בלבד", () => {
+  let s = createGroceryState();
+  const { state: withReceipt, receiptId } = logReceipt(s, { store: "שופרסל", adHocItems: [{ name: "לחם", price: 10 }] });
+  const img = { id: "i1", path: "p/1.jpg", name: "1.jpg", mime: "image/jpeg", size: 100, createdAt: new Date().toISOString() };
+  const next = updateReceiptImages(withReceipt, receiptId, [img]);
+  assert.deepEqual(next.receipts[0].images, [img]);
+  const unchanged = updateReceiptImages(withReceipt, "לא-קיים", [img]);
+  assert.deepEqual(unchanged.receipts, withReceipt.receipts); // receiptId זר: לא עושה כלום, לא זורק
+});
+
+// ---------- ניתוח לפי חנות ----------
+test("storeTotals: סך הוצאה וממוצע להזמנה, רק מרשומות עם מחיר תקין וחנות ידועה", () => {
+  const history = [
+    { name: "א", price: 100, store: "שופרסל", purchasedAt: "2026-08-01T00:00:00.000Z" },
+    { name: "ב", price: 50, store: "שופרסל", purchasedAt: "2026-08-05T00:00:00.000Z" },
+    { name: "ג", price: 30, store: "רמי לוי", purchasedAt: "2026-08-06T00:00:00.000Z" },
+    { name: "ד", price: null, store: "שופרסל", purchasedAt: "2026-08-07T00:00:00.000Z" }, // בלי מחיר - לא נספר
+    { name: "ה", price: 40, store: null, purchasedAt: "2026-08-08T00:00:00.000Z" }, // בלי חנות - לא נספר
+  ];
+  const totals = storeTotals(history);
+  assert.deepEqual(totals.map(t => t.store), ["שופרסל", "רמי לוי"]);
+  const shufersal = totals.find(t => t.store === "שופרסל");
+  assert.equal(shufersal.total, 150);
+  assert.equal(shufersal.count, 2);
+  assert.equal(shufersal.avgItemPrice, 75);
+});
+
+test("storeTotals: אין נתוני מחיר/חנות בכלל => רשימה ריקה (UI מציג 'אין מספיק נתונים')", () => {
+  assert.deepEqual(storeTotals([]), []);
+  assert.deepEqual(storeTotals([{ name: "א", price: null, store: "שופרסל" }]), []);
+});
+
+test("mostPurchasedProducts: byFrequency לפי מספר רכישות, bySpend רק מרשומות עם מחיר תקין", () => {
+  const history = [
+    { name: "חלב", price: 6, category: "קירור" }, { name: "חלב", price: 7, category: "קירור" }, { name: "חלב", price: null, category: "קירור" },
+    { name: "לחם", price: 100, category: "יבשים ומזווה" },
+  ];
+  const { byFrequency, bySpend } = mostPurchasedProducts(history);
+  assert.equal(byFrequency[0].key, "חלב");
+  assert.equal(byFrequency[0].count, 3);
+  assert.equal(bySpend[0].key, "לחם"); // 100 > 13 (סך החלב עם מחיר תקין)
+  assert.equal(bySpend[0].total, 100);
+  const milkSpend = bySpend.find(b => b.key === "חלב");
+  assert.equal(milkSpend.total, 13);
+});
+
+test("mostPurchasedCategories: אותו עיקרון, לפי קטגוריה", () => {
+  const history = [
+    { name: "א", category: "קירור", price: 10 }, { name: "ב", category: "קירור", price: 20 }, { name: "ג", category: "ניקיון", price: 5 },
+  ];
+  const { byFrequency, bySpend } = mostPurchasedCategories(history);
+  assert.equal(byFrequency[0].key, "קירור");
+  assert.equal(byFrequency[0].count, 2);
+  assert.equal(bySpend[0].key, "קירור");
+  assert.equal(bySpend[0].total, 30);
+});
+
+test("cheapestStoreSeen: 'החנות הזולה ביותר שראינו' — רק למוצר עם מחיר מ-2+ חנויות שונות", () => {
+  const history = [
+    { name: "חלב", price: 6.9, store: "שופרסל" },
+    { name: "חלב", price: 5.5, store: "רמי לוי" },
+    { name: "חלב", price: 6.2, store: "יינות ביתן" },
+    { name: "לחם", price: 10, store: "שופרסל" }, // חנות יחידה — לא מספיק נתונים
+  ];
+  const facts = cheapestStoreSeen(history);
+  assert.equal(facts.length, 1); // רק "חלב", לא "לחם"
+  const milk = facts[0];
+  assert.equal(milk.name, "חלב");
+  assert.equal(milk.cheapestStore, "רמי לוי");
+  assert.equal(milk.cheapestPrice, 5.5);
+  assert.equal(milk.stores.length, 3);
+});
+
+test("cheapestStoreSeen: אין שום מוצר עם 2+ חנויות => רשימה ריקה, בלי מספר מומצא", () => {
+  assert.deepEqual(cheapestStoreSeen([]), []);
+  assert.deepEqual(cheapestStoreSeen([{ name: "חלב", price: 6, store: "שופרסל" }]), []);
 });
