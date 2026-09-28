@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, ExternalLink, AlertTriangle, Upload, X, Pencil, ChevronDown, Search } from "lucide-react";
+import { Plus, Trash2, ExternalLink, AlertTriangle, Upload, X, Pencil, ChevronDown, Search, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useStore, cp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { ACCEPT_ATTR, CUSTOM_CATEGORY, DOC_CATEGORIES, createHomeDocuments, formatSize, messageFor, objectPath, validateUpload } from "@/lib/home-documents";
 import { STORE_KEY, INIT, DEFAULT_CHECKLIST, CHECKLIST_GROUPS, INSPIRATION_GROUPS, LINE_STATUSES, itemTotal, linesTotal } from "./model";
 import ImageAttachments, { ImageBadge, ImageStrip, purgeImages, useImageTracker } from "./ImageAttachments";
 import { imagesOf } from "./images";
+import { DISLIKE, LIKE, reactionSummary, toggleReaction } from "./reactions";
 import "./renovation-v2.css";
 
 const NAV = [
@@ -318,7 +319,10 @@ function Inspirations({ data, setData }) {
   const categories = data.inspirationCategories || [];
   const [draft, setDraft] = useState(emptyInspiration(categories[0])); const [error, setError] = useState("");
   const [newCategory, setNewCategory] = useState(""); const [categoryError, setCategoryError] = useState("");
+  const [me, setMe] = useState(null); // { id, email } של המשתמש/ת המחוברים, לתיעוד מי הגיב/ה
   const tracker = useImageTracker([]);
+  useEffect(() => { let alive = true; supabase.auth.getSession().then(({ data: s }) => { const u = s?.session?.user; if (alive && u) setMe({ id: u.id, email: u.email || "" }); }).catch(() => {}); return () => { alive = false; }; }, []);
+  const react = (item, type) => { if (!me) return; setState(setData, d => ({ inspirations: d.inspirations.map(x => x.id === item.id ? { ...x, reactions: toggleReaction(x.reactions, { userId: me.id, email: me.email, type, now: Date.now() }) } : x) })); };
   const startDraft = next => { tracker.settle(draft.images, false); tracker.reset(next.images); setDraft(next); setError(""); }; // מעבר טיוטה: מנקה העלאות שלא נשמרו
   const patch = (key, value) => { setDraft(d => ({ ...d, [key]: value })); setError(""); };
   const save = e => {
@@ -357,6 +361,11 @@ function Inspirations({ data, setData }) {
     {item.description && <p style={{ margin: "6px 0 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{item.description}</p>}
     {imagesOf(item).length > 0 && <div style={{ marginTop: 8 }}><ImageStrip entry={item} /></div>}
     {item.link && <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4, minHeight: 44, color: "#176f7a", overflowWrap: "anywhere" }}><ExternalLink size={15} />{(() => { try { return new URL(item.link).hostname.replace(/^www\./, ""); } catch { return item.link; } })()}</a>}
+    {(() => { const s = reactionSummary(item.reactions, me?.id); return <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+      <button type="button" onClick={() => react(item, LIKE)} disabled={!me} aria-pressed={s.mine === LIKE} aria-label={`לייק ל${item.title}`} title={s.likeLabels.join(", ")} style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 999, border: "1px solid " + (s.mine === LIKE ? "#238a67" : "#DCE3DE"), background: s.mine === LIKE ? "#E6F0EB" : "#fff", color: s.mine === LIKE ? "#1D5A48" : "#44514A", cursor: me ? "pointer" : "default" }}><ThumbsUp size={16} />{s.likes}</button>
+      <button type="button" onClick={() => react(item, DISLIKE)} disabled={!me} aria-pressed={s.mine === DISLIKE} aria-label={`דיסלייק ל${item.title}`} title={s.dislikeLabels.join(", ")} style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 40, padding: "0 12px", borderRadius: 999, border: "1px solid " + (s.mine === DISLIKE ? "#8a6a64" : "#DCE3DE"), background: s.mine === DISLIKE ? "#F3E9E7" : "#fff", color: s.mine === DISLIKE ? "#7a4a42" : "#44514A", cursor: me ? "pointer" : "default" }}><ThumbsDown size={16} />{s.dislikes}</button>
+      {(s.likeLabels.length > 0 || s.dislikeLabels.length > 0) && <span style={{ color: "#63716A", fontSize: 13, overflowWrap: "anywhere" }}>{[s.likeLabels.length ? `👍 ${s.likeLabels.join(", ")}` : "", s.dislikeLabels.length ? `👎 ${s.dislikeLabels.join(", ")}` : ""].filter(Boolean).join(" · ")}</span>}
+    </div>; })()}
   </Card>;
   return <div style={{ display: "grid", gap: 12 }}>
     <div><h2 style={{ margin: 0 }}>השראות</h2><span style={{ color: "#63716A" }}>רעיונות, תמונות וקישורים לבית החדש</span></div>
