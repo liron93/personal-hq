@@ -157,6 +157,27 @@ export function markPurchased(state, id, { price = null, purchasedAt = new Date(
   };
 }
 
+/**
+ * שחזור: מבטל סימון "נרכש" בטעות ומחזיר את הפריט לרשימת "צריך לקנות". מוחק את רשומת ההיסטוריה
+ * (השונה מהכלל הרגיל "היסטוריה לא נמחקת לעולם" בכוונה: זו לא היסטוריית רכישה אמיתית, אלא תיקון
+ * טעות לחיצה, ולכן היא לא אמורה להשפיע על ניתוח חיסכון/הוצאה). אם הרשומה הייתה חלק מקבלה
+ * (receiptId) ואחרי ההסרה לא נשארו לקבלה שורות, מנקה גם את רשומת הקבלה עצמה כדי לא להשאיר קבלה ריקה.
+ */
+export function restoreToList(state, id) {
+  const idx = (state.history || []).findIndex(h => h.id === id);
+  if (idx === -1) return state;
+  const entry = state.history[idx];
+  const item = {
+    id: crypto.randomUUID ? crypto.randomUUID() : uid(), name: entry.name, qty: entry.qty, unit: entry.unit,
+    category: entry.category, categoryAuto: false, priority: entry.priority || DEFAULT_PRIORITY, note: entry.note || "",
+    purchased: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  };
+  const history = state.history.filter(h => h.id !== id);
+  const stillLinked = entry.receiptId && history.some(h => h.receiptId === entry.receiptId);
+  const receipts = entry.receiptId && !stillLinked ? (state.receipts || []).filter(r => r.id !== entry.receiptId) : state.receipts;
+  return { ...state, items: [...(state.items || []), item], history, receipts };
+}
+
 /** עדכון רשומת היסטוריה (בעיקר תיקון מחיר/חנות בדיעבד). ההיסטוריה עצמה אף פעם לא נמחקת. */
 export function updateHistoryEntry(state, id, patch) {
   const idx = (state.history || []).findIndex(h => h.id === id);
