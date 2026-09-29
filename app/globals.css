@@ -39,23 +39,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hq-back-link { border-bottom: 1px solid transparent; transition: border-color 150ms ease, opacity 150ms ease; }
 .hq-back-link:hover { border-bottom-color: currentColor; }
 
-/* סליידר "החליקו לאישור": companies/household/SwipeConfirm.jsx. input[type=range] מותאם
-   כדי להיראות כמו פס גרירה מלא, לא כמו שדה טווח רגיל - הפס נשלט ב-CSS var שהרכיב מעדכן
-   על כל שינוי ערך. min-height 44px ורוחב מלא, כדי שהוא נוח לאצבע ולא צר כמו כפתור. */
-.hq-swipe-confirm { position: relative; min-height: 44px; border-radius: 22px; background: #E9EDF1; overflow: hidden; }
+/* סליידר "החליקו לאישור": companies/household/SwipeConfirm.jsx. גרסה 2: גרירה ידנית עם
+   Pointer Events (לא input[type=range] - בבדיקה אמיתית בטלפון הידית לא הגיבה בכלל, כנראה
+   קונפליקט בין עיצוב מותאם לטיפול המגע המובנה של הדפדפן בטווח). מיקום המילוי/הידית נשלט
+   ע"י --p (0..1) ש-JS מעדכן על כל תזוזה. touch-action:none ברכיב עצמו מבטל לגמרי טיפול מגע
+   של הדפדפן עליו, כדי שלא תהיה תחרות בין הדפדפן ל-JS על אותה גרירה. */
+.hq-swipe-confirm { position: relative; min-height: 44px; border-radius: 22px; background: #E9EDF1; overflow: hidden; user-select: none; -webkit-user-select: none; }
+.hq-swipe-confirm:focus-visible { outline: 2px solid #1D5A48; outline-offset: 2px; }
+.hq-swipe-fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: calc(var(--p, 0) * 100%); background: #1D5A48; border-radius: 22px; pointer-events: none; }
 .hq-swipe-track-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #63716A; font-size: 13px; font-weight: 700; pointer-events: none; z-index: 1; }
-.hq-swipe-confirm input[type="range"] {
-  -webkit-appearance: none; appearance: none; position: relative; z-index: 2; width: 100%; height: 44px; margin: 0;
-  background: linear-gradient(to left, #1D5A48 var(--hq-swipe-pct, 0%), transparent var(--hq-swipe-pct, 0%));
-  border-radius: 22px; cursor: grab; touch-action: pan-y;
+.hq-swipe-thumb {
+  position: absolute; top: 2px; inset-inline-start: calc(var(--p, 0) * (100% - 44px)); width: 40px; height: 40px;
+  border-radius: 50%; background: #238a67; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); z-index: 2; pointer-events: none;
 }
-.hq-swipe-confirm input[type="range"]:active { cursor: grabbing; }
-.hq-swipe-confirm input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 40px; height: 40px; border-radius: 50%; background: #238a67; border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,.25); margin-block: 2px; cursor: grab;
-}
-.hq-swipe-confirm input[type="range"]::-moz-range-thumb { width: 40px; height: 40px; border-radius: 50%; background: #238a67; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: grab; }
-.hq-swipe-confirm input[type="range"]::-moz-range-track { background: transparent; height: 44px; }
 .hq-swipe-confirmed { min-height: 44px; border-radius: 22px; background: #E6F0EB; color: #1D5A48; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
 
 /* בסיס responsive: מסך מלא במובייל, גוף מרכזי קריא בדסקטופ - נאכף דרך lib/ui.jsx / app/page.jsx / CompanyShell */

@@ -76,7 +76,7 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
 
       {/* סליידר החלקה במקום כפתור סימון קטן: פידבק ("קרוב מדי, לחיצה בטעות") - דורש גרירה
           מכוונת לרוחב מלא, לא נגיעה קלה בכפתור צמוד לכפתורים אחרים. */}
-      {!purchased && <div style={{ marginTop: 8 }}><SwipeConfirm onConfirm={() => onPurchase(item.id)} label={`החליקו לאישור: ${item.name} נרכש`} confirmedLabel="נרכש ✓" /></div>}
+      {!purchased && <div style={{ marginTop: 8 }}><SwipeConfirm onConfirm={() => onPurchase(item.id)} label={`החליקו לאישור: ${item.name} נרכש`} /></div>}
 
       {open && !purchased && (
         <div style={{ marginTop: 10, marginRight: 4, display: "grid", gap: 8 }}>
