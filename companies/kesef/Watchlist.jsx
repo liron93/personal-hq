@@ -4,6 +4,7 @@ import { RefreshCw, Plus, ChevronDown } from "lucide-react";
 import { INK, BG, GREEN, RUST, MUTED, LINE, cardStyle, inputStyle, primaryBtn } from "@/lib/theme";
 import { ils } from "@/lib/format";
 import { Sec, Row, EditableNum } from "@/lib/ui";
+import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { newWatchItem, positionStatus } from "./model";
 
 const usd = v => (v == null ? "—" : "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -11,9 +12,9 @@ const pctNum = v => (v == null ? "—" : (Math.round(v * 100) / 100).toLocaleStr
 const fmtTime = t => (t ? new Date(t).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "טרם עודכן");
 
 async function fetchQuote(symbol) {
-  const res = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
+  const res = await apiFetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "שגיאה בשליפת נתונים משירות המידע.");
+  if (!res.ok) throw new Error(apiErrorMessage(res.status, json.error, "שגיאה בשליפת נתונים משירות המידע."));
   return json; // { price, sector, peRatio, dividendYield, fetchedAt }
 }
 
