@@ -357,7 +357,11 @@ insert into public.company_capability_map (company_key, read_capability, write_c
   ('hq:kesef:v1',              'finance.dashboard_budget.read',  'finance.dashboard_budget.write'),
   ('hq:kesef-transactions:v1', 'finance.transactions.read',      'finance.transactions.write'),
   ('hq:core:v1',               'core.read',                      'core.write'),
-  ('hq:household:v1',          'company.household.read',         'company.household.write');
+  ('hq:household:v1',          'company.household.read',         'company.household.write'),
+  -- תכנון 60 חודשים (Issue #7, P1, asaf/five-year-plan-model): מפתח משותף נפרד מ-hq:kesef:v1
+  -- כדי לא לנפח את ה-blob הקיים, אבל ממופה לאותן יכולות כספים קיימות בדיוק -- אין יכולת חדשה
+  -- בבלוק capabilities למעלה, ואין שינוי לשום role_template. עדיין ב-proposed/, לא הורץ.
+  ('hq:kesef:plan:v1',         'finance.dashboard_budget.read',  'finance.dashboard_budget.write');
 -- END SEED company_capability_map
 
 -- BEGIN SEED role_templates

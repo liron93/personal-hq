@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { tabBtn } from "@/lib/theme";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, ensureCurrentMonthSnapshot, assetsTotal } from "./model";
+import { STORE_KEY as PLAN_STORE_KEY, INIT as PLAN_INIT } from "./five-year-plan-model";
 import * as coreFacts from "@/lib/coreFacts";
 import CompanyTasks from "@/lib/CompanyTasks";
 import Dash from "./Dash";
@@ -14,8 +15,12 @@ import MarketConnection from "./MarketConnection";
 import Flow from "./Flow";
 import "@/app/finance-control-room.css";
 
-// recharts כבד — נטען רק כשנכנסים לטאב ההיסטוריה
+// recharts כבד — נטען רק כשנכנסים לטאב הרלוונטי (בדיוק כמו History)
 const History = dynamic(() => import("./History"), {
+  ssr: false,
+  loading: () => <div style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>טוען...</div>,
+});
+const FiveYearPlan = dynamic(() => import("./FiveYearPlan"), {
   ssr: false,
   loading: () => <div style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>טוען...</div>,
 });
@@ -23,12 +28,13 @@ const History = dynamic(() => import("./History"), {
 const TABS = [
   { id: "market", l: "חיבור שוק ארה״ב" },
   { id: "dash", l: "תמונת מצב" }, { id: "flow", l: "תזרים" }, { id: "budget", l: "תקציב" }, { id: "history", l: "היסטוריה" },
-  { id: "assets", l: "נכסים" }, { id: "watchlist", l: "מעקב מניות" }, { id: "tasks", l: "משימות ועדכון" },
+  { id: "assets", l: "נכסים" }, { id: "watchlist", l: "מעקב מניות" }, { id: "plan", l: "תכנון 5 שנים" }, { id: "tasks", l: "משימות ועדכון" },
 ];
 
 export default function Company() {
   const { data: d, setData: setD, upd, ready } = useStore(STORE_KEY, INIT);
   const { data: core, ready: coreReady } = useStore(coreFacts.STORE_KEY, coreFacts.INIT);
+  const { data: planData, setData: setPlanData, ready: planReady } = useStore(PLAN_STORE_KEY, PLAN_INIT);
   const [tab, setTab] = useState("dash");
   // Keep fetched market data across department switches, but never credentials.
   const [marketResult, setMarketResult] = useState(null);
@@ -58,6 +64,9 @@ export default function Company() {
         {tab === "budget" && <Budget d={d} setD={setD} />}
         {tab === "assets" && <Assets d={d} upd={upd} />}
         {tab === "watchlist" && <Watchlist d={d} setD={setD} totalNetWorth={assetsTotal(d.assets)} />}
+        {tab === "plan" && (planReady
+          ? <FiveYearPlan planData={planData} setPlanData={setPlanData} d={d} core={core} />
+          : <div style={{ padding: 40, textAlign: "center", opacity: 0.6 }}>טוען...</div>)}
         {tab === "tasks" && <CompanyTasks d={d} setD={setD} />}
       </div>
     </div>
