@@ -5,6 +5,7 @@ import { tabBtn } from "@/lib/theme";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, ensureCurrentMonthSnapshot, assetsTotal } from "./model";
 import { STORE_KEY as PLAN_STORE_KEY, INIT as PLAN_INIT } from "./five-year-plan-model";
+import { RISEUP_STORE_KEY, RISEUP_INIT } from "./riseup-sync-model";
 import * as coreFacts from "@/lib/coreFacts";
 import CompanyTasks from "@/lib/CompanyTasks";
 import Dash from "./Dash";
@@ -12,6 +13,7 @@ import Budget from "./Budget";
 import Assets from "./Assets";
 import Watchlist from "./Watchlist";
 import MarketConnection from "./MarketConnection";
+import RiseupSync from "./RiseupSync";
 import Flow from "./Flow";
 import "@/app/finance-control-room.css";
 
@@ -27,6 +29,7 @@ const FiveYearPlan = dynamic(() => import("./FiveYearPlan"), {
 
 const TABS = [
   { id: "market", l: "חיבור שוק ארה״ב" },
+  { id: "riseup", l: "סנכרון RiseUp" },
   { id: "dash", l: "תמונת מצב" }, { id: "flow", l: "תזרים" }, { id: "budget", l: "תקציב" }, { id: "history", l: "היסטוריה" },
   { id: "assets", l: "נכסים" }, { id: "watchlist", l: "מעקב מניות" }, { id: "plan", l: "תכנון 5 שנים" }, { id: "tasks", l: "משימות ועדכון" },
 ];
@@ -35,6 +38,9 @@ export default function Company() {
   const { data: d, setData: setD, upd, ready } = useStore(STORE_KEY, INIT);
   const { data: core, ready: coreReady } = useStore(coreFacts.STORE_KEY, coreFacts.INIT);
   const { data: planData, setData: setPlanData, ready: planReady } = useStore(PLAN_STORE_KEY, PLAN_INIT);
+  // צילום סנכרון RiseUp חי במפתח משלו (כמו market-snapshot אצל EODHD) - לא חלק מ-STORE_KEY הראשי,
+  // כדי שכשל/ריענון בו לא יגע בנתוני הכספים הרגילים. נטען כאן ומועבר כ-prop ל-RiseupSync.
+  const { data: riseup, setData: setRiseup, ready: riseupReady } = useStore(RISEUP_STORE_KEY, RISEUP_INIT);
   const [tab, setTab] = useState("dash");
   // חיבור השוק (MarketConnection) שומר את הצילום האחרון בעצמו דרך lib/store.js,
   // פר-משתמש — לא צריך להרים state לכאן כדי לשרוד מעבר בין טאבים או רענון דף.
@@ -57,6 +63,7 @@ export default function Company() {
       </aside>
       <div className="finance-console-content">
         {tab === "market" && <MarketConnection />}
+        {tab === "riseup" && <RiseupSync data={riseup} setData={setRiseup} ready={riseupReady} />}
         {tab === "dash" && <Dash d={d} core={core} onOpenBudget={() => setTab("budget")} />}
         {tab === "flow" && <Flow d={d} setD={setD} core={core} />}
         {tab === "history" && <History d={d} setD={setD} />}
