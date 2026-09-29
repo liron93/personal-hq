@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingBasket, Check, ChevronDown, Plus, Receipt, RotateCcw, Store, X } from "lucide-react";
+import { ShoppingBasket, ChevronDown, Plus, Receipt, RotateCcw, Store, X } from "lucide-react";
+import SwipeConfirm from "./SwipeConfirm";
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
@@ -61,12 +62,6 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
           {item.note && <div style={{ fontSize: 12, color: MUTED, marginTop: 4, overflowWrap: "anywhere" }}>{item.note}</div>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          {!purchased && (
-            <button onClick={() => onPurchase(item.id)} title="סמן כנרכש" aria-label={`סמן ${item.name} כנרכש`}
-              style={{ border: `1px solid ${GREEN}`, background: "transparent", color: GREEN, borderRadius: 2, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Check size={15} />
-            </button>
-          )}
           {purchased && (
             <button onClick={() => onRestore(item.id)} title="שחזור לרשימת הקניות (סומן בטעות)" aria-label={`שחזור ${item.name} לרשימת הקניות`}
               style={{ border: `1px solid ${MUTED}`, background: "transparent", color: INK, borderRadius: 2, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -78,6 +73,10 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
           </button>
         </div>
       </div>
+
+      {/* סליידר החלקה במקום כפתור סימון קטן: פידבק ("קרוב מדי, לחיצה בטעות") - דורש גרירה
+          מכוונת לרוחב מלא, לא נגיעה קלה בכפתור צמוד לכפתורים אחרים. */}
+      {!purchased && <div style={{ marginTop: 8 }}><SwipeConfirm onConfirm={() => onPurchase(item.id)} label={`החליקו לאישור: ${item.name} נרכש`} confirmedLabel="נרכש ✓" /></div>}
 
       {open && !purchased && (
         <div style={{ marginTop: 10, marginRight: 4, display: "grid", gap: 8 }}>
