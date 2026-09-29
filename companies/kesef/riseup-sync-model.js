@@ -1,62 +1,69 @@
-// מודל טהור (בלי import של @/...) לסנכרון RiseUp: מיפוי קטגוריות, דה-דופ, וצילום מצב
-// לשמירה דרך lib/store.js (ראו RiseupSync.jsx). מיובא מ-./model.js בלבד (יחסי, לא @/).
-import { BUDGET_CATS_DEFAULT } from "./model.js";
+// מודל טהור (בלי import של @/...) לסנכרון RiseUp: הכנסה/הוצאה, תיוג מעטפות אישי, דה-דופ,
+// וצילום מצב לשמירה דרך lib/store.js (ראו RiseupSync.jsx).
 
 export const RISEUP_STORE_KEY = "hq:kesef:riseup-snapshot:v1";
 
 // snapshot: null עד סנכרון ראשון מוצלח. lastError: תיעוד ניסיון הסנכרון האחרון שנכשל
-// (כולל "לא מוגדר"), כדי שהמצב ישרוד רענון דף בלי לבצע קריאה נוספת.
-export const RISEUP_INIT = { snapshot: null, lastError: null };
+// (כולל "לא מוגדר"), כדי שהמצב ישרוד רענון דף בלי לבצע קריאה נוספת. envelopeLabels: תיוג
+// אישי של המשתמש/ת למעטפות RiseUp לפי id יציב (ראו למטה) - נשמר בנפרד מהצילום עצמו, כדי
+// שתיוג לא ידרוס/יאבד בסנכרון הבא ולהפך.
+export const RISEUP_INIT = { snapshot: null, lastError: null, envelopeLabels: {} };
+
+export const UNLABELED = "לא מתויג";
+export const SAVINGS_LABEL = "חיסכון";
+const MAX_LABEL_LEN = 40;
 
 /*
-  מיפוי envelopes[].type של RiseUp לקטגוריות התקציב הקיימות (BUDGET_CATS_DEFAULT מ-model.js):
-  ["מזון", "ביטוחים", "מנויים", "פנאי", "חיסכון", "אחר"].
-
-  הטיפוסים אצל RiseUp: fixed, trackingCategory, variable, variableIncome, riseupGoal.
-
-  ההחלטה ולמה:
-  - variableIncome: זו לא הוצאה בכלל - זו הכנסה. מוחרגת לגמרי מסכומי ההוצאה לפי קטגוריה,
-    ומסוכמת בנפרד (summarizeEnvelopes().income). לצרף אותה ל"אחר" היה מעוות את סך ההוצאות.
-  - riseupGoal: יעד חיסכון מפורש שהמשתמש הגדיר ב-RiseUp - יש כאן התאמה סמנטית אמיתית,
-    לא ניחוש -> ממופה ל"חיסכון".
-  - fixed / trackingCategory / variable: אלה מתארים *איך* המעטפה מתנהגת (סכום קבוע חודשי /
-    מעקב מצטבר / סכום משתנה) ולא *במה* היא עוסקת. אין דרך אמינה להסיק מהטיפוס לבד אם מדובר
-    ב"מזון", "ביטוחים" או "מנויים" - וה-API (כפי שתואר) לא חושף קטגוריה חופשית/שם מעטפה
-    כחלק מהחוזה היציב שאפשר לסמוך עליו כאן. ניחוש כזה (למשל "fixed"->"ביטוחים") היה מטעה
-    יותר משהוא מועיל, ומחזיק "עובדה" שאין לנו. לכן שלושת אלה נופלים ל"אחר" *בגלוי* -
-    לא בשקט, ולא כברירת מחדל של "לא ידעתי מה לעשות עם type לא מוכר" (זו סיבה שונה, ראו למטה).
-    שיפור עתידי אפשרי (מחוץ לתחום v1): מיפוי לפי שם/id של המעטפה במקום type בלבד.
-  - כל type שאינו אחד מחמשת הטיפוסים המוכרים: גם הוא נופל ל"אחר", ולעולם לא גורם לקריסה,
-    אבל מדווח בנפרד (summarizeEnvelopes().unmappedTypes) כדי להבדיל בין "ידענו וקבענו אחר
-    במפורש" לבין "type לא מוכר בכלל" - הראשון צפוי, השני כדאי שיבלוט.
+  זיהוי הכנסה מול הוצאה: לפי הסימן של הסכום, כמו שהתיעוד הרשמי של RiseUp מגדיר במפורש
+  ("originalAmount: positive = income, negative = expense") - לא לפי envelopes[].type.
+  גרסה קודמת הסתמכה על type==="variableIncome" בלבד, וזה היה שגוי בפועל: לא כל מעטפת
+  הכנסה אמיתית (למשל משכורת שמוגדרת ב-RiseUp כמעטפה "fixed") נושאת את ה-type הזה, וזה
+  גרם ל"הכנסה בפועל: 0 ₪" גם כשהיו נתוני הכנסה אמיתיים - הם פשוט נספרו כהוצאה ב"אחר".
+  riseupGoal (יעד חיסכון) הוא חריג מפורש: אף פעם לא הכנסה, גם אם מוגדר עם סכום חיובי.
 */
-export const INCOME_TYPES = Object.freeze(["variableIncome"]);
-export const TYPE_TO_CATEGORY = Object.freeze({
-  riseupGoal: "חיסכון",
-  fixed: "אחר",
-  trackingCategory: "אחר",
-  variable: "אחר",
-});
-const FALLBACK_CATEGORY = "אחר";
-
 export function isIncomeEnvelope(envelope) {
-  return INCOME_TYPES.includes(envelope?.type);
+  if (!envelope || envelope.type === "riseupGoal") return false;
+  if (envelope.type === "variableIncome") return true;
+  // originalAmount=0 אינו אות אמין ("שום דבר לא תוכנן"), אז נופלים ל-balancedAmount (בפועל)
+  // כדי לא לפספס הכנסה בלתי מתוכננת/חד-פעמית.
+  const planned = envelope.originalAmount;
+  const amount = Number.isFinite(planned) && planned !== 0 ? planned
+    : Number.isFinite(envelope.balancedAmount) ? envelope.balancedAmount : 0;
+  return amount > 0;
 }
 
-/** מחזיר את קטגוריית ההוצאה של מעטפה, או null אם זו הכנסה (לא נספרת בקטגוריות הוצאה). */
-export function mapEnvelopeCategory(envelope) {
-  if (isIncomeEnvelope(envelope)) return null;
-  const cat = TYPE_TO_CATEGORY[envelope?.type] || FALLBACK_CATEGORY;
-  return BUDGET_CATS_DEFAULT.includes(cat) ? cat : FALLBACK_CATEGORY;
+const norm = s => String(s ?? "").trim().slice(0, MAX_LABEL_LEN);
+
+/** תיוג אישי חדש/מעודכן למעטפה לפי id. תווית ריקה מוחקת תיוג קיים (חוזר ל"לא מתויג"). */
+export function setEnvelopeLabel(labels, id, label) {
+  const clean = labels && typeof labels === "object" ? { ...labels } : {};
+  if (!id) return clean;
+  const value = norm(label);
+  if (!value) delete clean[id]; else clean[id] = value;
+  return clean;
 }
 
-// מסכם envelopes[] לפי קטגוריית הוצאה (מתוכנן/בפועל, ערך מוחלט - כמו est/act בקטגוריית
-// תקציב רגילה ב-model.js, שתמיד מוצגים כחיוביים) + סה"כ הכנסה בנפרד. לא קורס על קלט
-// חסר/משונה - כל שדה חסר מטופל כ-0/מחרוזת ריקה.
-export function summarizeEnvelopes(envelopes) {
-  const byCategory = Object.fromEntries(BUDGET_CATS_DEFAULT.map(c => [c, { planned: 0, actual: 0, count: 0 }]));
+/** כל התוויות שכבר בשימוש, ממוינות א"ב, לצורך auto-complete בממשק - לא רשימה סגורה. */
+export function knownLabels(labels) {
+  return [...new Set(Object.values(labels || {}).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+}
+
+/**
+ * מסכם envelopes[] להכנסה (בנפרד) ולהוצאות לפי התיוג האישי של המשתמש/ת (labels: id -> תווית).
+ * מעטפת יעד חיסכון (riseupGoal) מתויגת אוטומטית "חיסכון" גם בלי תיוג ידני - יש כאן התאמה
+ * סמנטית אמיתית מה-type. מעטפת הוצאה בלי תיוג אישי נופלת ל"לא מתויג" בגלוי, ולא מנוחשת -
+ * ל-RiseUp אין שם/קטגוריה חופשית בחוזה היציב של ה-API (רק id יציב + type כללי), אז המשתמש/ת
+ * הם היחידים שיכולים לדעת אם מעטפה מסוימת היא "סופר", "דלק" או "מסעדות". סכומים בערך מוחלט
+ * (כמו est/act בתקציב הרגיל, שתמיד מוצגים כחיוביים). לא קורס על קלט חסר/משונה.
+ */
+export function summarizeEnvelopes(envelopes, labels = {}) {
   const income = { planned: 0, actual: 0, count: 0 };
-  const unmappedTypes = new Set();
+  const byLabel = new Map(); // תווית -> { planned, actual, count }
+  const bump = (label, planned, actual) => {
+    const row = byLabel.get(label) || { label, planned: 0, actual: 0, count: 0 };
+    row.planned += Math.abs(planned); row.actual += Math.abs(actual); row.count += 1;
+    byLabel.set(label, row);
+  };
 
   for (const raw of Array.isArray(envelopes) ? envelopes : []) {
     const envelope = raw || {};
@@ -64,22 +71,15 @@ export function summarizeEnvelopes(envelopes) {
     const actual = Number.isFinite(envelope.balancedAmount) ? envelope.balancedAmount : 0;
 
     if (isIncomeEnvelope(envelope)) {
-      income.planned += planned;
-      income.actual += actual;
-      income.count += 1;
+      income.planned += planned; income.actual += actual; income.count += 1;
       continue;
     }
-
-    const knownType = envelope.type === "riseupGoal" || Object.prototype.hasOwnProperty.call(TYPE_TO_CATEGORY, envelope.type);
-    if (!knownType) unmappedTypes.add(envelope.type || "(ללא סוג)");
-
-    const cat = mapEnvelopeCategory(envelope) || FALLBACK_CATEGORY;
-    byCategory[cat].planned += Math.abs(planned);
-    byCategory[cat].actual += Math.abs(actual);
-    byCategory[cat].count += 1;
+    const label = envelope.type === "riseupGoal" ? SAVINGS_LABEL : (labels?.[envelope.id] || UNLABELED);
+    bump(label, planned, actual);
   }
 
-  return { byCategory, income, unmappedTypes: Array.from(unmappedTypes) };
+  const byLabelSorted = [...byLabel.values()].sort((a, b) => b.actual - a.actual || b.planned - a.planned || a.label.localeCompare(b.label, "he"));
+  return { income, byLabel: byLabelSorted };
 }
 
 /** דה-דופ: אותו budgetDate + אותו cashflowHash כמו הצילום השמור = שום דבר לא השתנה. */
@@ -88,10 +88,11 @@ export function isSameAsLastSnapshot(prevSnapshot, response) {
 }
 
 /**
- * בונה צילום מעודכן משמור מתוצאת סנכרון מוצלחת.
- * changed=false כשה-cashflowHash זהה לצילום הקודם לאותו חודש (no-op מתועד - שום דבר לא
- * חושב/הוחלף מחדש); syncedAt כן מתעדכן בכל מקרה כדי שהממשק ישקף מתי בוצע ניסיון הסנכרון
- * האחרון בפועל, גם כשהוא היה no-op.
+ * בונה צילום מעודכן משמור מתוצאת סנכרון מוצלחת. הצילום שומר רק את envelopes הגולמיים -
+ * הסיכום (summarizeEnvelopes) מחושב חי במסך מה-envelopes + התיוגים הנוכחיים, כדי שעריכת
+ * תיוג תשפיע מיד על הפילוח בלי לדרוש סנכרון חוזר. changed=false כשה-cashflowHash זהה
+ * לצילום הקודם לאותו חודש (no-op מתועד); syncedAt כן מתעדכן בכל מקרה כדי שהממשק ישקף מתי
+ * בוצע ניסיון הסנכרון האחרון בפועל, גם כשהוא היה no-op.
  */
 export function buildSyncedSnapshot(prevSnapshot, response, now = () => new Date().toISOString()) {
   const syncedAt = now();
@@ -103,7 +104,6 @@ export function buildSyncedSnapshot(prevSnapshot, response, now = () => new Date
     cashflowHash: response.cashflowHash,
     lastUpdatedAt: response.lastUpdatedAt || null,
     envelopes: Array.isArray(response.envelopes) ? response.envelopes : [],
-    summary: summarizeEnvelopes(response.envelopes),
     syncedAt,
     stale: false,
     staleReason: null,
