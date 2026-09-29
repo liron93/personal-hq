@@ -37,6 +37,22 @@ test("personal companies are never part of the shared workspace", () => {
   for (const caps of Object.values(authz.ROLE_TEMPLATES)) for (const c of caps) assert.equal(/health|wellbeing|career|nefesh|avoda/.test(c), false, c);
 });
 
+test("visiblePersonalCompanies (Issue #7, P0): owner sees all personal companies; no non-owner ever sees any of them, not even with hq.view — no more 'empty personal space' consolation prize", () => {
+  assert.deepEqual([...authz.visiblePersonalCompanies([], { isOwner: true })].sort(), [...authz.PERSONAL_COMPANIES].sort());
+  assert.deepEqual(authz.visiblePersonalCompanies([], { isOwner: false }), []);
+  assert.deepEqual(authz.visiblePersonalCompanies(undefined, { isOwner: false }), []);
+  // partner_lior ו-partner_full_finance_edit כוללות hq.view; זה לבדו כבר לא מספיק כדי לראות חברה אישית.
+  for (const template of ["partner_lior", "partner_full_finance_edit", "partner_full_finance", "partner_household"]) {
+    const grants = authz.capabilitiesForTemplate(template);
+    assert.equal(authz.canViewHq(grants), true, template); // יש לה hq.view...
+    assert.deepEqual(authz.visiblePersonalCompanies(grants, { isOwner: false }), [], template); // ...ובכל זאת: כלום
+  }
+  // designer_beit_hadash (בלי hq.view בכלל) גם לא רואה שום חברה אישית.
+  assert.deepEqual(authz.visiblePersonalCompanies(authz.capabilitiesForTemplate("designer_beit_hadash"), { isOwner: false }), []);
+  assert.equal("PARTNER_PERSONAL_COMPANIES" in authz, false); // הקבוע הישן הוסר: אין יותר רשימת "פרס ניחומים"
+  assert.equal("OWNER_ONLY_COMPANIES" in authz, false);
+});
+
 test("B+ is the default for the partner (Liron, 21.9.2026: must be able to edit); B stays read-only; A differs as designed", () => {
   assert.equal(authz.DEFAULT_PARTNER_TEMPLATE, "partner_full_finance_edit");
   const b = authz.capabilitiesForTemplate("partner_full_finance");
