@@ -52,10 +52,16 @@ test("B+ is the default for the partner (Liron, 21.9.2026: must be able to edit)
   const a = authz.capabilitiesForTemplate("partner_budget_view");
   assert.equal(authz.financeLevel(a), "dashboard_budget");
   assert.equal(authz.canAccessStateKey(a, "hq:kesef-transactions:v1"), false);
+  // תכנון 60 חודשים (hq:kesef:plan:v1, Issue #7, P1): ממופה לאותן יכולות בדיוק כמו hq:kesef:v1 — בלי יכולת חדשה.
+  assert.deepEqual(authz.COMPANY_STATE_CAPABILITIES["hq:kesef:plan:v1"], authz.COMPANY_STATE_CAPABILITIES["hq:kesef:v1"]);
+  assert.equal(authz.canAccessStateKey(b, "hq:kesef:plan:v1"), true); // B: קריאה בלבד
+  assert.equal(authz.canAccessStateKey(b, "hq:kesef:plan:v1", { write: true }), false);
+  assert.equal(authz.canAccessStateKey(edit, "hq:kesef:plan:v1", { write: true }), true); // B+: גם עריכה
   const d = authz.capabilitiesForTemplate("designer_beit_hadash");
   assert.deepEqual(authz.visibleSharedCompanies(d), ["beit-hadash"]);
   assert.equal(authz.canViewHq(d), false);
   assert.equal(authz.financeLevel(d), "none");
+  assert.equal(authz.canAccessStateKey(d, "hq:kesef:plan:v1"), false); // שקד לא מקבלת שום גישה לתכנון 60 החודשים
   assert.deepEqual(authz.visibleSharedCompanies(b).sort(), ["beit-hadash", "kesef"]);
   assert.equal(authz.canViewHq(b), true);
 });
