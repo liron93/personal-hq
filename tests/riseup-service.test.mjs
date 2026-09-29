@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getRiseupKey, isRiseupConfigured } from "../lib/riseup-key.mjs";
-import { createRiseupService, categorizeUpstreamStatus, ERROR_CATEGORIES, isValidBudgetDate, RiseupError } from "../lib/riseup-service.mjs";
+import { createRiseupService, categorizeUpstreamStatus, computeLocalFingerprint, ERROR_CATEGORIES, isValidBudgetDate, RiseupError } from "../lib/riseup-service.mjs";
 import { createRiseupHandler } from "../lib/riseup-handler.mjs";
 
 // טוקנים מזויפים בלבד, בצורה שברור שאינה אמיתית. לעולם לא RISEUP_PAT אמיתי בבדיקות.
@@ -177,4 +177,42 @@ test("handler: unexpected non-RiseupError from service is sanitized to a generic
   const res = await h(req());
   assert.equal(res.status, 500);
   assert.doesNotMatch(await res.text(), /SECRET/);
+});
+
+// --- הצורה האמיתית מפרודקשן (29.9.2026, ref 905bc4aae4a5bc53): אין cashflowHash, יש _meta/excluded
+// לא-מתועדים, ולכל envelope יש actuals נוסף. ערכים בדויים בלבד - לא נתוני RiseUp אמיתיים.
+const REAL_SHAPE_ROW = {
+  customerId: 1, budgetDate: "2026-09", lastUpdatedAt: "2026-09-20T10:00:00Z",
+  excluded: [], _meta: { requestId: "demo-fake" },
+  envelopes: [
+    { id: "e1", type: "fixed", originalAmount: -500, balancedAmount: -420, balanceDate: "2026-09-20", actuals: [] },
+    { id: "e2", type: "variableIncome", originalAmount: 1000, balancedAmount: 1000, balanceDate: "2026-09-20", actuals: [] },
+  ],
+};
+
+test("service: real production shape (no cashflowHash, extra _meta/excluded/actuals fields) is accepted, not rejected", async () => {
+  const service = createRiseupService({ fetcher: async () => Response.json(REAL_SHAPE_ROW) });
+  const result = await service(FAKE_TOKEN);
+  assert.equal(result.customerId, 1);
+  assert.equal(result.envelopes.length, 2);
+  assert.ok(result.cashflowHash.startsWith("local:"), "falls back to a locally computed fingerprint");
+});
+
+test("computeLocalFingerprint: deterministic and order-independent", () => {
+  const a = computeLocalFingerprint("2026-09", REAL_SHAPE_ROW.envelopes);
+  const b = computeLocalFingerprint("2026-09", [...REAL_SHAPE_ROW.envelopes].reverse());
+  assert.equal(a, b);
+});
+
+test("computeLocalFingerprint: changes when an amount changes (real change is detected, not masked)", () => {
+  const a = computeLocalFingerprint("2026-09", REAL_SHAPE_ROW.envelopes);
+  const changed = REAL_SHAPE_ROW.envelopes.map(e => e.id === "e1" ? { ...e, balancedAmount: -430 } : e);
+  const b = computeLocalFingerprint("2026-09", changed);
+  assert.notEqual(a, b);
+});
+
+test("service: a server-provided cashflowHash is still used as-is when present (no unnecessary local computation)", async () => {
+  const service = createRiseupService({ fetcher: async () => Response.json(ROW) });
+  const result = await service(FAKE_TOKEN);
+  assert.equal(result.cashflowHash, "hash-1");
 });
