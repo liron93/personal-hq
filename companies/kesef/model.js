@@ -1,4 +1,8 @@
-import { uid } from "@/lib/format";
+// יחסי ולא @/ בכוונה: מאפשר ל-companies/kesef/riseup-sync-model.js (ומבדיקות ב-tests/) לייבא
+// את BUDGET_CATS_DEFAULT מכאן ישירות תחת "node --test" הרגיל, בלי alias resolver - כמו
+// שכל lib/*.mjs הניתן-לבדיקה בפרויקט כבר עושה (למשל lib/eodhd-service.mjs). זהה במובהק
+// ל-"@/lib/format" תחת webpack/Next (jsconfig.json ממפה "@/*" ל-"./*") - אין שינוי התנהגות.
+import { uid } from "../../lib/format.js";
 
 export const STORE_KEY = "hq:kesef:v1";
 
