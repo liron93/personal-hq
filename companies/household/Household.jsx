@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingBasket, Check, ChevronDown, Plus, Receipt, Store, X } from "lucide-react";
+import { ShoppingBasket, Check, ChevronDown, Plus, Receipt, RotateCcw, Store, X } from "lucide-react";
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
@@ -9,7 +9,7 @@ import { STORE_KEY, INIT, ensureHousehold } from "./model";
 import {
   CATEGORIES, PRIORITIES, FILTERS,
   quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry,
-  groupByRoute, filterEntries, detectCategory, addCategoryKeyword,
+  groupByRoute, filterEntries, detectCategory, addCategoryKeyword, restoreToList,
   budgetVsActual, budgetTrend, repeatProducts, repeatCategories, pricePerUnit,
   groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
@@ -38,7 +38,7 @@ function Pill({ color, children }) {
 }
 
 /** שורת פריט: תצוגה מקופלת + טופס עריכה מלא (כמות/יחידה, קטגוריה, עדיפות, הערה) בפתיחה. */
-function ItemRow({ item, onUpdate, onDelete, onPurchase, purchased }) {
+function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased }) {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [price, setPrice] = useState(item.price ?? "");
@@ -65,6 +65,12 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, purchased }) {
             <button onClick={() => onPurchase(item.id)} title="סמן כנרכש" aria-label={`סמן ${item.name} כנרכש`}
               style={{ border: `1px solid ${GREEN}`, background: "transparent", color: GREEN, borderRadius: 2, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Check size={15} />
+            </button>
+          )}
+          {purchased && (
+            <button onClick={() => onRestore(item.id)} title="שחזור לרשימת הקניות (סומן בטעות)" aria-label={`שחזור ${item.name} לרשימת הקניות`}
+              style={{ border: `1px solid ${MUTED}`, background: "transparent", color: INK, borderRadius: 2, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <RotateCcw size={14} />
             </button>
           )}
           <button aria-label={open ? "כיווץ" : "הרחבה"} onClick={() => setOpen(o => !o)} style={{ border: "none", background: "transparent", cursor: "pointer", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -200,6 +206,7 @@ function ShoppingList({ g, setGrocery }) {
   });
   const onDelete = id => patch(prev => removeItem(prev, id));
   const onPurchase = id => patch(prev => markPurchased(prev, id));
+  const onRestore = id => patch(prev => restoreToList(prev, id));
   const onUpdatePurchased = (id, p) => patch(prev => updateHistoryEntry(prev, id, p));
 
   const entries = filterEntries(g, filter);
@@ -234,7 +241,7 @@ function ShoppingList({ g, setGrocery }) {
           <div key={category} style={{ marginBottom: 4 }}>
             <Sec title={category} />
             <div style={cardStyle}>
-              {items.map(item => <ItemRow key={item.id} item={item} purchased={false} onUpdate={onUpdate} onDelete={onDelete} onPurchase={onPurchase} />)}
+              {items.map(item => <ItemRow key={item.id} item={item} purchased={false} onUpdate={onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} />)}
             </div>
           </div>
         ))
@@ -243,7 +250,7 @@ function ShoppingList({ g, setGrocery }) {
           {entries.length === 0 && <div style={{ padding: 16, fontSize: 14, color: MUTED, lineHeight: 1.7 }}>אין פריטים להצגה בפילטר הזה.</div>}
           {entries.map(item => (
             <ItemRow key={`${item.purchased ? "h" : "i"}-${item.id}`} item={item} purchased={item.purchased}
-              onUpdate={item.purchased ? onUpdatePurchased : onUpdate} onDelete={onDelete} onPurchase={onPurchase} />
+              onUpdate={item.purchased ? onUpdatePurchased : onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} />
           ))}
         </div>
       )}

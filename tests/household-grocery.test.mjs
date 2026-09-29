@@ -543,3 +543,50 @@ test("cheapestStoreSeen: אין שום מוצר עם 2+ חנויות => רשימ
   assert.deepEqual(cheapestStoreSeen([]), []);
   assert.deepEqual(cheapestStoreSeen([{ name: "חלב", price: 6, store: "שופרסל" }]), []);
 });
+
+test("שחזור: פריט שסומן בטעות כנרכש חוזר לרשימה ולא נשאר בהיסטוריה", () => {
+  let state = grocery.createGroceryState();
+  ({ state } = { state: grocery.quickAddItem(state, "מלפפון") });
+  const id = state.items[0].id;
+  state = grocery.markPurchased(state, id, { price: 5, store: "שופרסל" });
+  assert.equal(state.items.length, 0);
+  assert.equal(state.history.length, 1);
+  const historyId = state.history[0].id;
+  state = grocery.restoreToList(state, historyId);
+  assert.equal(state.history.length, 0);
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].name, "מלפפון");
+  assert.equal(state.items[0].purchased, false);
+  assert.notEqual(state.items[0].id, id); // מזהה חדש, לא מתנגש עם השורה הישנה
+});
+
+test("שחזור מקבלה: הפריט חוזר לרשימה, ושאר שורות אותה קבלה לא נפגעות", () => {
+  let state = grocery.createGroceryState();
+  ({ state } = { state: grocery.quickAddItem(state, "עגבניות") });
+  const { state: afterReceipt, receiptId } = grocery.logReceipt(state, {
+    store: "רמי לוי", listItems: [{ id: state.items[0].id, price: 8 }], adHocItems: [{ name: "לחם", price: 12 }],
+  });
+  state = afterReceipt;
+  assert.equal(state.history.length, 2);
+  const tomatoEntry = state.history.find(h => h.name === "עגבניות");
+  state = grocery.restoreToList(state, tomatoEntry.id);
+  assert.equal(state.history.length, 1);
+  assert.equal(state.history[0].name, "לחם");
+  assert.equal(state.receipts.length, 1); // הקבלה עדיין רלוונטית לשורה שנשארה
+  assert.equal(state.items.some(i => i.name === "עגבניות"), true);
+});
+
+test("שחזור מקבלה עם שורה יחידה: מוחק גם את רשומת הקבלה הריקה", () => {
+  let state = grocery.createGroceryState();
+  const { state: afterReceipt } = grocery.logReceipt(state, { store: "ויקטורי", adHocItems: [{ name: "חלב", price: 6 }] });
+  state = afterReceipt;
+  assert.equal(state.receipts.length, 1);
+  state = grocery.restoreToList(state, state.history[0].id);
+  assert.equal(state.receipts.length, 0);
+  assert.equal(state.history.length, 0);
+});
+
+test("שחזור עם מזהה לא קיים לא משנה כלום", () => {
+  const state = grocery.createGroceryState();
+  assert.equal(grocery.restoreToList(state, "no-such-id"), state);
+});
