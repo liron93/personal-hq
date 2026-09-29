@@ -244,12 +244,14 @@ test("designer (Shaked): edits Beit Hadash incl. documents end to end; finance a
   assert.equal(canViewCompany(access, "avoda"), false);
 });
 
-test("partner sees Beit Hadash, finance and her own (empty) career; never wellbeing (nefesh)", async () => {
+test("partner sees only Beit Hadash and finance; health/career/wellbeing are completely hidden, not shown as an empty personal space (Issue #7, P0)", async () => {
   reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") } } });
   const access = await resolveAccess(db.client(PARTNER));
-  assert.deepEqual(visibleCompanySlugs(access, SLUGS), ["beit-hadash", "kesef", "health", "avoda"]);
+  assert.deepEqual(visibleCompanySlugs(access, SLUGS), ["beit-hadash", "kesef"]);
   assert.equal(isHqVisible(access), true);
-  assert.equal(isCompanyReadOnly(access, "avoda"), false);
+  assert.equal(canViewCompany(access, "health"), false);
+  assert.equal(canViewCompany(access, "avoda"), false);
+  assert.equal(canViewCompany(access, "nefesh"), false);
 });
 
 test("personal keys of a member (health, career) stay in company_state per user and never touch workspace_state", async () => {
@@ -456,7 +458,7 @@ test("a removed member loses the cached grants: restricted, and a later network 
 
 test("member with capabilities: sees exactly what the grants allow", async () => {
   reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
-  assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(PARTNER)), SLUGS), ["beit-hadash", "kesef", "health", "avoda"]);
+  assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(PARTNER)), SLUGS), ["beit-hadash", "kesef"]);
   assert.deepEqual(visibleCompanySlugs(await resolveAccess(db.client(DESIGNER)), SLUGS), ["beit-hadash"]);
 });
 
@@ -474,7 +476,7 @@ test("network drops AFTER verification: last verified grants are used, without w
   const off = await resolveAccess(db.client(PARTNER));
   assert.deepEqual([off.mode, off.reason, off.stale], ["member", "cached", true]);
   assert.deepEqual(off.grants, first.grants);
-  assert.deepEqual(visibleCompanySlugs(off, SLUGS), ["beit-hadash", "kesef", "health", "avoda"]);
+  assert.deepEqual(visibleCompanySlugs(off, SLUGS), ["beit-hadash", "kesef"]);
   assert.equal(isCompanyReadOnly(off, "kesef"), true); // B נשארת קריאה בלבד גם offline
 });
 
@@ -533,9 +535,11 @@ const SUMMARIES = {
 const ctx = (visible, extra = {}) => buildJarvisContext({ visible: new Set(visible), greeting: "hi", openTasks: 1, urgentActions: [], income: 5, core: { mortgageMonthly: 7 }, coreDenied: false, summaries: SUMMARIES, ...extra });
 
 test("JARVIS context contains only sections of visible companies, and hidden ones are absent entirely", () => {
-  const lior = ctx(["beit-hadash", "kesef", "avoda"]);
-  assert.deepEqual(Object.keys(lior).sort(), ["career", "finance", "greeting", "home", "money", "openTasks", "urgentActions"]);
-  const text = JSON.stringify(lior);
+  // "visible" כאן הוא קלט שרירותי לבדיקת buildJarvisContext כפונקציה טהורה — לא בהכרח מה שליאור
+  // רואה בפועל (מאז Issue #7 P0 היא לא רואה avoda בכלל, ראה tests/company-visibility-matrix.test.mjs).
+  const withCareer = ctx(["beit-hadash", "kesef", "avoda"]);
+  assert.deepEqual(Object.keys(withCareer).sort(), ["career", "finance", "greeting", "home", "money", "openTasks", "urgentActions"]);
+  const text = JSON.stringify(withCareer);
   for (const leak of ["secret-goal", "secret-status", "private decision", "weekWorkouts", "wellbeing", "health"]) assert.equal(text.includes(leak), false, leak);
   assert.deepEqual(Object.keys(ctx(["beit-hadash"], { coreDenied: true })).sort(), ["greeting", "home", "openTasks", "urgentActions"]);
   assert.deepEqual(Object.keys(ctx([])).sort(), ["greeting", "money", "openTasks", "urgentActions"]);
