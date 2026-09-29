@@ -1,98 +1,101 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { Check } from "lucide-react";
+import { CARD, GREEN } from "@/lib/theme";
 
-// סליידר אישור: תגובה לפידבק ("קרוב מדי, קל ללחוץ בטעות") על כפתור "סמן כנרכש" הקודם.
-// גרסה שנייה: הגרסה הראשונה נבנתה על <input type="range"> וב-בדיקה אמיתית בטלפון הידית
-// לא הגיבה בכלל לנגיעה - כנראה קונפליקט בין העיצוב המותאם (-webkit-appearance:none) לבין
-// טיפול המגע המובנה של הדפדפן בטווח. כאן הגרירה ממומשת ידנית לגמרי עם Pointer Events
-// (pointerdown/move/up, עם setPointerCapture כדי שהגרירה תמשיך גם אם האצבע זזה מחוץ
-// לגבולות המדויקים של האלמנט) - בלי להסתמך על טיפול מגע מובנה של אף דפדפן, ולכן אין
-// קונפליקט אפשרי מהסוג הזה. touch-action:none על המסלול מבטל כל טיפול מגע ברירת מחדל של
-// הדפדפן עליו (כולל גלילת העמוד דרכו), כדי שלא תהיה תחרות בין הדפדפן ל-JS על אותו מגע.
-// נגישות: role="slider" + aria-value* + ArrowLeft/ArrowRight/Enter במקלדת - לא "בחינם" כמו
-// input[type=range], אבל ממומש ידנית כאן במפורש.
-const THRESHOLD = 0.8; // 80% מהמרחק - פחות מהגרסה הקודמת (85%), כדי שגרירה אמיתית של אגודל שלא מגיעה בדיוק לקצה עדיין תיחשב
-const THUMB = 44;
-const STEP = 0.1;
+// שורת פריט "ניתנת להחלקה" בסגנון אפליקציית ההודעות של iOS: השורה עצמה (לא רכיב נוסף
+// מתחתיה) היא הסליידר. גרסה קודמת הוסיפה בר סליידר נפרד מתחת לכל שורה - פידבק מפורש:
+// "לא צריך להוסיף בר סליידר אלא השורה עצמה היא סליידר". כאן: גרירת ה-children (תוכן
+// השורה) שמאלה חושפת רקע ירוק עם "נרכש" שהיה מוסתר מאחוריה; שחרור אחרי סף מאשר, לפני
+// הסף מחזיר למקום. הקשה רגילה (טוגל פתיחה, כפתורי restore/chevron בתוך children) ממשיכה
+// לעבוד כרגיל - התערבות בג'סטורה מתחילה רק אחרי שחצינו סף תזוזה אופקי מובהק.
+const THRESHOLD_RATIO = 0.42; // חלק מ-maxDrag (לא מרוחב השורה המלאה - ראו MAX_DRAG למטה)
+const MAX_DRAG_RATIO = 0.55; // כמה מרוחב השורה אפשר לגרור בפועל בפועל
+const MAX_DRAG_PX = 220; // ותקרה מוחלטת, כדי שבמסך רחב (דסקטופ) לא יידרש מרחק גרירה עצום
+const MOVE_THRESHOLD = 6; // px - כמה תזוזה לפני שמחליטים שזו גרירה אופקית ולא הקשה/גלילה
 
-export default function SwipeConfirm({ label = "החליקו לאישור רכישה", confirmedLabel = "נרכש", onConfirm, disabled }) {
-  const trackRef = useRef(null);
-  const draggingRef = useRef(false);
-  const firedRef = useRef(false);
-  const [progress, setProgress] = useState(0); // 0..1
+export default function SwipeConfirm({ onConfirm, disabled, children, revealLabel = "נרכש", ariaLabel }) {
+  const wrapRef = useRef(null);
+  const startRef = useRef(null); // {x, y, maxDrag} | null
+  const draggingRef = useRef(false); // חצינו את סף התזוזה - זו גרירה אופקית ממשית
+  const dxRef = useRef(0);
+  const justDraggedRef = useRef(false); // מדכא click שמגיע מיד אחרי גרירה (גם כזו שחזרה ל-0)
+  const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
 
-  const fire = () => {
-    if (firedRef.current) return;
-    firedRef.current = true;
-    setProgress(1);
-    setConfirmed(true);
-    onConfirm?.();
-  };
-
-  // בודק סף גם מחוץ לגרירה עצמה (למשל אחרי חץ מקלדת), לא רק ב-pointerup.
-  // אפסילון קטן נגד שגיאת נקודה צפה: 8 לחיצות של STEP=0.1 מצטברות ל-0.7999999999999999,
-  // לא 0.8 בדיוק - בלי זה המשתמש "תקוע" בדיוק על ה-80% המוצג במקלדת בלי שהאישור יורה.
-  useEffect(() => {
-    if (progress >= THRESHOLD - 1e-9 && !firedRef.current) fire();
-  }, [progress]); // eslint-disable-line
-
-  const progressFromClientX = clientX => {
-    const el = trackRef.current;
-    if (!el) return 0;
-    const rect = el.getBoundingClientRect();
-    const travel = Math.max(1, rect.width - THUMB);
-    // RTL: 0 בקצה הימני של המסלול, 1 בקצה השמאלי - "גרירה שמאלה" מגדילה את ההתקדמות.
-    const p = (rect.right - THUMB / 2 - clientX) / travel;
-    return Math.min(1, Math.max(0, p));
-  };
+  const clampDx = (raw, maxDrag) => Math.min(0, Math.max(-maxDrag, raw));
 
   const onPointerDown = e => {
-    if (disabled || confirmed) return;
-    draggingRef.current = true;
-    setDragging(true);
-    // try/catch: יכול לזרוק NotFoundError אם הדפדפן כבר לא רואה pointer פעיל עם ה-id הזה
-    // (למשל pointerdown סינתטי/מהיר) - לא קריטי לגרירה עצמה, רק מבטיח שהיא ממשיכה גם
-    // כשהאצבע יוצאת מגבולות האלמנט.
-    try { trackRef.current?.setPointerCapture?.(e.pointerId); } catch { /* לא קריטי */ }
-    setProgress(progressFromClientX(e.clientX));
+    if (disabled) return;
+    const rect = wrapRef.current?.getBoundingClientRect();
+    const maxDrag = Math.min(MAX_DRAG_PX, (rect?.width || 300) * MAX_DRAG_RATIO);
+    startRef.current = { x: e.clientX, y: e.clientY, pointerId: e.pointerId, maxDrag };
+    draggingRef.current = false;
+    // לא תופסים pointer capture כאן במכוון - רק כשמתברר בפועל שזו גרירה אופקית
+    // (ב-onPointerMove), כדי שהקשה רגילה על תוכן השורה תמשיך לעבוד בלי הפרעה.
   };
+
   const onPointerMove = e => {
-    if (!draggingRef.current) return;
-    setProgress(progressFromClientX(e.clientX));
+    const start = startRef.current;
+    if (!start) return;
+    const moveX = e.clientX - start.x;
+    const moveY = e.clientY - start.y;
+    if (!draggingRef.current) {
+      if (Math.abs(moveX) < MOVE_THRESHOLD && Math.abs(moveY) < MOVE_THRESHOLD) return;
+      if (Math.abs(moveY) > Math.abs(moveX)) { startRef.current = null; return; } // גלילה אנכית - משאירים לדפדפן
+      draggingRef.current = true;
+      setDragging(true);
+      try { wrapRef.current?.setPointerCapture?.(e.pointerId); } catch { /* לא קריטי */ }
+    }
+    e.preventDefault();
+    const clamped = clampDx(moveX, start.maxDrag);
+    dxRef.current = clamped;
+    setDx(clamped);
   };
+
   const endDrag = () => {
-    if (!draggingRef.current) return;
+    const start = startRef.current;
+    const wasDragging = draggingRef.current;
+    const finalDx = dxRef.current;
+    startRef.current = null;
     draggingRef.current = false;
     setDragging(false);
-    setProgress(p => {
-      if (p >= THRESHOLD) return p; // ה-effect למעלה כבר מטפל באישור; לא לאפס תוך כדי
-      return 0;
-    });
+    if (!wasDragging || !start) { dxRef.current = 0; setDx(0); return; }
+    justDraggedRef.current = true;
+    queueMicrotask(() => { justDraggedRef.current = false; });
+    if (-finalDx >= start.maxDrag * THRESHOLD_RATIO) {
+      onConfirm?.(); // השורה תיעלם מהרשימה עם עדכון ה-state אצל ההורה - אין צורך לאפס dx
+    } else {
+      dxRef.current = 0;
+      setDx(0);
+    }
   };
 
-  const onKeyDown = e => {
-    if (disabled || confirmed) return;
-    if (e.key === "ArrowLeft") { e.preventDefault(); setProgress(p => Math.min(1, Math.round((p + STEP) * 100) / 100)); }
-    else if (e.key === "ArrowRight") { e.preventDefault(); setProgress(p => Math.max(0, Math.round((p - STEP) * 100) / 100)); }
-    else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fire(); }
+  const onClickCapture = e => {
+    if (justDraggedRef.current) { e.preventDefault(); e.stopPropagation(); }
   };
-
-  if (confirmed) return <div className="hq-swipe-confirmed" role="status">{confirmedLabel}</div>;
 
   return (
-    <div
-      ref={trackRef} className="hq-swipe-confirm" role="slider" tabIndex={disabled ? -1 : 0}
-      aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label={label}
-      aria-disabled={disabled || undefined}
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}
-      onKeyDown={onKeyDown}
-      style={{ "--p": progress, touchAction: "none", cursor: disabled ? "not-allowed" : dragging ? "grabbing" : "grab" }}
-    >
-      <div className="hq-swipe-fill" />
-      <span className="hq-swipe-track-label">{label}</span>
-      <div className="hq-swipe-thumb" style={{ transition: dragging ? "none" : "inset-inline-start 180ms ease" }} />
+    <div ref={wrapRef} className="hq-swipe-row">
+      <div className="hq-swipe-reveal" aria-hidden="true" style={{ background: GREEN }}>
+        <Check size={16} /> {revealLabel}
+      </div>
+      <div
+        className={`hq-swipe-content${dragging ? " dragging" : ""}`}
+        style={{ transform: `translateX(${dx}px)`, transition: dragging ? "none" : "transform 200ms ease", background: CARD }}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}
+        onClickCapture={onClickCapture}
+      >
+        {children}
+      </div>
+      {/* חלופה נגישה למקלדת/קורא מסך: מוסתרת חזותית ומופיעה רק ב-focus (כמו קישור "דלג
+          לתוכן") - לא יוצרת מטרת-נגיעה נוספת למשתמשי עכבר/מגע, ולכן לא חוזרת לבעיה
+          המקורית ("כפתור קטן קרוב מדי, קל ללחוץ בטעות"). */}
+      {!disabled && (
+        <button type="button" className="hq-swipe-a11y" onClick={() => onConfirm?.()} aria-label={ariaLabel || "סימון כנרכש"}>
+          <Check size={14} /> סימון כנרכש
+        </button>
+      )}
     </div>
   );
 }

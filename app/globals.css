@@ -39,20 +39,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hq-back-link { border-bottom: 1px solid transparent; transition: border-color 150ms ease, opacity 150ms ease; }
 .hq-back-link:hover { border-bottom-color: currentColor; }
 
-/* סליידר "החליקו לאישור": companies/household/SwipeConfirm.jsx. גרסה 2: גרירה ידנית עם
-   Pointer Events (לא input[type=range] - בבדיקה אמיתית בטלפון הידית לא הגיבה בכלל, כנראה
-   קונפליקט בין עיצוב מותאם לטיפול המגע המובנה של הדפדפן בטווח). מיקום המילוי/הידית נשלט
-   ע"י --p (0..1) ש-JS מעדכן על כל תזוזה. touch-action:none ברכיב עצמו מבטל לגמרי טיפול מגע
-   של הדפדפן עליו, כדי שלא תהיה תחרות בין הדפדפן ל-JS על אותה גרירה. */
-.hq-swipe-confirm { position: relative; min-height: 44px; border-radius: 22px; background: #E9EDF1; overflow: hidden; user-select: none; -webkit-user-select: none; }
-.hq-swipe-confirm:focus-visible { outline: 2px solid #1D5A48; outline-offset: 2px; }
-.hq-swipe-fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: calc(var(--p, 0) * 100%); background: #1D5A48; border-radius: 22px; pointer-events: none; }
-.hq-swipe-track-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #63716A; font-size: 13px; font-weight: 700; pointer-events: none; z-index: 1; }
-.hq-swipe-thumb {
-  position: absolute; top: 2px; inset-inline-start: calc(var(--p, 0) * (100% - 44px)); width: 40px; height: 40px;
-  border-radius: 50%; background: #238a67; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); z-index: 2; pointer-events: none;
+/* שורת פריט "ניתנת להחלקה" (companies/household/SwipeConfirm.jsx), בסגנון iOS Messages:
+   השורה עצמה היא הסליידר - לא בר נפרד מתחתיה (גרסה קודמת עשתה את זה וזה היה לא נכון,
+   פידבק מפורש). .hq-swipe-row עוטף שתי שכבות: .hq-swipe-reveal (רקע ירוק + "נרכש", קבוע
+   מתחת) ו-.hq-swipe-content (התוכן האמיתי של השורה, זז ב-transform:translateX לפי גרירה
+   שמנוהלת ידנית ב-JS עם Pointer Events - לא input[type=range], ראו הערה בקובץ עצמו).
+   touch-action:pan-y מאפשר לדפדפן לטפל בגלילה אנכית של הרשימה כרגיל; רק תזוזה אופקית
+   מובהקת נתפסת ע"י הג'סטורה. */
+.hq-swipe-row { position: relative; overflow: hidden; border-radius: 10px; }
+.hq-swipe-reveal { position: absolute; inset: 0; display: flex; align-items: center; gap: 6px; padding-inline-start: 18px; color: #fff; font-size: 13px; font-weight: 700; pointer-events: none; }
+.hq-swipe-content { position: relative; z-index: 1; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.hq-swipe-content.dragging { cursor: grabbing; }
+
+/* חלופת נגישות למקלדת/קורא מסך: מוסתרת חזותית ומופיעה רק ב-focus, כמו קישור "דלג לתוכן" -
+   לא יוצרת מטרת-נגיעה נוספת למשתמשי עכבר/מגע (זו בדיוק הבעיה שגרמה להסרת הכפתור המקורי). */
+.hq-swipe-a11y { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; background: transparent; cursor: pointer; }
+.hq-swipe-a11y:focus-visible {
+  position: static; width: auto; height: auto; margin: 8px 0 0; padding: 8px 12px; overflow: visible; clip: auto; white-space: normal;
+  display: inline-flex; align-items: center; gap: 6px; background: #1D5A48; color: #fff; border-radius: 8px; font-size: 13px; font-weight: 700;
+  outline: 2px solid #1D5A48; outline-offset: 2px;
 }
-.hq-swipe-confirmed { min-height: 44px; border-radius: 22px; background: #E6F0EB; color: #1D5A48; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
 
 /* בסיס responsive: מסך מלא במובייל, גוף מרכזי קריא בדסקטופ - נאכף דרך lib/ui.jsx / app/page.jsx / CompanyShell */
 @media (max-width: 480px) {
