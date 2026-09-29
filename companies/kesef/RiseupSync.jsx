@@ -1,8 +1,7 @@
 "use client";
 import { useState } from "react";
 import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
-import { BUDGET_CATS_DEFAULT } from "./model";
-import { buildSyncedSnapshot, markSyncFailed } from "./riseup-sync-model";
+import { buildSyncedSnapshot, knownLabels, markSyncFailed, setEnvelopeLabel, summarizeEnvelopes, UNLABELED } from "./riseup-sync-model";
 import s from "./riseup-sync.module.css";
 
 // v1: קריאה בלבד, בקשה ידנית אחת בכל לחיצה, ללא ריענון אוטומטי בטעינה וללא היסטוריה -
@@ -21,9 +20,35 @@ async function fetchBudget() {
   return value;
 }
 
+// RiseUp לא חושף שם/קטגוריה חופשית למעטפה - רק id יציב. מזהה קצר לתצוגה, כדי שאפשר יהיה
+// להבדיל בין שורות בלי לחשוף/להדפיס את ה-id המלא בכל מקום.
+const shortId = id => `מעטפה #${String(id || "").slice(-6) || "?"}`;
+
+function EnvelopeRow({ envelope, label, options, onLabel }) {
+  const [value, setValue] = useState(label || "");
+  const planned = Number.isFinite(envelope.originalAmount) ? envelope.originalAmount : 0;
+  const actual = Number.isFinite(envelope.balancedAmount) ? envelope.balancedAmount : 0;
+  const commit = () => { if (value.trim() !== (label || "")) onLabel(envelope.id, value); };
+  return (
+    <div className={s.envelopeRow}>
+      <div className={s.envelopeInfo}>
+        <strong>{shortId(envelope.id)}</strong>
+        <span>מתוכנן {Math.abs(planned).toLocaleString("he-IL")} ₪ · בפועל {Math.abs(actual).toLocaleString("he-IL")} ₪</span>
+      </div>
+      <label className={s.envelopeLabelField}>
+        <span>תיוג אישי</span>
+        <input list="riseup-known-labels" value={value} placeholder={UNLABELED}
+          onChange={e => setValue(e.target.value)} onBlur={commit}
+          onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }} />
+      </label>
+    </div>
+  );
+}
+
 export default function RiseupSync({ data, setData, ready }) {
   const snapshot = data?.snapshot || null;
   const lastError = data?.lastError || null;
+  const labels = data?.envelopeLabels || {};
   const notConfigured = lastError?.code === "not_configured";
   const [busy, setBusy] = useState(false); // רק דגל UI - לא נשמר, לא חלק מה-store הפר-משתמש
 
@@ -33,21 +58,26 @@ export default function RiseupSync({ data, setData, ready }) {
     try {
       const response = await fetchBudget();
       const { snapshot: next } = buildSyncedSnapshot(snapshot, response);
-      setData({ snapshot: next, lastError: null });
+      setData(prev => ({ ...prev, snapshot: next, lastError: null }));
     } catch (e) {
       if (e.notConfigured) {
-        setData({ snapshot, lastError: { code: "not_configured", message: e.message, at: new Date().toISOString() } });
+        setData(prev => ({ ...prev, snapshot, lastError: { code: "not_configured", message: e.message, at: new Date().toISOString() } }));
       } else {
-        setData({ snapshot: markSyncFailed(snapshot, e.message), lastError: { code: e.code || "error", message: e.message, at: new Date().toISOString() } });
+        setData(prev => ({ ...prev, snapshot: markSyncFailed(snapshot, e.message), lastError: { code: e.code || "error", message: e.message, at: new Date().toISOString() } }));
       }
     } finally {
       setBusy(false);
     }
   }
 
+  const onLabel = (id, value) => setData(prev => ({ ...prev, envelopeLabels: setEnvelopeLabel(prev?.envelopeLabels, id, value) }));
+
   if (!ready) return <div style={{ padding: 40, textAlign: "center", opacity: .6 }}>טוען...</div>;
 
-  const summary = snapshot?.summary;
+  // מחושב חי מה-envelopes הגולמיים השמורים + התיוגים הנוכחיים - עריכת תיוג משפיעה מיד על
+  // הפילוח, בלי לדרוש סנכרון חוזר (הסיכום עצמו לא נשמר בצילום, ראו riseup-sync-model.js).
+  const summary = snapshot ? summarizeEnvelopes(snapshot.envelopes, labels) : null;
+  const options = knownLabels(labels);
   const badgeLabel = notConfigured ? "לא מוגדר בשרת" : snapshot ? (snapshot.stale ? "שגיאה — מוצג נתון קודם" : "מסונכרן") : lastError ? "שגיאה" : "טרם סונכרן";
 
   return (
@@ -77,19 +107,29 @@ export default function RiseupSync({ data, setData, ready }) {
             <article><span>הכנסה בפועל</span><strong>{summary.income.actual.toLocaleString("he-IL")} ₪</strong></article>
             <article><span>מעטפות בסך הכל</span><strong>{snapshot.envelopes.length}</strong></article>
           </div>
+
           <div className={s.table}>
             <table>
-              <caption>הוצאות לפי קטגוריה (מתוכנן מול בפועל)</caption>
-              <thead><tr><th>קטגוריה</th><th>מתוכנן</th><th>בפועל</th><th>מעטפות</th></tr></thead>
+              <caption>הוצאות לפי תיוג אישי (מתוכנן מול בפועל)</caption>
+              <thead><tr><th>תיוג</th><th>מתוכנן</th><th>בפועל</th><th>מעטפות</th></tr></thead>
               <tbody>
-                {BUDGET_CATS_DEFAULT.map(cat => {
-                  const row = summary.byCategory[cat];
-                  return <tr key={cat}><td>{cat}</td><td>{row.planned.toLocaleString("he-IL")} ₪</td><td>{row.actual.toLocaleString("he-IL")} ₪</td><td>{row.count}</td></tr>;
-                })}
+                {summary.byLabel.map(row => (
+                  <tr key={row.label}><td>{row.label}</td><td>{row.planned.toLocaleString("he-IL")} ₪</td><td>{row.actual.toLocaleString("he-IL")} ₪</td><td>{row.count}</td></tr>
+                ))}
               </tbody>
             </table>
           </div>
-          {summary.unmappedTypes.length > 0 && <p className={s.footnote}>סוגי מעטפה לא מוכרים אצל RiseUp שנפלו ל"אחר": {summary.unmappedTypes.join(", ")}</p>}
+          <p className={s.footnote}>
+            RiseUp לא חושף שם/קטגוריה למעטפה — רק סכום ומזהה. עד שמעטפה מתויגת ידנית למטה (לדוגמה "סופר", "דלק", "מסעדות"), היא מופיעה תחת "{UNLABELED}". התיוג נשמר אצלך ומזהה את אותה מעטפה גם בסנכרונים הבאים.
+          </p>
+
+          <datalist id="riseup-known-labels">{options.map(o => <option key={o} value={o} />)}</datalist>
+          <h3 className={s.envelopesTitle}>תיוג מעטפות ({snapshot.envelopes.length})</h3>
+          <div className={s.envelopeList}>
+            {snapshot.envelopes.map(envelope => (
+              <EnvelopeRow key={envelope.id} envelope={envelope} label={labels[envelope.id]} options={options} onLabel={onLabel} />
+            ))}
+          </div>
         </section>
       )}
     </section>
