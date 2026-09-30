@@ -137,10 +137,18 @@ function Today({ jobs, flags, onOpen, onNavigate }) {
 function Jobs({ jobs, flags, onSave, onOpen }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  // דיפולטיבית מוסתר - פידבק מפורש. לא מוחל כשהמשתמש/ת בוחר/ת במפורש לסנן לפי "נדחתה" -
+  // אחרת אין טעם בסינון הזה (0 תוצאות תמיד), סותר את הכוונה המפורשת של הבחירה.
+  const [hideRejected, setHideRejected] = useState(true);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState(blankJob);
   const [message, setMessage] = useState("");
-  const visible = jobs.filter(job => (filter === "all" || effectiveStatus(job, flags) === filter) && (job.company_name + " " + job.role_title).toLowerCase().includes(query.toLowerCase()));
+  const visible = jobs.filter(job => {
+    const status = effectiveStatus(job, flags);
+    if (filter !== "all" && status !== filter) return false;
+    if (hideRejected && filter !== "rejected" && status === "rejected") return false;
+    return (job.company_name + " " + job.role_title).toLowerCase().includes(query.toLowerCase());
+  });
   const create = async event => {
     event.preventDefault(); setMessage("");
     if (!draft.company_name.trim() || !draft.role_title.trim()) { setMessage("יש למלא חברה ותפקיד."); return; }
@@ -159,6 +167,10 @@ function Jobs({ jobs, flags, onSave, onOpen }) {
         {message && <Notice kind="error">{message}</Notice>}<button className={styles.primary}>שמירת משרה</button>
       </form>}
       <div className={styles.listTools}><input aria-label="חיפוש משרות" placeholder="חיפוש חברה או תפקיד" value={query} onChange={event => setQuery(event.target.value)} /><select aria-label="סינון סטטוס" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">כל הסטטוסים</option>{Object.entries(STATUS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475467", margin: "10px 0" }}>
+        <input type="checkbox" checked={hideRejected} onChange={event => setHideRejected(event.target.checked)} />
+        <span>הסתר משרות שנדחו</span>
+      </label>
       <div className={styles.jobList}>{visible.map(job => <button onClick={() => onOpen(job)} key={job.id} className={styles.jobCard}><span className={styles.jobIdentity}><strong>{job.role_title}</strong><small>{job.company_name}</small></span><span><Status value={effectiveStatus(job, flags)} /><small>{job.next_action_at || "ללא מועד"}</small></span></button>)}</div>
       {!visible.length && <Empty label={jobs.length ? "לא נמצאו משרות בסינון הזה" : "עדיין אין משרות במרכז הקריירה"} action="הוספת המשרה הראשונה" onClick={() => setAdding(true)} />}
     </section>
