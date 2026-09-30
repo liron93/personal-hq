@@ -7,23 +7,21 @@ import { CARD, GREEN } from "@/lib/theme";
 // מתחתיה) היא הסליידר. גרירת ה-children (תוכן השורה) שמאלה חושפת רקע ירוק עם "נרכש"
 // שהיה מוסתר מאחוריה; שחרור אחרי סף מאשר, לפני הסף מחזיר למקום.
 //
-// באג אמיתי שנתפס בבדיקה בטלפון אמיתי (לא שוחזר בבדיקה בדפדפן/אמולציה!): עם
-// touch-action:pan-y, מנגנון הגלילה האנכית הטבעי של המערכת "מתחרה" על הג'סטורה מול ה-JS
-// - ברוב המגעים האמיתיים יש רכיב אנכי קטן גם בגרירה אופקית מכוונת, ולפעמים המערכת "זוכה"
-// באמצע הגרירה ומפסיקה למסור pointermove ל-JS בכלל (בלי pointercancel אפילו) - בדיוק
-// התסמין שדווח: "מתחיל לראות ירוק אבל תקוע". התיקון: touch-action:none מבטל לגמרי את
-// הטיפול הטבעי של המערכת בכל מגע שמתחיל על האלמנט הזה, כך שאין תחרות בכלל - כל המגע עובר
-// דרכנו. המחיר: גלילה אנכית שמתחילה בדיוק על שורת פריט כבר לא "בחינם" מהדפדפן, אז
-// ממומשת כאן ידנית (window.scrollBy) ברגע שמתברר שהג'סטורה בעצם אנכית.
+// היסטוריה חשובה (לא לחזור על הטעות): ניסיון קודם עבר ל-touch-action:none + גלילה אנכית
+// ידנית (window.scrollBy) כדי לפתור "תקוע באמצע גרירה" בטלפון אמיתי - וזה יצר רגרסיה
+// גרועה יותר: גלילה כללית ברשימה נהייתה "באגית וקופצת" (גלילה ידנית ב-JS על main thread
+// לעולם לא תהיה חלקה כמו גלילה טבעית של הדפדפן על ה-compositor thread) בלי אפילו לתקן את
+// באג הגרירה. חזרה במכוון ל-touch-action:pan-y (גלילה אנכית תמיד טבעית/חלקה של הדפדפן) -
+// באג "תקוע" ידוע ועדיין לא פתור, אבל עדיף על פני רגרסיה שפוגעת בכל שימוש ברשימה.
 const THRESHOLD_RATIO = 0.42; // חלק מ-maxDrag (לא מרוחב השורה המלאה - ראו MAX_DRAG למטה)
 const MAX_DRAG_RATIO = 0.55; // כמה מרוחב השורה אפשר לגרור בפועל
 const MAX_DRAG_PX = 220; // תקרה מוחלטת, כדי שבמסך רחב (דסקטופ) לא יידרש מרחק גרירה עצום
-const LOCK_THRESHOLD = 8; // px - תזוזה כוללת לפני שנועלים כיוון (x=גרירה / y=גלילה) ולא זזים ממנו
+const MOVE_THRESHOLD = 6; // px - כמה תזוזה לפני שמחליטים שזו גרירה אופקית ולא הקשה/גלילה
 
 export default function SwipeConfirm({ onConfirm, disabled, children, revealLabel = "נרכש", ariaLabel }) {
   const wrapRef = useRef(null);
-  const startRef = useRef(null); // {x, y, lastY, maxDrag} | null
-  const lockRef = useRef(null); // null (עוד לא הוכרע) | "x" (גרירה) | "y" (גלילה)
+  const startRef = useRef(null); // {x, y, maxDrag} | null
+  const draggingRef = useRef(false); // חצינו את סף התזוזה - זו גרירה אופקית ממשית
   const dxRef = useRef(0);
   const justDraggedRef = useRef(false); // מדכא click שמגיע מיד אחרי גרירה (גם כזו שחזרה ל-0)
   const [dx, setDx] = useState(0);
@@ -35,8 +33,8 @@ export default function SwipeConfirm({ onConfirm, disabled, children, revealLabe
     if (disabled) return;
     const rect = wrapRef.current?.getBoundingClientRect();
     const maxDrag = Math.min(MAX_DRAG_PX, (rect?.width || 300) * MAX_DRAG_RATIO);
-    startRef.current = { x: e.clientX, y: e.clientY, lastY: e.clientY, maxDrag };
-    lockRef.current = null;
+    startRef.current = { x: e.clientX, y: e.clientY, maxDrag };
+    draggingRef.current = false;
     // לא תופסים pointer capture כאן במכוון - רק כשמתברר בפועל שזו גרירה אופקית (ב-move),
     // כדי שהקשה רגילה על תוכן השורה (טוגל פתיחה, כפתורי restore/chevron) תמשיך לעבוד.
   };
@@ -46,24 +44,13 @@ export default function SwipeConfirm({ onConfirm, disabled, children, revealLabe
     if (!start) return;
     const moveX = e.clientX - start.x;
     const moveY = e.clientY - start.y;
-
-    if (lockRef.current === null) {
-      if (Math.abs(moveX) < LOCK_THRESHOLD && Math.abs(moveY) < LOCK_THRESHOLD) return;
-      lockRef.current = Math.abs(moveX) > Math.abs(moveY) ? "x" : "y";
-      if (lockRef.current === "x") {
-        setDragging(true);
-        try { wrapRef.current?.setPointerCapture?.(e.pointerId); } catch { /* לא קריטי */ }
-      }
+    if (!draggingRef.current) {
+      if (Math.abs(moveX) < MOVE_THRESHOLD && Math.abs(moveY) < MOVE_THRESHOLD) return;
+      if (Math.abs(moveY) > Math.abs(moveX)) { startRef.current = null; return; } // גלילה אנכית - משאירים לדפדפן (touch-action:pan-y)
+      draggingRef.current = true;
+      setDragging(true);
+      try { wrapRef.current?.setPointerCapture?.(e.pointerId); } catch { /* לא קריטי */ }
     }
-
-    if (lockRef.current === "y") {
-      // ראו הערה למעלה: touch-action:none ביטל את הגלילה הטבעית, אז מבצעים אותה ידנית.
-      const dy = e.clientY - start.lastY;
-      start.lastY = e.clientY;
-      window.scrollBy(0, -dy);
-      return;
-    }
-
     e.preventDefault();
     const clamped = clampDx(moveX, start.maxDrag);
     dxRef.current = clamped;
@@ -72,10 +59,10 @@ export default function SwipeConfirm({ onConfirm, disabled, children, revealLabe
 
   const endDrag = () => {
     const start = startRef.current;
-    const wasDragging = lockRef.current === "x";
+    const wasDragging = draggingRef.current;
     const finalDx = dxRef.current;
     startRef.current = null;
-    lockRef.current = null;
+    draggingRef.current = false;
     setDragging(false);
     if (!wasDragging || !start) { dxRef.current = 0; setDx(0); return; }
     justDraggedRef.current = true;
