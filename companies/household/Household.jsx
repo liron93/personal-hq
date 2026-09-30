@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { toN } from "@/lib/format";
@@ -62,13 +62,42 @@ function QtyStepper({ qty, onChange }) {
     (פידבק מפורש: לא נחוץ). סימון "נרכש" עם צ'קבוקס בצד ימין לשם - לא ג'סטורת גרירה (ראו
     היסטוריה ב-git log: כמה ניסיונות סליידר בהשראת iOS Messages לא עבדו אמין על מכשיר
     אמיתי; פידבק מפורש לעבור לצ'קבוקס פשוט וודאי). סימון = onPurchase; ביטול סימון על
-    פריט שכבר נרכש
-    (סומן בטעות) = onRestore - אותו צ'קבוקס, שני הכיוונים. */
+    פריט שכבר נרכש (סומן בטעות) = onRestore - אותו צ'קבוקס, שני הכיוונים. לחיצה ארוכה
+    על השם פותחת עריכה שלו (פידבק מפורש - לא הייתה דרך לשנות שם פריט קיים); הקשה רגילה
+    עדיין פותחת/סוגרת את לשונית העריכה. */
+const NAME_LONG_PRESS_MS = 500;
+const NAME_PRESS_CANCEL_PX = 8; // תזוזה מעבר לזה תוך כדי לחיצה = לא לחיצה ארוכה, לא לפתוח עריכה
+
 function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased }) {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [price, setPrice] = useState(item.price ?? "");
   const [store, setStore] = useState(item.store ?? "");
+  // לחיצה ארוכה על השם פותחת עריכה שלו - פידבק מפורש (אין דרך אחרת לשנות שם פריט קיים).
+  // לא ג'סטורת גרירה/כיוון - רק טיימר, בלי כל מחלקת הבאגים שהייתה עם הסליידר. תזוזה קטנה
+  // בזמן הלחיצה (למשל תחילת גלילה) מבטלת את הטיימר כרגיל, בלי להתערב בגלילה עצמה.
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(item.name);
+  const pressTimerRef = useRef(null);
+  const pressStartRef = useRef(null);
+  const clearPressTimer = () => { if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null; } };
+  const onNamePointerDown = e => {
+    if (editingName) return;
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    clearPressTimer();
+    pressTimerRef.current = setTimeout(() => { pressTimerRef.current = null; setNameDraft(item.name); setEditingName(true); }, NAME_LONG_PRESS_MS);
+  };
+  const onNamePointerMove = e => {
+    const start = pressStartRef.current;
+    if (!start || !pressTimerRef.current) return;
+    if (Math.abs(e.clientX - start.x) > NAME_PRESS_CANCEL_PX || Math.abs(e.clientY - start.y) > NAME_PRESS_CANCEL_PX) clearPressTimer();
+  };
+  const saveNameEdit = () => {
+    const trimmed = nameDraft.trim();
+    setEditingName(false);
+    if (trimmed && trimmed !== item.name) onUpdate(item.id, { name: trimmed });
+  };
+  const cancelNameEdit = () => { setEditingName(false); setNameDraft(item.name); };
 
   return (
     <div style={{ borderBottom: `1px solid ${LINE}`, padding: "10px 0" }}>
@@ -80,11 +109,25 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
           <input type="checkbox" checked={purchased} onChange={() => (purchased ? onRestore(item.id) : onPurchase(item.id))} style={{ width: 20, height: 20 }} />
         </label>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
-            <div style={{ fontSize: 16, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
-              {item.name}
+          {editingName ? (
+            <input
+              autoFocus className="hq-field" value={nameDraft} onChange={e => setNameDraft(e.target.value)}
+              onBlur={saveNameEdit}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); saveNameEdit(); } else if (e.key === "Escape") { e.preventDefault(); cancelNameEdit(); } }}
+              onClick={e => e.stopPropagation()}
+              style={{ ...inputStyle, width: "100%", fontSize: 16, border: `1px solid ${LINE}`, borderRadius: 2, padding: "4px 6px" }}
+            />
+          ) : (
+            <div
+              style={{ cursor: "pointer", WebkitTouchCallout: "none", userSelect: "none", WebkitUserSelect: "none" }}
+              onClick={() => setOpen(o => !o)}
+              onPointerDown={onNamePointerDown} onPointerMove={onNamePointerMove} onPointerUp={clearPressTimer} onPointerCancel={clearPressTimer}
+            >
+              <div style={{ fontSize: 16, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
+                {item.name}
+              </div>
             </div>
-          </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 }}>
             <Pill color={INK}>{item.category}</Pill>
             {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
