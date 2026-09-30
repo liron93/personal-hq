@@ -62,6 +62,38 @@ test("rich AI-ready fields round-trip through saveJob/validateState", () => {
   assert.equal(safe.jobs[0].tailoredQuestions[0].question, "ספר על עצמך");
 });
 
+// ---------- הצעות עדכון מייל (career_email_updates, שלב 1 - ראו P0 של עמית ב-Issue #7) ----------
+test("parseEmailUpdateProposal: תרחיש Gett - דחייה שהתגלתה במייל, עם שיוך למשרה קיימת", () => {
+  const proposal = model.parseEmailUpdateProposal({
+    companyName: "Gett", roleTitle: "מנהל/ת מוצר", proposedStatus: "rejected",
+    jobId: "job-gett-123", summary: "התקבל מייל דחייה ב-27.9.2026 מכתובת careers@gett.com",
+    sourceLabel: "gmail", sourceLink: "https://mail.google.com/mail/u/0/#inbox/fake-thread-id",
+  });
+  assert.equal(proposal.companyName, "Gett");
+  assert.equal(proposal.proposedStatus, "rejected");
+  assert.equal(proposal.jobId, "job-gett-123");
+  assert.ok(proposal.summary.includes("27.9.2026"));
+});
+
+test("parseEmailUpdateProposal: jobId מותר null בכוונה - 'דורש שיוך ידני', לא מנחש", () => {
+  const proposal = model.parseEmailUpdateProposal({ companyName: "חברה לא מזוהה", proposedStatus: "applied" });
+  assert.equal(proposal.jobId, null);
+  assert.equal(proposal.roleTitle, "");
+});
+
+test("parseEmailUpdateProposal: שם חברה חובה, סטטוס מוצע חייב להיות מהרשימה הסגורה", () => {
+  assert.throws(() => model.parseEmailUpdateProposal({ companyName: "", proposedStatus: "applied" }));
+  assert.throws(() => model.parseEmailUpdateProposal({ companyName: "Gett", proposedStatus: "סטטוס-שהומצא" }));
+  assert.throws(() => model.parseEmailUpdateProposal(null));
+});
+
+test("parseEmailUpdateProposal: sourceLink עובר את אותה בדיקת HTTPS-בטוח כמו כתובת משרה", () => {
+  assert.throws(() => model.parseEmailUpdateProposal({ companyName: "Gett", proposedStatus: "rejected", sourceLink: "javascript:alert(1)" }));
+  assert.throws(() => model.parseEmailUpdateProposal({ companyName: "Gett", proposedStatus: "rejected", sourceLink: "http://localhost/mail" }));
+  // ריק מותר - הקישור אופציונלי
+  assert.equal(model.parseEmailUpdateProposal({ companyName: "Gett", proposedStatus: "rejected", sourceLink: "" }).sourceLink, "");
+});
+
 test("cv text is stored, validated and can be cleared without touching jobs", () => {
   let state = model.saveJob(model.INIT, input, undefined, "2026-09-11T10:00:00.000Z");
   state = model.saveCv(state, { filename: "cv.pdf", text: "טקסט קורות חיים" }, "2026-09-12T00:00:00.000Z");

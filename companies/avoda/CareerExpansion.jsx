@@ -8,6 +8,7 @@ import hrQuestions from "./data/hr-questions.json";
 import hrTerminology from "./data/hr-terminology-questions.json";
 import hrConcepts from "./data/hr-concepts.json";
 import { TRACKS, addHrAttempt, conceptsFor, hrHistory, isHrQuestion, normalizePrefs, questionsFor, setTrack } from "./practice-tracks";
+import { STATUSES } from "./model";
 import styles from "./career.module.css";
 
 const difficultyLabels = { easy: "קל", medium: "בינוני", hard: "מתקדם" };
@@ -119,5 +120,82 @@ export function CommunicationsHub({ user }) {
     {types.length > 1 && <div className={styles.listTools}><select aria-label="סינון לפי סוג עדכון" value={typeFilter} onChange={event => setTypeFilter(event.target.value)}><option value="all">כל הסוגים</option>{types.map(type => <option key={type} value={type}>{communicationTypeLabels[type] || type}</option>)}</select></div>}
     {loading ? <p className={styles.muted}>טוען עדכונים…</p> : <div className={styles.historyList}>{visible.map(item => <article className={styles.historyItem} key={item.id}><div><strong>{item.title || communicationTypeLabels[item.type] || item.type}</strong><small>{communicationTypeLabels[item.type] || item.type} · {new Date(item.created_at).toLocaleDateString("he-IL")}{!item.delivered && " · חדש"}</small></div>{open === item.id ? <p>{item.content}</p> : <button className={styles.textButton} onClick={() => markRead(item)}>הצגת התוכן המלא</button>}</article>)}</div>}
     {!loading && !visible.length && <div className={styles.empty}><p>אין עדכונים להצגה.</p></div>}
+  </section>;
+}
+
+/**
+ * P0 של עמית (Issue #7, "רועי: סריקת מייל יומית לעדכון מועמדויות") - שלב 1 בלבד: מציג
+ * הצעות עדכון שכבר קיימות ב-career_email_updates (supabase/proposed/career/001_*.sql,
+ * עוד לא הורץ - הטבלה ריקה עד שמישהו/סוכן יכתוב אליה בשלב נפרד ומאושר בנפרד). לעולם לא
+ * מעדכן סטטוס מועמדות אוטומטית - "אישור" הוא הפעולה היחידה שמשנה את career_jobs.status,
+ * ורק בלחיצה מפורשת של המשתמש/ת. "דחייה" רק מסמנת את ההצעה כנדחתה, לא נוגעת במשרה.
+ */
+export function EmailUpdatesHub({ user, onJobUpdated }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [busyId, setBusyId] = useState(null);
+
+  const load = async () => {
+    setLoading(true); setMessage("");
+    const { data, error } = await supabase.from("career_email_updates").select("*").eq("user_id", user.id).eq("review_status", "pending").order("detected_at", { ascending: false });
+    if (error) { setMessage("לא ניתן לטעון הצעות עדכון כרגע."); setLoading(false); return; }
+    setItems(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, [user.id]);
+
+  // הגנה כפולה לפני render כ-href: safeJobUrl כבר רץ בזמן היצירה (parseEmailUpdateProposal),
+  // כאן רק ודאות נוספת שלא נעביר קישור לא-HTTP(S) ל-<a href>.
+  const safeLink = link => { try { return link && /^https?:$/.test(new URL(link).protocol) ? new URL(link).href : ""; } catch { return ""; } };
+
+  const approve = async item => {
+    setBusyId(item.id); setMessage("");
+    const now = new Date().toISOString();
+    if (item.job_id) {
+      const jobUpdate = await supabase.from("career_jobs").update({ status: item.proposed_status, updated_at: now }).eq("id", item.job_id).eq("user_id", user.id);
+      if (jobUpdate.error) { setMessage("הסטטוס לא עודכן במשרה. נסה/י שוב."); setBusyId(null); return; }
+      await supabase.from("career_job_activity").insert({ user_id: user.id, job_id: item.job_id, activity_type: "email_update_approved", summary: `עודכן מ-${item.source_label}: ${STATUSES[item.proposed_status] || item.proposed_status}` });
+    }
+    const reviewResult = await supabase.from("career_email_updates").update({ review_status: "approved", reviewed_at: now }).eq("id", item.id).eq("user_id", user.id);
+    setBusyId(null);
+    if (reviewResult.error) { setMessage("המשרה עודכנה, אך סימון ההצעה כמאושרת נכשל - היא עשויה להופיע שוב."); return; }
+    setItems(list => list.filter(entry => entry.id !== item.id));
+    if (item.job_id) onJobUpdated?.();
+  };
+
+  const dismiss = async item => {
+    setBusyId(item.id); setMessage("");
+    const result = await supabase.from("career_email_updates").update({ review_status: "dismissed", reviewed_at: new Date().toISOString() }).eq("id", item.id).eq("user_id", user.id);
+    setBusyId(null);
+    if (result.error) { setMessage("הדחייה לא נשמרה. נסה/י שוב."); return; }
+    setItems(list => list.filter(entry => entry.id !== item.id));
+  };
+
+  return <section className={styles.panel}>
+    <div className={styles.sectionTitle}><div><p>הצעות שהתגלו בסריקת מייל - לעולם לא מתעדכן אוטומטית, כל הצעה מחכה לאישור שלך</p><h2>עדכוני מייל</h2></div><span className={styles.active}>{items.length} ממתינות</span></div>
+    {message && <p className={styles.error} role="alert">{message}</p>}
+    {loading ? <p className={styles.muted}>טוען הצעות…</p> : <div className={styles.historyList}>
+      {items.map(item => {
+        const link = safeLink(item.source_link);
+        return <article className={styles.historyItem} key={item.id}>
+          <div>
+            <strong>{item.company_name}{item.role_title ? ` · ${item.role_title}` : ""}</strong>
+            <small>
+              <span className={styles["status_" + item.proposed_status] || ""}>{STATUSES[item.proposed_status] || item.proposed_status}</span>
+              {" · "}{new Date(item.detected_at).toLocaleDateString("he-IL")}
+              {!item.job_id && " · דורש שיוך ידני"}
+            </small>
+          </div>
+          {item.summary && <p>{item.summary}</p>}
+          {link && <p><a href={link} target="_blank" rel="noreferrer">פתיחת המייל המקורי</a></p>}
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button className={styles.primary} disabled={busyId === item.id} onClick={() => approve(item)}>אישור</button>
+            <button className={styles.secondary} disabled={busyId === item.id} onClick={() => dismiss(item)}>דחייה</button>
+          </div>
+        </article>;
+      })}
+    </div>}
+    {!loading && !items.length && <div className={styles.empty}><p>אין הצעות עדכון ממתינות כרגע. הסריקה היומית (שלב נפרד, טרם מופעלת) תמלא כאן הצעות כשתחובר.</p></div>}
   </section>;
 }

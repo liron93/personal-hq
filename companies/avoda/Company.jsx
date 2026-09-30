@@ -6,7 +6,7 @@ import styles from "./career.module.css";
 import { useStore } from "@/lib/store";
 import { DEFAULT_PREFS, normalizePrefs } from "./practice-tracks";
 import { effectiveStatus, isActiveJob, statusForSave, withFlag } from "./job-status";
-import { PracticeHub, HistoryHub, InterviewHub, LearningHub, CommunicationsHub } from "./CareerExpansion";
+import { PracticeHub, HistoryHub, InterviewHub, LearningHub, CommunicationsHub, EmailUpdatesHub } from "./CareerExpansion";
 
 const STATUS = {
   considering: "לבדיקה",
@@ -20,6 +20,7 @@ const STATUS = {
 const NAV = [
   ["today", "היום"],
   ["jobs", "משרות"],
+  ["emailUpdates", "עדכוני מייל"],
   ["updates", "עדכונים"],
   ["profile", "פרופיל"],
   ["cv", "קורות חיים"],
@@ -228,6 +229,7 @@ export default function Company() {
     <main className={styles.main}><nav className={styles.mobileNav} aria-label="ניווט קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav>
       {view === "today" && <Today jobs={data.jobs} flags={prefs.irrelevantJobs} onOpen={setSelected} onNavigate={setView}/>}
       {view === "jobs" && <Jobs jobs={data.jobs} flags={prefs.irrelevantJobs} onOpen={setSelected} onSave={saveJobWithFlag}/>}
+      {view === "emailUpdates" && <EmailUpdatesHub user={data.user} onJobUpdated={data.load}/>}
       {view === "updates" && <CommunicationsHub user={data.user}/>}
       {view === "profile" && <Profile profile={data.profile} onSave={data.saveProfile}/>}
       {view === "cv" && <CvCenter cvs={data.cvs} onUpload={data.uploadCv} onActive={data.makeActive}/>} 

@@ -119,6 +119,31 @@ export function parseJob(input) {
   };
 }
 
+/**
+ * ולידציה להצעת עדכון מייל (career_email_updates, ראו supabase/proposed/career/001_*.sql) -
+ * מה שהאפליקציה מצפה לקבל משורה שסוכן/Gmail scan יכתוב בעתיד (שלב 2, לא כאן). שימוש כפול:
+ * (1) בדיקת קלט לפני כתיבה אמיתית, כשהאינטגרציה תחובר; (2) אותה בדיקה ממש על נתוני בדיקה/
+ * דמה בטסטים, כולל תרחיש הקבלה של Gett שעמית ביקש - כך שהתנהגות ה-UI מכוסה גם בלי DB אמיתי.
+ * jobId מותר null בכוונה: "דורש שיוך ידני" כשאין התאמה בטוחה למשרה קיימת (לא מנחשים).
+ */
+export function parseEmailUpdateProposal(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("הצעת עדכון לא תקינה");
+  const companyName = text(input, "companyName", 160);
+  if (!companyName) throw new Error("שם חברה הוא שדה חובה בהצעת עדכון");
+  const proposedStatus = text(input, "proposedStatus", 30);
+  if (!Object.hasOwn(STATUSES, proposedStatus)) throw new Error("סטטוס מוצע לא תקין");
+  const jobId = input.jobId == null ? null : String(input.jobId);
+  return {
+    companyName,
+    roleTitle: text(input, "roleTitle", 200),
+    proposedStatus,
+    jobId,
+    summary: text(input, "summary", 2000),
+    sourceLabel: text(input, "sourceLabel", 40) || "gmail",
+    sourceLink: safeJobUrl(text(input, "sourceLink", 2048)),
+  };
+}
+
 export function saveJob(state, input, id, now = new Date().toISOString()) {
   const fields = parseJob(input);
   const previous = id ? state.jobs.find(job => job.id === id) : null;
