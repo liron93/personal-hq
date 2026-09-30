@@ -107,6 +107,49 @@ test("service: happy path returns normalized shape and logs only status+token-re
   }
 });
 
+test("service: logs field-names-only shape of envelope actuals/_meta/excluded, never a real value", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    const FAKE_MERCHANT = "בית קפה דמיוני בע\"מ"; // שם עסק מזויף - לעולם לא אמור להופיע בלוג
+    const FAKE_AMOUNT = 123.45; // סכום מזויף - לעולם לא אמור להופיע בלוג
+    const body = {
+      ...ROW,
+      // actuals הוא שדה בתוך כל envelope בנפרד, לא ברמת הגוף העליונה - ראו REAL_SHAPE_ROW למטה.
+      envelopes: [{ id: "e1", type: "fixed", originalAmount: -100, balancedAmount: -80, actuals: [{ merchant: FAKE_MERCHANT, amount: FAKE_AMOUNT, date: "2026-09-15", category: "סופר" }] }],
+      _meta: { unknownField: "x" },
+      excluded: [],
+    };
+    const service = createRiseupService({ fetcher: async () => Response.json(body) });
+    await service(FAKE_TOKEN, {});
+    const shapeLog = logs.find(l => l.includes("[riseup:shape]"));
+    assert.ok(shapeLog, "expected a [riseup:shape] log line");
+    assert.match(shapeLog, /envelopeActuals=array\[1\]\{merchant,amount,date,category\}/);
+    assert.match(shapeLog, /_meta=object\{unknownField\}/);
+    assert.match(shapeLog, /excluded=array\[0\]/);
+    // הבדיקה הקריטית: אף ערך אמיתי לא דלף ללוג, רק שמות השדות/הטיפוסים שלהם.
+    assert.ok(!logs.some(l => l.includes(FAKE_MERCHANT)));
+    assert.ok(!logs.some(l => l.includes(String(FAKE_AMOUNT))));
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("service: shape log handles missing/empty envelope actuals and missing _meta/excluded without crashing", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    const service = createRiseupService({ fetcher: async () => Response.json(ROW) }); // envelopes: [], בלי _meta/excluded בכלל
+    await service(FAKE_TOKEN, {});
+    const shapeLog = logs.find(l => l.includes("[riseup:shape]"));
+    assert.match(shapeLog, /envelopeActuals=missing-on-all-envelopes _meta=missing excluded=missing/);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 // ---- handler: סדר guard-first, מפתח לא מוגדר, ולידציית month, מיפוי סטטוסים ----
 
 const denyGuard = status => async () => ({ ok: false, response: Response.json({ error: "x" }, { status }) });
