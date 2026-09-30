@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  isIncomeEnvelope, summarizeEnvelopes, setEnvelopeLabel, knownLabels,
+  isIncomeEnvelope, summarizeEnvelopes, summarizeTransactions, setEnvelopeLabel, knownLabels,
   isSameAsLastSnapshot, buildSyncedSnapshot, markSyncFailed,
-  RISEUP_STORE_KEY, RISEUP_INIT, UNLABELED, SAVINGS_LABEL,
+  RISEUP_STORE_KEY, RISEUP_INIT, UNLABELED, SAVINGS_LABEL, INCOME_LABEL,
 } from "../companies/kesef/riseup-sync-model.js";
 
 test("income detection: by amount sign per RiseUp's documented contract, not by type alone", () => {
@@ -54,6 +54,31 @@ test("summarizeEnvelopes: never crashes on missing/malformed input", () => {
     assert.equal(summary.income.count, 0);
     assert.ok(Array.isArray(summary.byLabel));
   }
+});
+
+test("summarizeTransactions: flattens envelope.actuals to date+business+amount+label rows, sorted newest first", () => {
+  const envelopes = [
+    { id: "e1", type: "fixed", actuals: [
+      { id: "t1", date: "2026-09-10", business: "סופר A", amount: -50, isIncome: false },
+      { id: "t2", date: "2026-09-15", business: "סופר B", amount: -30, isIncome: false },
+    ] },
+    { id: "e2", type: "riseupGoal", actuals: [{ id: "t3", date: "2026-09-12", business: "", amount: -200, isIncome: false }] },
+    { id: "e3", type: "variableIncome", actuals: [{ id: "t4", date: "2026-09-01", business: "מעסיק", amount: 10000, isIncome: true }] },
+  ];
+  const labels = { e1: "סופר" };
+  const rows = summarizeTransactions(envelopes, labels);
+  assert.deepEqual(rows.map(r => r.id), ["t2", "t3", "t1", "t4"]); // מהחדש לישן: 15,12,10,01
+  assert.equal(rows.find(r => r.id === "t1").label, "סופר"); // תיוג אישי של המעטפה
+  assert.equal(rows.find(r => r.id === "t3").label, SAVINGS_LABEL); // riseupGoal אוטומטי
+  assert.equal(rows.find(r => r.id === "t4").label, INCOME_LABEL); // isIncome גובר על תיוג המעטפה
+});
+
+test("summarizeTransactions: envelope without a personal label falls back to UNLABELED, never crashes on bad input", () => {
+  assert.equal(summarizeTransactions([{ id: "e1", type: "fixed", actuals: [{ id: "t1", date: "2026-09-10", amount: -5, isIncome: false }] }], {})[0].label, UNLABELED);
+  for (const bad of [null, undefined, "x", 5, [null, undefined, {}, { id: "z" }, { id: "e1", actuals: "not-array" }, { id: "e1", actuals: [null, "x", { id: "ok" }] }]]) {
+    assert.doesNotThrow(() => summarizeTransactions(bad, {}));
+  }
+  assert.deepEqual(summarizeTransactions([{ id: "e1", actuals: [null, "x", { id: "ok" }] }], {}).map(r => r.id), ["ok"]);
 });
 
 test("setEnvelopeLabel: adds/updates/clears immutably, trims and caps length, ignores missing id", () => {
