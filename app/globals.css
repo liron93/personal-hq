@@ -44,11 +44,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
    פידבק מפורש). .hq-swipe-row עוטף שתי שכבות: .hq-swipe-reveal (רקע ירוק + "נרכש", קבוע
    מתחת) ו-.hq-swipe-content (התוכן האמיתי של השורה, זז ב-transform:translateX לפי גרירה
    שמנוהלת ידנית ב-JS עם Pointer Events - לא input[type=range], ראו הערה בקובץ עצמו).
-   touch-action:pan-y מאפשר לדפדפן לטפל בגלילה אנכית של הרשימה כרגיל; רק תזוזה אופקית
-   מובהקת נתפסת ע"י הג'סטורה. */
+   touch-action:none (לא pan-y!) - בבדיקה אמיתית בטלפון pan-y גרם למנגנון הגלילה הטבעי
+   "לחטוף" את הג'סטורה באמצע גרירה אופקית אמיתית (יש כמעט תמיד רכיב אנכי קטן במגע יד
+   אמיתי) ולהפסיק למסור pointermove ל-JS - "מתחיל לראות ירוק אבל תקוע". עם none אין תחרות
+   בכלל; גלילה אנכית שמתחילה על השורה ממומשת ידנית ב-JS (ראו הקובץ עצמו). */
 .hq-swipe-row { position: relative; overflow: hidden; border-radius: 10px; }
 .hq-swipe-reveal { position: absolute; inset: 0; display: flex; align-items: center; gap: 6px; padding-inline-start: 18px; color: #fff; font-size: 13px; font-weight: 700; pointer-events: none; }
-.hq-swipe-content { position: relative; z-index: 1; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+.hq-swipe-content { position: relative; z-index: 1; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .hq-swipe-content.dragging { cursor: grabbing; }
 
 /* חלופת נגישות למקלדת/קורא מסך: מוסתרת חזותית ומופיעה רק ב-focus, כמו קישור "דלג לתוכן" -
