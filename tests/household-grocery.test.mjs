@@ -12,7 +12,7 @@ const HOUSEHOLD_KEY = "hq:household:v1";
 const {
   CATEGORIES, FALLBACK_CATEGORY, PRIORITIES, DEFAULT_CATEGORY_DICT,
   createGroceryState, ensureGroceryState, detectCategory, isGenuineFallback, addCategoryKeyword,
-  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry,
+  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate,
   sortItems, groupByRoute, filterEntries,
   monthlySpend, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
@@ -58,6 +58,16 @@ test("quickAddItem: שם ריק לא משנה כלום", () => {
   const s0 = createGroceryState();
   assert.equal(quickAddItem(s0, "   "), s0);
   assert.equal(quickAddItem(s0, ""), s0);
+});
+
+test("findActiveDuplicate: מתעלם מרישיות/רווחים, לא מוצא כלום כשאין התאמה או שם ריק", () => {
+  const s0 = quickAddItem(createGroceryState(), "עגבניות");
+  assert.equal(findActiveDuplicate(s0.items, "עגבניות").name, "עגבניות");
+  assert.equal(findActiveDuplicate(s0.items, "  עגבניות  ").name, "עגבניות");
+  assert.equal(findActiveDuplicate(s0.items, "מלפפון"), null);
+  assert.equal(findActiveDuplicate(s0.items, ""), null);
+  assert.equal(findActiveDuplicate([], "עגבניות"), null);
+  assert.equal(findActiveDuplicate(null, "עגבניות"), null);
 });
 
 test("addItem: טופס מלא עם קטגוריה ידנית מבטל את הדגל האוטומטי", () => {

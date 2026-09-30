@@ -106,6 +106,14 @@ export function newGroceryItem({ name, qty = null, unit = "", category, priority
   };
 }
 
+/** פריט פעיל (לא נרכש) עם אותו שם (לא רגיש לאותיות רישיות/רווחים מובילים-עוקבים) אם קיים -
+    כדי להזהיר לפני הוספת כפילות בטעות, במקום ליצור שורה כפולה בשקט. */
+export function findActiveDuplicate(items, name) {
+  const n = norm(name).toLowerCase();
+  if (!n) return null;
+  return (items || []).find(i => norm(i.name).toLowerCase() === n) || null;
+}
+
 /** הוספה מהירה: שם בלבד (Enter), קטגוריה מזוהה אוטומטית. שם ריק לא משנה כלום. */
 export function quickAddItem(state, name, dict = state?.categoryDict) {
   if (!isValidName(name)) return state;
