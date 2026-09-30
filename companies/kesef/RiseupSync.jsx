@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
-import { buildSyncedSnapshot, knownLabels, markSyncFailed, setEnvelopeLabel, summarizeEnvelopes, UNLABELED } from "./riseup-sync-model";
+import { buildSyncedSnapshot, knownLabels, markSyncFailed, setEnvelopeLabel, summarizeEnvelopes, summarizeTransactions, UNLABELED } from "./riseup-sync-model";
 import s from "./riseup-sync.module.css";
 
 // v1: קריאה בלבד, בקשה ידנית אחת בכל לחיצה, ללא ריענון אוטומטי בטעינה וללא היסטוריה -
@@ -77,6 +77,9 @@ export default function RiseupSync({ data, setData, ready }) {
   // מחושב חי מה-envelopes הגולמיים השמורים + התיוגים הנוכחיים - עריכת תיוג משפיעה מיד על
   // הפילוח, בלי לדרוש סנכרון חוזר (הסיכום עצמו לא נשמר בצילום, ראו riseup-sync-model.js).
   const summary = snapshot ? summarizeEnvelopes(snapshot.envelopes, labels) : null;
+  // פילוח עסקה-עסקה (תאריך+עסק+סכום) - לא רק סיכום לפי מעטפה, בקשה מפורשת שזה ייראה
+  // "בדיוק כמו ברייזאפ". מגיע מ-envelope.actuals[], ראו lib/riseup-service.mjs.
+  const transactions = snapshot ? summarizeTransactions(snapshot.envelopes, labels) : [];
   const options = knownLabels(labels);
   const badgeLabel = notConfigured ? "לא מוגדר בשרת" : snapshot ? (snapshot.stale ? "שגיאה — מוצג נתון קודם" : "מסונכרן") : lastError ? "שגיאה" : "טרם סונכרן";
 
@@ -120,8 +123,27 @@ export default function RiseupSync({ data, setData, ready }) {
             </table>
           </div>
           <p className={s.footnote}>
-            RiseUp לא חושף שם/קטגוריה למעטפה — רק סכום ומזהה. עד שמעטפה מתויגת ידנית למטה (לדוגמה "סופר", "דלק", "מסעדות"), היא מופיעה תחת "{UNLABELED}". התיוג נשמר אצלך ומזהה את אותה מעטפה גם בסנכרונים הבאים.
+            RiseUp לא חושף שם/קטגוריה למעטפה עצמה — רק סכום ומזהה. עד שמעטפה מתויגת ידנית למטה (לדוגמה "סופר", "דלק", "מסעדות"), כל העסקאות שבה מופיעות תחת "{UNLABELED}". התיוג נשמר אצלך ומזהה את אותה מעטפה גם בסנכרונים הבאים.
           </p>
+
+          {transactions.length > 0 && (
+            <div className={s.table}>
+              <table>
+                <caption>עסקאות אחרונות ({transactions.length}) — תאריך, עסק, קטגוריה וסכום, כמו ברייזאפ</caption>
+                <thead><tr><th>תאריך</th><th>עסק</th><th>קטגוריה</th><th>סכום</th></tr></thead>
+                <tbody>
+                  {transactions.map(t => (
+                    <tr key={t.id}>
+                      <td><bdi dir="ltr">{t.date ? new Date(t.date).toLocaleDateString("he-IL") : "—"}</bdi></td>
+                      <td>{t.business || "—"}{t.isInstallment && t.paymentNumber && t.totalPayments ? ` (תשלום ${t.paymentNumber}/${t.totalPayments})` : ""}</td>
+                      <td>{t.label}</td>
+                      <td style={{ color: t.isIncome ? "#9ae8e0" : "inherit" }}>{t.isIncome ? "+" : "-"}{Math.abs(t.amount).toLocaleString("he-IL")} ₪</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <datalist id="riseup-known-labels">{options.map(o => <option key={o} value={o} />)}</datalist>
           <h3 className={s.envelopesTitle}>תיוג מעטפות ({snapshot.envelopes.length})</h3>

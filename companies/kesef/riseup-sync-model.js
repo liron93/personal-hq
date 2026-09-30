@@ -11,6 +11,7 @@ export const RISEUP_INIT = { snapshot: null, lastError: null, envelopeLabels: {}
 
 export const UNLABELED = "לא מתויג";
 export const SAVINGS_LABEL = "חיסכון";
+export const INCOME_LABEL = "הכנסה";
 const MAX_LABEL_LEN = 40;
 
 /*
@@ -80,6 +81,39 @@ export function summarizeEnvelopes(envelopes, labels = {}) {
 
   const byLabelSorted = [...byLabel.values()].sort((a, b) => b.actual - a.actual || b.planned - a.planned || a.label.localeCompare(b.label, "he"));
   return { income, byLabel: byLabelSorted };
+}
+
+/**
+ * פילוח עסקה-עסקה (תאריך+עסק+סכום+קטגוריה), לא רק סיכום לפי מעטפה - בקשה מפורשת: "בדיוק
+ * כמו ברייזאפ". envelope.actuals[] (ראו lib/riseup-service.mjs::normalizeTransaction)
+ * הוא המקור; כל עסקה מתויגת לפי התיוג האישי של המעטפה שהיא שייכת אליה (או SAVINGS_LABEL/
+ * INCOME_LABEL אוטומטית ליעד חיסכון/הכנסה - לא לפי תיוג ידני). ממוין מהחדש לישן, כמו
+ * שרשימת עסקאות רגילה מוצגת. לא קורס על קלט חסר/משונה.
+ */
+export function summarizeTransactions(envelopes, labels = {}) {
+  const rows = [];
+  for (const raw of Array.isArray(envelopes) ? envelopes : []) {
+    const envelope = raw || {};
+    if (!Array.isArray(envelope.actuals)) continue;
+    const envelopeLabel = envelope.type === "riseupGoal" ? SAVINGS_LABEL : (labels?.[envelope.id] || UNLABELED);
+    for (const t of envelope.actuals) {
+      if (!t || typeof t !== "object" || typeof t.id !== "string") continue;
+      rows.push({
+        id: t.id,
+        date: typeof t.date === "string" ? t.date : null,
+        business: typeof t.business === "string" ? t.business : "",
+        amount: Number.isFinite(t.amount) ? t.amount : 0,
+        isIncome: t.isIncome === true,
+        label: t.isIncome === true ? INCOME_LABEL : envelopeLabel,
+        envelopeId: envelope.id,
+        isInstallment: t.isInstallment === true,
+        paymentNumber: Number.isFinite(t.paymentNumber) ? t.paymentNumber : null,
+        totalPayments: Number.isFinite(t.totalPayments) ? t.totalPayments : null,
+      });
+    }
+  }
+  rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || a.business.localeCompare(b.business, "he"));
+  return rows;
 }
 
 /** דה-דופ: אותו budgetDate + אותו cashflowHash כמו הצילום השמור = שום דבר לא השתנה. */

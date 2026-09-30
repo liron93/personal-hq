@@ -107,47 +107,57 @@ test("service: happy path returns normalized shape and logs only status+token-re
   }
 });
 
-test("service: logs field-names-only shape of envelope actuals/_meta/excluded, never a real value", async () => {
-  const logs = [];
-  const originalWarn = console.warn;
-  console.warn = (...args) => logs.push(args.join(" "));
-  try {
-    const FAKE_MERCHANT = "בית קפה דמיוני בע\"מ"; // שם עסק מזויף - לעולם לא אמור להופיע בלוג
-    const FAKE_AMOUNT = 123.45; // סכום מזויף - לעולם לא אמור להופיע בלוג
-    const body = {
-      ...ROW,
-      // actuals הוא שדה בתוך כל envelope בנפרד, לא ברמת הגוף העליונה - ראו REAL_SHAPE_ROW למטה.
-      envelopes: [{ id: "e1", type: "fixed", originalAmount: -100, balancedAmount: -80, actuals: [{ merchant: FAKE_MERCHANT, amount: FAKE_AMOUNT, date: "2026-09-15", category: "סופר" }] }],
-      _meta: { unknownField: "x" },
-      excluded: [],
-    };
-    const service = createRiseupService({ fetcher: async () => Response.json(body) });
-    await service(FAKE_TOKEN, {});
-    const shapeLog = logs.find(l => l.includes("[riseup:shape]"));
-    assert.ok(shapeLog, "expected a [riseup:shape] log line");
-    assert.match(shapeLog, /envelopeActuals=array\[1\]\{merchant,amount,date,category\}/);
-    assert.match(shapeLog, /_meta=object\{unknownField\}/);
-    assert.match(shapeLog, /excluded=array\[0\]/);
-    // הבדיקה הקריטית: אף ערך אמיתי לא דלף ללוג, רק שמות השדות/הטיפוסים שלהם.
-    assert.ok(!logs.some(l => l.includes(FAKE_MERCHANT)));
-    assert.ok(!logs.some(l => l.includes(String(FAKE_AMOUNT))));
-  } finally {
-    console.warn = originalWarn;
-  }
+// מבנה השדות האמיתי (ref 905bc4aae4a5bc53, 30.9.2026) התגלה דרך לוג חקר בטוח שכבר הוסר -
+// עכשיו שהמבנה ידוע, הפירוק עצמו (normalizeTransaction, פרטי) נבדק ישירות דרך fetchBudget.
+test("service: envelope actuals[] parsed into per-transaction rows (date, business, amount) - the real data behind cashflow", async () => {
+  const FAKE_BUSINESS = "בית קפה דמיוני בע\"מ"; // שם עסק בדוי - לא נתון אמיתי של אף משתמש
+  const body = {
+    ...ROW,
+    envelopes: [{
+      id: "e1", type: "fixed", originalAmount: -100, balancedAmount: -80,
+      actuals: [
+        { transactionId: "t1", transactionDate: "2026-09-15", billingDate: "2026-09-18", businessName: FAKE_BUSINESS, billingAmount: -45.5, originalAmount: -45.5, isIncome: false, isInstallment: false, paymentNumber: null, totalNumberOfPayments: null },
+        { transactionId: "t2", transactionDate: "2026-09-10", businessName: "עסק ב", billingAmount: -34.5, isIncome: false, isInstallment: true, paymentNumber: 2, totalNumberOfPayments: 4 },
+      ],
+    }],
+  };
+  const service = createRiseupService({ fetcher: async () => Response.json(body) });
+  const result = await service(FAKE_TOKEN, {});
+  assert.equal(result.envelopes[0].actuals.length, 2);
+  const [t1, t2] = result.envelopes[0].actuals;
+  assert.equal(t1.id, "t1");
+  assert.equal(t1.date, "2026-09-15"); // transactionDate מועדף על billingDate
+  assert.equal(t1.business, FAKE_BUSINESS);
+  assert.equal(t1.amount, -45.5);
+  assert.equal(t1.isIncome, false);
+  assert.equal(t2.date, "2026-09-10"); // נופל ל-billingDate רק כשאין transactionDate - כאן אין billingDate כלל אז null... נבדק למטה
+  assert.equal(t2.isInstallment, true);
+  assert.equal(t2.paymentNumber, 2);
+  assert.equal(t2.totalPayments, 4);
 });
 
-test("service: shape log handles missing/empty envelope actuals and missing _meta/excluded without crashing", async () => {
-  const logs = [];
-  const originalWarn = console.warn;
-  console.warn = (...args) => logs.push(args.join(" "));
-  try {
-    const service = createRiseupService({ fetcher: async () => Response.json(ROW) }); // envelopes: [], בלי _meta/excluded בכלל
-    await service(FAKE_TOKEN, {});
-    const shapeLog = logs.find(l => l.includes("[riseup:shape]"));
-    assert.match(shapeLog, /envelopeActuals=missing-on-all-envelopes _meta=missing excluded=missing/);
-  } finally {
-    console.warn = originalWarn;
-  }
+test("service: transaction without billingDate falls back correctly, malformed/idless rows dropped silently", async () => {
+  const body = {
+    ...ROW,
+    envelopes: [{
+      id: "e1", type: "fixed", originalAmount: -100, balancedAmount: -80,
+      actuals: [
+        { transactionId: "t3", billingDate: "2026-09-12", businessName: "עסק ג", billingAmount: -10 }, // אין transactionDate - נופל ל-billingDate
+        { businessName: "חסר transactionId - נופל" }, // בלי id - מסונן החוצה
+        null, "לא אובייקט",
+      ],
+    }],
+  };
+  const service = createRiseupService({ fetcher: async () => Response.json(body) });
+  const result = await service(FAKE_TOKEN, {});
+  assert.equal(result.envelopes[0].actuals.length, 1);
+  assert.equal(result.envelopes[0].actuals[0].date, "2026-09-12");
+});
+
+test("service: envelope with no actuals field at all gets an empty array, not a crash", async () => {
+  const service = createRiseupService({ fetcher: async () => Response.json(ROW) }); // ROW.envelopes: []
+  const result = await service(FAKE_TOKEN, {});
+  assert.deepEqual(result.envelopes, []);
 });
 
 // ---- handler: סדר guard-first, מפתח לא מוגדר, ולידציית month, מיפוי סטטוסים ----
