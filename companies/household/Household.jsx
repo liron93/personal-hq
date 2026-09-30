@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, ensureHousehold } from "./model";
 import {
   CATEGORIES, PRIORITIES, FILTERS,
-  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry,
+  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate,
   groupByRoute, filterEntries, detectCategory, addCategoryKeyword, restoreToList,
   budgetVsActual, budgetTrend, repeatProducts, repeatCategories, pricePerUnit,
   groceryAlerts, INSUFFICIENT_DATA,
@@ -37,10 +37,32 @@ function Pill({ color, children }) {
   return <span style={{ fontSize: 13, color: BG, background: color, borderRadius: 2, padding: "2px 9px", whiteSpace: "nowrap" }}>{children}</span>;
 }
 
-/** שורת פריט: תצוגה מקופלת + טופס עריכה מלא (כמות/יחידה, קטגוריה, עדיפות, הערה) בפתיחה.
-    סימון "נרכש" עם צ'קבוקס בצד ימין לשם - לא ג'סטורת גרירה (ראו היסטוריה ב-git log:
-    כמה ניסיונות סליידר בהשראת iOS Messages לא עבדו אמין על מכשיר אמיתי; פידבק מפורש
-    לעבור לצ'קבוקס פשוט וודאי). סימון = onPurchase; ביטול סימון על פריט שכבר נרכש
+/** בורר כמות עם +/- בשורה עצמה - במקום שדה כמות (וגם יחידה, שהוסרה) שהיו רק בלשונית
+    העריכה שנפתחת; פידבק מפורש שזה לא נוח. ברירת המחדל המוצגת היא 1 (גם כש-item.qty
+    עדיין null בפועל) - לא יורד מתחת ל-1 מהכפתורים (למחוק פריט שלא רוצים יותר, לא "0"). */
+function QtyStepper({ qty, onChange }) {
+  const value = qty ?? 1;
+  return (
+    <div onClick={e => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <button type="button" aria-label="הפחתת כמות" disabled={value <= 1} onClick={() => onChange(value - 1)}
+        style={{ width: 22, height: 22, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, fontSize: 14, lineHeight: 1, color: value <= 1 ? MUTED : INK, opacity: value <= 1 ? 0.5 : 1, cursor: value <= 1 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        −
+      </button>
+      <span style={{ fontSize: 13, minWidth: 16, textAlign: "center" }}>{value}</span>
+      <button type="button" aria-label="הוספת כמות" onClick={() => onChange(value + 1)}
+        style={{ width: 22, height: 22, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, fontSize: 14, lineHeight: 1, color: INK, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        +
+      </button>
+    </div>
+  );
+}
+
+/** שורת פריט: תצוגה מקופלת + טופס עריכה מלא (קטגוריה, עדיפות, הערה) בפתיחה. כמות מוצגת
+    ונערכת תמיד עם QtyStepper בשורה עצמה, לא בלשונית - ואין יותר שדה "יחידה" בכלל
+    (פידבק מפורש: לא נחוץ). סימון "נרכש" עם צ'קבוקס בצד ימין לשם - לא ג'סטורת גרירה (ראו
+    היסטוריה ב-git log: כמה ניסיונות סליידר בהשראת iOS Messages לא עבדו אמין על מכשיר
+    אמיתי; פידבק מפורש לעבור לצ'קבוקס פשוט וודאי). סימון = onPurchase; ביטול סימון על
+    פריט שכבר נרכש
     (סומן בטעות) = onRestore - אותו צ'קבוקס, שני הכיוונים. */
 function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased }) {
   const [open, setOpen] = useState(false);
@@ -57,14 +79,16 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
         >
           <input type="checkbox" checked={purchased} onChange={() => (purchased ? onRestore(item.id) : onPurchase(item.id))} style={{ width: 20, height: 20 }} />
         </label>
-        <div style={{ minWidth: 0, flex: 1, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
-          <div style={{ fontSize: 16, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
-            {item.name}
-            {item.qty != null && <span style={{ color: MUTED, marginRight: 8, fontSize: 14 }}>{item.qty} {item.unit}</span>}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
+            <div style={{ fontSize: 16, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
+              {item.name}
+            </div>
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 }}>
             <Pill color={INK}>{item.category}</Pill>
             {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
+            {!purchased && <QtyStepper qty={item.qty} onChange={q => onUpdate(item.id, { qty: q })} />}
             {purchased && item.price != null && <Pill color={GREEN}>{ils(item.price)}</Pill>}
             {purchased && item.store && <Pill color={MUTED}>{item.store}</Pill>}
           </div>
@@ -77,10 +101,6 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
 
       {open && !purchased && (
         <div style={{ marginTop: 10, marginRight: 4, display: "grid", gap: 8 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
-            <LabeledInput label="כמות" value={item.qty ?? ""} onBlur={v => onUpdate(item.id, { qty: toN(v) || null })} />
-            <LabeledInput label="יחידה" text value={item.unit} onBlur={v => onUpdate(item.id, { unit: v })} />
-          </div>
           <div>
             <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>קטגוריה</div>
             <select value={item.category} onChange={e => onUpdate(item.id, { category: e.target.value })} className="hq-field" style={{ ...inputStyle, width: "100%" }}>
@@ -126,40 +146,45 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
   );
 }
 
-function QuickAdd({ onQuickAdd, onOpenForm }) {
+function QuickAdd({ items, onQuickAdd, onOpenForm }) {
   const [name, setName] = useState("");
-  const submit = () => { if (!name.trim()) return; onQuickAdd(name); setName(""); };
+  // אזהרה לפני הוספה כפולה בטעות, במקום ליצור שורה כפולה בשקט - פידבק מפורש. חוסמת
+  // בפועל (submit לא מוסיף) - הכפילות עצמה עדיין קיימת ברשימה, מוטב לכוון לשנות כמות שם.
+  const duplicate = name.trim() ? findActiveDuplicate(items, name) : null;
+  const submit = () => { if (!name.trim() || duplicate) return; onQuickAdd(name); setName(""); };
   return (
-    <div style={{ display: "flex", gap: 8, marginBottom: 14, minWidth: 0 }}>
-      <input className="hq-field" placeholder="הוסיפו פריט ולחצו Enter…" value={name}
-        onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submit(); }}
-        style={{ ...inputStyle, flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 2, padding: "9px 10px" }} />
-      <button onClick={submit} aria-label="הוסף פריט" style={{ border: "none", background: INK, color: BG, borderRadius: 2, width: 40, flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Plus size={16} />
-      </button>
-      <button onClick={onOpenForm} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "0 10px", flexShrink: 0, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-        טופס מלא
-      </button>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 8, minWidth: 0 }}>
+        <input className="hq-field" placeholder="הוסיפו פריט ולחצו Enter…" value={name}
+          onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submit(); }}
+          style={{ ...inputStyle, flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 2, padding: "9px 10px" }} />
+        <button onClick={submit} aria-label="הוסף פריט" style={{ border: "none", background: INK, color: BG, borderRadius: 2, width: 40, flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Plus size={16} />
+        </button>
+        <button onClick={onOpenForm} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "0 10px", flexShrink: 0, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          טופס מלא
+        </button>
+      </div>
+      {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: "6px 0 0" }}>"{duplicate.name}" כבר קיים ברשימה - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
     </div>
   );
 }
 
-function FullAddForm({ dict, onAdd, onClose }) {
-  const [f, setF] = useState({ name: "", qty: "", unit: "", category: "", priority: "רגיל", note: "" });
+function FullAddForm({ dict, items, onAdd, onClose }) {
+  const [f, setF] = useState({ name: "", qty: "", category: "", priority: "רגיל", note: "" });
   const detected = f.name.trim() ? detectCategory(f.name, dict) : "";
+  const duplicate = f.name.trim() ? findActiveDuplicate(items, f.name) : null;
   const submit = () => {
-    if (!f.name.trim()) return;
-    onAdd({ name: f.name, qty: toN(f.qty) || null, unit: f.unit, category: f.category || undefined, priority: f.priority, note: f.note });
+    if (!f.name.trim() || duplicate) return;
+    onAdd({ name: f.name, qty: toN(f.qty) || null, category: f.category || undefined, priority: f.priority, note: f.note });
     onClose();
   };
   return (
     <div style={{ ...cardStyle, padding: 14 }}>
       <div style={{ display: "grid", gap: 8 }}>
         <input className="hq-field" placeholder="שם פריט" value={f.name} onChange={e => setF(s => ({ ...s, name: e.target.value }))} style={inputStyle} />
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
-          <input className="hq-field" placeholder="כמות" value={f.qty} onChange={e => setF(s => ({ ...s, qty: e.target.value }))} style={inputStyle} />
-          <input className="hq-field" placeholder="יחידה (יח׳, ק״ג, ליטר...)" value={f.unit} onChange={e => setF(s => ({ ...s, unit: e.target.value }))} style={inputStyle} />
-        </div>
+        {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>"{duplicate.name}" כבר קיים ברשימה - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
+        <input className="hq-field" placeholder="כמות" value={f.qty} onChange={e => setF(s => ({ ...s, qty: e.target.value }))} style={inputStyle} />
         <div>
           <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>קטגוריה {f.category ? "" : detected && `(זוהה אוטומטית: ${detected})`}</div>
           <select value={f.category} onChange={e => setF(s => ({ ...s, category: e.target.value }))} className="hq-field" style={{ ...inputStyle, width: "100%" }}>
@@ -216,8 +241,8 @@ function ShoppingList({ g, setGrocery }) {
         <span style={{ fontSize: 12, color: MUTED }}>{activeCount} פריטים ברשימה</span>
       </div>
 
-      <QuickAdd onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
-      {showFullForm && <FullAddForm dict={g.categoryDict} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
+      <QuickAdd items={g.items} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
+      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
       <datalist id="household-known-stores">{knownStores(g).map(s => <option key={s} value={s} />)}</datalist>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
@@ -394,7 +419,7 @@ function ReceiptForm({ g, setGrocery }) {
                   <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, fontSize: 13, cursor: "pointer" }}>
                       <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
-                      <span style={{ overflowWrap: "anywhere" }}>{item.name}{item.qty != null && ` (${item.qty} ${item.unit})`}</span>
+                      <span style={{ overflowWrap: "anywhere" }}>{item.name}{item.qty != null && ` (${item.qty})`}</span>
                     </label>
                     {checked && <input className="hq-field" placeholder="מחיר ₪" value={prices[item.id]} onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 90, flexShrink: 0 }} />}
                   </div>
