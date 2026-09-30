@@ -39,28 +39,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hq-back-link { border-bottom: 1px solid transparent; transition: border-color 150ms ease, opacity 150ms ease; }
 .hq-back-link:hover { border-bottom-color: currentColor; }
 
-/* שורת פריט "ניתנת להחלקה" (companies/household/SwipeConfirm.jsx), בסגנון iOS Messages:
-   השורה עצמה היא הסליידר - לא בר נפרד מתחתיה (גרסה קודמת עשתה את זה וזה היה לא נכון,
-   פידבק מפורש). .hq-swipe-row עוטף שתי שכבות: .hq-swipe-reveal (רקע ירוק + "נרכש", קבוע
-   מתחת) ו-.hq-swipe-content (התוכן האמיתי של השורה, זז ב-transform:translateX לפי גרירה
-   שמנוהלת ידנית ב-JS עם Pointer Events - לא input[type=range], ראו הערה בקובץ עצמו).
-   touch-action:pan-y מאפשר לדפדפן לטפל בגלילה אנכית של הרשימה כרגיל (גלילה טבעית וחלקה -
-   ראו הערה ב-SwipeConfirm.jsx על למה ניסיון עם touch-action:none+גלילה ידנית ב-JS הוחזר,
-   הוא גרם לגלילה "באגית וקופצת"); רק תזוזה אופקית מובהקת נתפסת ע"י הג'סטורה. */
-.hq-swipe-row { position: relative; overflow: hidden; border-radius: 10px; }
-.hq-swipe-reveal { position: absolute; inset: 0; display: flex; align-items: center; gap: 6px; padding-inline-start: 18px; color: #fff; font-size: 13px; font-weight: 700; pointer-events: none; }
-.hq-swipe-content { position: relative; z-index: 1; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
-.hq-swipe-content.dragging { cursor: grabbing; }
-
-/* חלופת נגישות למקלדת/קורא מסך: מוסתרת חזותית ומופיעה רק ב-focus, כמו קישור "דלג לתוכן" -
-   לא יוצרת מטרת-נגיעה נוספת למשתמשי עכבר/מגע (זו בדיוק הבעיה שגרמה להסרת הכפתור המקורי). */
-.hq-swipe-a11y { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; background: transparent; cursor: pointer; }
-.hq-swipe-a11y:focus-visible {
-  position: static; width: auto; height: auto; margin: 8px 0 0; padding: 8px 12px; overflow: visible; clip: auto; white-space: normal;
-  display: inline-flex; align-items: center; gap: 6px; background: #1D5A48; color: #fff; border-radius: 8px; font-size: 13px; font-weight: 700;
-  outline: 2px solid #1D5A48; outline-offset: 2px;
-}
-
 /* בסיס responsive: מסך מלא במובייל, גוף מרכזי קריא בדסקטופ - נאכף דרך lib/ui.jsx / app/page.jsx / CompanyShell */
 @media (max-width: 480px) {
   html, body { font-size: 15px; }

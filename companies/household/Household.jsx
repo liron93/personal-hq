@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ShoppingBasket, ChevronDown, Plus, Receipt, RotateCcw, Store, X } from "lucide-react";
-import SwipeConfirm from "./SwipeConfirm";
+import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
@@ -35,55 +34,46 @@ const PRIORITY_COLOR = { "דחוף": RUST, "חשוב": AMBER, "רגיל": MUTED 
 const ALERT_COLOR = { critical: RUST, warning: AMBER, info: MUTED };
 
 function Pill({ color, children }) {
-  return <span style={{ fontSize: 11, color: BG, background: color, borderRadius: 2, padding: "2px 9px", whiteSpace: "nowrap" }}>{children}</span>;
+  return <span style={{ fontSize: 13, color: BG, background: color, borderRadius: 2, padding: "2px 9px", whiteSpace: "nowrap" }}>{children}</span>;
 }
 
-/** שורת פריט: תצוגה מקופלת + טופס עריכה מלא (כמות/יחידה, קטגוריה, עדיפות, הערה) בפתיחה. */
+/** שורת פריט: תצוגה מקופלת + טופס עריכה מלא (כמות/יחידה, קטגוריה, עדיפות, הערה) בפתיחה.
+    סימון "נרכש" עם צ'קבוקס בצד ימין לשם - לא ג'סטורת גרירה (ראו היסטוריה ב-git log:
+    כמה ניסיונות סליידר בהשראת iOS Messages לא עבדו אמין על מכשיר אמיתי; פידבק מפורש
+    לעבור לצ'קבוקס פשוט וודאי). סימון = onPurchase; ביטול סימון על פריט שכבר נרכש
+    (סומן בטעות) = onRestore - אותו צ'קבוקס, שני הכיוונים. */
 function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased }) {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [price, setPrice] = useState(item.price ?? "");
   const [store, setStore] = useState(item.store ?? "");
 
-  // תוכן שורת הכותרת (שם/קטגוריה/כפתורים) - זהה לפריט נרכש ולא-נרכש; ההבדל הוא רק אם
-  // הוא עטוף ב-SwipeConfirm (ראו מטה). פידבק מפורש: השורה *עצמה* היא הסליידר, לא רכיב
-  // נפרד מתחתיה כמו בגרסה הקודמת - בסגנון אפליקציית ההודעות של iOS.
-  const header = (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, padding: "10px 0" }}>
-      <div style={{ minWidth: 0, flex: 1, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
-        <div style={{ fontSize: 14, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
-          {item.name}
-          {item.qty != null && <span style={{ color: MUTED, marginRight: 8, fontSize: 12 }}>{item.qty} {item.unit}</span>}
+  return (
+    <div style={{ borderBottom: `1px solid ${LINE}`, padding: "10px 0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <label
+          style={{ display: "flex", alignItems: "center", padding: 8, margin: -8, cursor: "pointer", flexShrink: 0 }}
+          aria-label={purchased ? `שחזור ${item.name} לרשימת הקניות (סומן בטעות)` : `סימון ${item.name} כנרכש`}
+        >
+          <input type="checkbox" checked={purchased} onChange={() => (purchased ? onRestore(item.id) : onPurchase(item.id))} style={{ width: 20, height: 20 }} />
+        </label>
+        <div style={{ minWidth: 0, flex: 1, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
+          <div style={{ fontSize: 16, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
+            {item.name}
+            {item.qty != null && <span style={{ color: MUTED, marginRight: 8, fontSize: 14 }}>{item.qty} {item.unit}</span>}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+            <Pill color={INK}>{item.category}</Pill>
+            {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
+            {purchased && item.price != null && <Pill color={GREEN}>{ils(item.price)}</Pill>}
+            {purchased && item.store && <Pill color={MUTED}>{item.store}</Pill>}
+          </div>
+          {item.note && <div style={{ fontSize: 14, color: MUTED, marginTop: 4, overflowWrap: "anywhere" }}>{item.note}</div>}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-          <Pill color={INK}>{item.category}</Pill>
-          {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
-          {purchased && item.price != null && <Pill color={GREEN}>{ils(item.price)}</Pill>}
-          {purchased && item.store && <Pill color={MUTED}>{item.store}</Pill>}
-        </div>
-        {item.note && <div style={{ fontSize: 12, color: MUTED, marginTop: 4, overflowWrap: "anywhere" }}>{item.note}</div>}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {purchased && (
-          <button onClick={() => onRestore(item.id)} title="שחזור לרשימת הקניות (סומן בטעות)" aria-label={`שחזור ${item.name} לרשימת הקניות`}
-            style={{ border: `1px solid ${MUTED}`, background: "transparent", color: INK, borderRadius: 2, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <RotateCcw size={14} />
-          </button>
-        )}
-        <button aria-label={open ? "כיווץ" : "הרחבה"} onClick={() => setOpen(o => !o)} style={{ border: "none", background: "transparent", cursor: "pointer", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <button aria-label={open ? "כיווץ" : "הרחבה"} onClick={() => setOpen(o => !o)} style={{ border: "none", background: "transparent", cursor: "pointer", width: 32, height: 32, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <ChevronDown size={14} color={MUTED} style={{ transform: open ? "rotate(180deg)" : "none" }} />
         </button>
       </div>
-    </div>
-  );
-
-  return (
-    <div style={{ borderBottom: `1px solid ${LINE}` }}>
-      {purchased ? header : (
-        <SwipeConfirm onConfirm={() => onPurchase(item.id)} ariaLabel={`סימון ${item.name} כנרכש`}>
-          {header}
-        </SwipeConfirm>
-      )}
 
       {open && !purchased && (
         <div style={{ marginTop: 10, marginRight: 4, display: "grid", gap: 8 }}>
