@@ -45,38 +45,45 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
   const [price, setPrice] = useState(item.price ?? "");
   const [store, setStore] = useState(item.store ?? "");
 
-  return (
-    <div style={{ borderBottom: `1px solid ${LINE}`, padding: "10px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <div style={{ minWidth: 0, flex: 1, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
-          <div style={{ fontSize: 14, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
-            {item.name}
-            {item.qty != null && <span style={{ color: MUTED, marginRight: 8, fontSize: 12 }}>{item.qty} {item.unit}</span>}
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-            <Pill color={INK}>{item.category}</Pill>
-            {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
-            {purchased && item.price != null && <Pill color={GREEN}>{ils(item.price)}</Pill>}
-            {purchased && item.store && <Pill color={MUTED}>{item.store}</Pill>}
-          </div>
-          {item.note && <div style={{ fontSize: 12, color: MUTED, marginTop: 4, overflowWrap: "anywhere" }}>{item.note}</div>}
+  // תוכן שורת הכותרת (שם/קטגוריה/כפתורים) - זהה לפריט נרכש ולא-נרכש; ההבדל הוא רק אם
+  // הוא עטוף ב-SwipeConfirm (ראו מטה). פידבק מפורש: השורה *עצמה* היא הסליידר, לא רכיב
+  // נפרד מתחתיה כמו בגרסה הקודמת - בסגנון אפליקציית ההודעות של iOS.
+  const header = (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, padding: "10px 0" }}>
+      <div style={{ minWidth: 0, flex: 1, cursor: "pointer" }} onClick={() => setOpen(o => !o)}>
+        <div style={{ fontSize: 14, overflowWrap: "anywhere", textDecoration: purchased ? "line-through" : "none", opacity: purchased ? 0.55 : 1 }}>
+          {item.name}
+          {item.qty != null && <span style={{ color: MUTED, marginRight: 8, fontSize: 12 }}>{item.qty} {item.unit}</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          {purchased && (
-            <button onClick={() => onRestore(item.id)} title="שחזור לרשימת הקניות (סומן בטעות)" aria-label={`שחזור ${item.name} לרשימת הקניות`}
-              style={{ border: `1px solid ${MUTED}`, background: "transparent", color: INK, borderRadius: 2, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <RotateCcw size={14} />
-            </button>
-          )}
-          <button aria-label={open ? "כיווץ" : "הרחבה"} onClick={() => setOpen(o => !o)} style={{ border: "none", background: "transparent", cursor: "pointer", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ChevronDown size={14} color={MUTED} style={{ transform: open ? "rotate(180deg)" : "none" }} />
-          </button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+          <Pill color={INK}>{item.category}</Pill>
+          {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
+          {purchased && item.price != null && <Pill color={GREEN}>{ils(item.price)}</Pill>}
+          {purchased && item.store && <Pill color={MUTED}>{item.store}</Pill>}
         </div>
+        {item.note && <div style={{ fontSize: 12, color: MUTED, marginTop: 4, overflowWrap: "anywhere" }}>{item.note}</div>}
       </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        {purchased && (
+          <button onClick={() => onRestore(item.id)} title="שחזור לרשימת הקניות (סומן בטעות)" aria-label={`שחזור ${item.name} לרשימת הקניות`}
+            style={{ border: `1px solid ${MUTED}`, background: "transparent", color: INK, borderRadius: 2, width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <RotateCcw size={14} />
+          </button>
+        )}
+        <button aria-label={open ? "כיווץ" : "הרחבה"} onClick={() => setOpen(o => !o)} style={{ border: "none", background: "transparent", cursor: "pointer", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ChevronDown size={14} color={MUTED} style={{ transform: open ? "rotate(180deg)" : "none" }} />
+        </button>
+      </div>
+    </div>
+  );
 
-      {/* סליידר החלקה במקום כפתור סימון קטן: פידבק ("קרוב מדי, לחיצה בטעות") - דורש גרירה
-          מכוונת לרוחב מלא, לא נגיעה קלה בכפתור צמוד לכפתורים אחרים. */}
-      {!purchased && <div style={{ marginTop: 8 }}><SwipeConfirm onConfirm={() => onPurchase(item.id)} label={`החליקו לאישור: ${item.name} נרכש`} /></div>}
+  return (
+    <div style={{ borderBottom: `1px solid ${LINE}` }}>
+      {purchased ? header : (
+        <SwipeConfirm onConfirm={() => onPurchase(item.id)} ariaLabel={`סימון ${item.name} כנרכש`}>
+          {header}
+        </SwipeConfirm>
+      )}
 
       {open && !purchased && (
         <div style={{ marginTop: 10, marginRight: 4, display: "grid", gap: 8 }}>
