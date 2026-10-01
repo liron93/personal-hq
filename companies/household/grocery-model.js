@@ -114,6 +114,32 @@ export function findActiveDuplicate(items, name) {
   return (items || []).find(i => norm(i.name).toLowerCase() === n) || null;
 }
 
+const tokensOf = name => norm(name).toLowerCase().split(/[\s,.-]+/).filter(Boolean);
+
+/**
+ * התאמת שם פריט שנסרק מקבלה (למשל "רוטב סויה יאמסה") לפריט קיים ברשימה (למשל "רוטב סויה") -
+ * לשימוש בסריקת קבלה בלבד, לא להוספה ידנית (שם משתמשים ב-findActiveDuplicate המדויק, כדי לא
+ * לחסום בטעות הוספת פריט שונה באמת). כאן מספיק שכל המילים של השם הקצר יותר מופיעות אצל הארוך
+ * יותר (מכל כיוון - לפעמים הקבלה מוסיפה פרטים כמו מותג, ולפעמים דווקא מקוצרת מהרשימה).
+ * זה יכול במקרים נדירים להתאים יתר על המידה (למשל "חלב" מול "חלב סויה" - מוצרים שונים) - אבל
+ * קביל כאן כי ההתאמה רק ממלאת מחיר על פריט קיים לפני אישור ידני בטופס (לעולם לא יוצרת/מוחקת
+ * נתון בשקט), וניתן לערוך/לנקות לפני השמירה בפועל.
+ */
+export function findReceiptMatch(items, scannedName) {
+  const exact = findActiveDuplicate(items, scannedName);
+  if (exact) return exact;
+  const scannedTokens = tokensOf(scannedName);
+  if (!scannedTokens.length) return null;
+  const scannedSet = new Set(scannedTokens);
+  for (const item of items || []) {
+    const itemSet = new Set(tokensOf(item.name));
+    if (!itemSet.size) continue;
+    const [smaller, larger] = itemSet.size <= scannedSet.size ? [itemSet, scannedSet] : [scannedSet, itemSet];
+    if ([...smaller].every(t => larger.has(t))) return item;
+  }
+  return null;
+}
+
 /** הוספה מהירה: שם בלבד (Enter), קטגוריה מזוהה אוטומטית. שם ריק לא משנה כלום. */
 export function quickAddItem(state, name, dict = state?.categoryDict) {
   if (!isValidName(name)) return state;
@@ -149,14 +175,20 @@ export function removeItem(state, id) {
 /** נורמליזציה של שם חנות: טקסט חופשי, נשמר null כשריק (בדיוק כמו price). לעולם לא בודים שם. */
 const normStore = store => { const s = norm(store); return s || null; };
 
-/** סימון כנרכש: מעביר את הפריט מ-items להיסטוריה (לא נמחק לעולם). מחיר וחנות אופציונליים, לחישובי חיסכון/ניתוח לפי חנות. */
-export function markPurchased(state, id, { price = null, purchasedAt = new Date().toISOString(), store = null } = {}) {
+/** נורמליזציה של תיאור מבצע (למשל "2 ב-20", "מועדון -10%") - טקסט חופשי קצר, null כשריק.
+    לעולם לא בודים מבצע - זה תמיד מגיע מהמשתמש/ת או מתוכן שנקרא בפועל מהקבלה. */
+const MAX_PROMO_LEN = 120;
+const normPromo = promo => { const s = norm(promo); return s ? s.slice(0, MAX_PROMO_LEN) : null; };
+
+/** סימון כנרכש: מעביר את הפריט מ-items להיסטוריה (לא נמחק לעולם). מחיר, חנות ומבצע אופציונליים, לחישובי חיסכון/ניתוח לפי חנות. */
+export function markPurchased(state, id, { price = null, purchasedAt = new Date().toISOString(), store = null, promo = null } = {}) {
   const idx = (state.items || []).findIndex(i => i.id === id);
   if (idx === -1) return state;
   const item = state.items[idx];
   const entry = {
     id: item.id, name: item.name, qty: item.qty, unit: item.unit, category: item.category, priority: item.priority,
-    note: item.note, price: isValidNonNegativeNumber(price) ? price : null, purchasedAt, store: normStore(store), receiptId: null,
+    note: item.note, price: isValidNonNegativeNumber(price) ? price : null, purchasedAt, store: normStore(store),
+    receiptId: null, promo: normPromo(promo),
   };
   return {
     ...state,
@@ -186,15 +218,28 @@ export function restoreToList(state, id) {
   return { ...state, items: [...(state.items || []), item], history, receipts };
 }
 
-/** עדכון רשומת היסטוריה (בעיקר תיקון מחיר/חנות בדיעבד). ההיסטוריה עצמה אף פעם לא נמחקת. */
+/** עדכון רשומת היסטוריה (בעיקר תיקון מחיר/חנות/מבצע בדיעבד). ההיסטוריה עצמה אף פעם לא נמחקת. */
 export function updateHistoryEntry(state, id, patch) {
   const idx = (state.history || []).findIndex(h => h.id === id);
   if (idx === -1) return state;
   const history = state.history.slice();
   const next = { ...history[idx], ...patch };
   if (Object.prototype.hasOwnProperty.call(patch, "store")) next.store = normStore(patch.store);
+  if (Object.prototype.hasOwnProperty.call(patch, "promo")) next.promo = normPromo(patch.promo);
   history[idx] = next;
   return { ...state, history };
+}
+
+/** המבצע האחרון שראינו למוצר הזה (לפי שם מדויק, לא רגיש לרישיות/רווחים - פריט פעיל שנוצר
+    מההיסטוריה הזו אמור לשאת את אותו שם) - למשל להציג אייקון ברשימת "צריך לקנות" שמזכיר
+    שבפעם הקודמת המוצר היה במבצע. null אם מעולם לא נרשם מבצע למוצר הזה. */
+export function lastPromoForProduct(history, name) {
+  const n = norm(name).toLowerCase();
+  if (!n) return null;
+  const matches = (history || []).filter(h => h.promo && norm(h.name).toLowerCase() === n);
+  if (!matches.length) return null;
+  const latest = [...matches].sort((a, b) => (a.purchasedAt < b.purchasedAt ? 1 : -1))[0];
+  return { promo: latest.promo, purchasedAt: latest.purchasedAt, store: latest.store };
 }
 
 /** רשימת שמות חנויות שהוזנו בעבר (מהיסטוריה + מקבלות), למיון/הצעה בטופס — רשימה מקומית פשוטה, בלי API חיצוני. */
@@ -236,12 +281,14 @@ export function logReceipt(state, { store, date = new Date().toISOString().slice
       id: item.id, name: item.name, qty: isValidPositiveNumber(li.qty) ? li.qty : item.qty, unit: item.unit,
       category: item.category, priority: item.priority, note: item.note,
       price: isValidNonNegativeNumber(li.price) ? li.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
+      promo: normPromo(li.promo),
     };
   });
   const fromAdHoc = validAdHoc.map(a => ({
     id: uid(), name: norm(a.name), qty: isValidPositiveNumber(a.qty) ? a.qty : null, unit: norm(a.unit),
     category: CATEGORIES.includes(a.category) ? a.category : detectCategory(a.name, state.categoryDict), priority: DEFAULT_PRIORITY,
     note: norm(a.note), price: isValidNonNegativeNumber(a.price) ? a.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
+    promo: normPromo(a.promo),
   }));
   return {
     state: {

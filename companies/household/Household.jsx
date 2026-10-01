@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
+import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { toN } from "@/lib/format";
@@ -9,7 +9,7 @@ import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, ensureHousehold } from "./model";
 import {
   CATEGORIES, PRIORITIES, FILTERS,
-  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate,
+  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate, findReceiptMatch, lastPromoForProduct,
   groupByRoute, filterEntries, detectCategory, addCategoryKeyword, restoreToList,
   budgetVsActual, budgetTrend, repeatProducts, repeatCategories, pricePerUnit,
   groceryAlerts, INSUFFICIENT_DATA,
@@ -101,11 +101,15 @@ function QtyStepper({ qty, onChange }) {
 const NAME_LONG_PRESS_MS = 500;
 const NAME_PRESS_CANCEL_PX = 8; // תזוזה מעבר לזה תוך כדי לחיצה = לא לחיצה ארוכה, לא לפתוח עריכה
 
-function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased }) {
+function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, lastPromo }) {
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [price, setPrice] = useState(item.price ?? "");
   const [store, setStore] = useState(item.store ?? "");
+  const [showPromo, setShowPromo] = useState(false);
+  // פריט שנרכש: המבצע (אם היה) שייך ישירות לרשומת ההיסטוריה הזו. פריט פעיל (עדיין לא נרכש):
+  // אין לו promo משלו (עוד לא נרכש!) - lastPromo הוא מה שהתקבל מההיסטוריה (ראה lastPromoForProduct).
+  const promoInfo = purchased ? (item.promo ? { promo: item.promo, purchasedAt: item.purchasedAt, store: item.store } : null) : lastPromo;
   // לחיצה ארוכה על השם פותחת עריכה שלו - פידבק מפורש (אין דרך אחרת לשנות שם פריט קיים).
   // לא ג'סטורת גרירה/כיוון - רק טיימר, בלי כל מחלקת הבאגים שהייתה עם הסליידר. תזוזה קטנה
   // בזמן הלחיצה (למשל תחילת גלילה) מבטלת את הטיימר כרגיל, בלי להתערב בגלילה עצמה.
@@ -167,7 +171,22 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased })
             {!purchased && <QtyStepper qty={item.qty} onChange={q => onUpdate(item.id, { qty: q })} />}
             {purchased && item.price != null && <Pill color={GREEN}>{ils(item.price)}</Pill>}
             {purchased && item.store && <Pill color={MUTED}>{item.store}</Pill>}
+            {promoInfo && (
+              <button type="button" onClick={() => setShowPromo(s => !s)}
+                aria-label={purchased ? "המבצע ברכישה הזו" : "המבצע האחרון שראינו במוצר הזה"}
+                style={{ display: "inline-flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: AMBER, cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit" }}>
+                <Tag size={13} /> מבצע
+              </button>
+            )}
           </div>
+          {showPromo && promoInfo && (
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
+              {promoInfo.promo}
+              {!purchased && (promoInfo.store || promoInfo.purchasedAt) && (
+                <> · בפעם האחרונה{promoInfo.store ? ` ב${promoInfo.store}` : ""}{promoInfo.purchasedAt ? ` (${new Date(promoInfo.purchasedAt).toLocaleDateString("he-IL")})` : ""}</>
+              )}
+            </div>
+          )}
           {item.note && <div style={{ fontSize: 14, color: MUTED, marginTop: 4, overflowWrap: "anywhere" }}>{item.note}</div>}
         </div>
         <button aria-label={open ? "כיווץ" : "הרחבה"} onClick={() => setOpen(o => !o)} style={{ border: "none", background: "transparent", cursor: "pointer", width: 32, height: 32, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -338,7 +357,7 @@ function ShoppingList({ g, setGrocery }) {
           <div key={category} style={{ marginBottom: 4 }}>
             <Sec title={category} />
             <div style={cardStyle}>
-              {items.map(item => <ItemRow key={item.id} item={item} purchased={false} onUpdate={onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} />)}
+              {items.map(item => <ItemRow key={item.id} item={item} purchased={false} onUpdate={onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} lastPromo={lastPromoForProduct(g.history, item.name)} />)}
             </div>
           </div>
         ))
@@ -347,7 +366,8 @@ function ShoppingList({ g, setGrocery }) {
           {entries.length === 0 && <div style={{ padding: 16, fontSize: 14, color: MUTED, lineHeight: 1.7 }}>אין פריטים להצגה בפילטר הזה.</div>}
           {entries.map(item => (
             <ItemRow key={`${item.purchased ? "h" : "i"}-${item.id}`} item={item} purchased={item.purchased}
-              onUpdate={item.purchased ? onUpdatePurchased : onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} />
+              onUpdate={item.purchased ? onUpdatePurchased : onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore}
+              lastPromo={item.purchased ? null : lastPromoForProduct(g.history, item.name)} />
           ))}
         </div>
       )}
@@ -421,14 +441,18 @@ function Savings({ g, setGrocery }) {
   );
 }
 
-/** שורת פריט אד-הוק בטופס הקבלה: דבר שלא היה ברשימה (קבלות אמיתיות כוללות תמיד גם כאלה). */
+/** שורת פריט אד-הוק בטופס הקבלה: דבר שלא היה ברשימה (קבלות אמיתיות כוללות תמיד גם כאלה).
+    row.promo (אם קיים - תמיד מגיע מסריקת AI, לא שדה שמוזן ידנית) מוצג כטקסט בלבד. */
 function AdHocRow({ row, onChange, onRemove }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto", gap: 6, alignItems: "center" }}>
-      <input className="hq-field" placeholder="שם פריט" value={row.name} onChange={e => onChange({ ...row, name: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
-      <input className="hq-field" placeholder="מחיר ₪" value={row.price} onChange={e => onChange({ ...row, price: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
-      <input className="hq-field" placeholder="כמות" value={row.qty} onChange={e => onChange({ ...row, qty: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
-      <button type="button" aria-label="הסרת שורה" onClick={onRemove} style={{ border: "none", background: "transparent", color: MUTED, cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><X size={15} /></button>
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto", gap: 6, alignItems: "center" }}>
+        <input className="hq-field" placeholder="שם פריט" value={row.name} onChange={e => onChange({ ...row, name: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
+        <input className="hq-field" placeholder="מחיר ₪" value={row.price} onChange={e => onChange({ ...row, price: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
+        <input className="hq-field" placeholder="כמות" value={row.qty} onChange={e => onChange({ ...row, qty: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
+        <button type="button" aria-label="הסרת שורה" onClick={onRemove} style={{ border: "none", background: "transparent", color: MUTED, cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><X size={15} /></button>
+      </div>
+      {row.promo && <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: AMBER, marginTop: 2 }}><Tag size={11} /> {row.promo}</div>}
     </div>
   );
 }
@@ -439,6 +463,7 @@ function ReceiptForm({ g, setGrocery }) {
   const [store, setStore] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [prices, setPrices] = useState({}); // itemId -> price string, נוכח = נבחר
+  const [scanPromos, setScanPromos] = useState({}); // itemId -> promo string, רק לפריטים שהותאמו מסריקת AI
   const [adHoc, setAdHoc] = useState([]);
   const [images, setImages] = useState([]);
   const [error, setError] = useState("");
@@ -454,7 +479,7 @@ function ReceiptForm({ g, setGrocery }) {
   const scanInputRef = useRef(null);
 
   const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
-  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
+  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
 
   const scanReceipt = async file => {
     setScanning(true); setScanError(""); setScanInfo(""); setError(""); setSavedMsg("");
@@ -475,20 +500,25 @@ function ReceiptForm({ g, setGrocery }) {
       // ניסתה לצבור unmatched כתופעת-לוואי מתוך ה-updater וזה לא היה אמין (נתפס בבדיקה
       // ידנית: פריטים לא-תואמים פשוט לא הגיעו ל-adHoc). g.items הוא מקור האמת ל"קיים
       // ברשימה", לא prices הקודם - אין תלות במצב הקודם כאן, אז אין צורך ב-updater בכלל.
+      // findReceiptMatch (לא findActiveDuplicate המדויק) - כדי ש"רוטב סויה" ברשימה יתאים
+      // ל"רוטב סויה יאמסה" בקבלה (שם עם מותג), ראו ההסבר ב-grocery-model.js.
       const matchedPrices = {};
+      const matchedPromos = {};
       const unmatchedItems = [];
       for (const item of items) {
-        const match = findActiveDuplicate(g.items, item.name);
-        if (match) matchedPrices[match.id] = String(item.price); else unmatchedItems.push(item);
+        const match = findReceiptMatch(g.items, item.name);
+        if (match) { matchedPrices[match.id] = String(item.price); if (item.promo) matchedPromos[match.id] = item.promo; }
+        else unmatchedItems.push(item);
       }
       if (Object.keys(matchedPrices).length) setPrices(prev => ({ ...prev, ...matchedPrices }));
+      if (Object.keys(matchedPromos).length) setScanPromos(prev => ({ ...prev, ...matchedPromos }));
       if (unmatchedItems.length) {
         // דה-דופ לפי שם (לא רגיש לאותיות/רווחים) מול מה שכבר ב-adHoc: אם המשתמש/ת מנסים
         // לסרוק שוב (למשל כי בפעם הקודמת לא היה משוב והם חשבו שזה לא עבד) - לא נוצרות שורות כפולות.
         setAdHoc(prev => {
           const existing = new Set(prev.map(r => r.name.trim().toLowerCase()));
           const toAdd = unmatchedItems.filter(item => !existing.has(item.name.trim().toLowerCase()));
-          return [...prev, ...toAdd.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "" }))];
+          return [...prev, ...toAdd.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "", promo: item.promo || null }))];
         });
       }
       const matchedCount = Object.keys(matchedPrices).length;
@@ -503,8 +533,8 @@ function ReceiptForm({ g, setGrocery }) {
 
   const submit = () => {
     setError(""); setSavedMsg(""); setScanError(""); setScanInfo("");
-    const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null }));
-    const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null }));
+    const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null, promo: scanPromos[id] || null }));
+    const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null, promo: r.promo || null }));
     if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
     if (listItems.length === 0 && adHocItems.length === 0) { setError("בחרו לפחות פריט אחד מהרשימה, או הוסיפו שורה ידנית."); return; }
     const { state: next, receiptId } = logReceipt(g, { store, date, listItems, adHocItems });
@@ -512,7 +542,7 @@ function ReceiptForm({ g, setGrocery }) {
     const withImages = images.length ? updateReceiptImages(next, receiptId, images) : next;
     tracker.settle(images, true);
     setGrocery(withImages);
-    tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]);
+    tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setAdHoc([]); setImages([]);
     setSavedMsg("הקבלה נשמרה, ועברה להיסטוריית הרכישות.");
   };
 
@@ -577,7 +607,7 @@ function ReceiptForm({ g, setGrocery }) {
               <AdHocRow key={i} row={row} onChange={r => setAdHoc(rows => rows.map((x, idx) => (idx === i ? r : x)))} onRemove={() => setAdHoc(rows => rows.filter((_, idx) => idx !== i))} />
             ))}
           </div>
-          <button type="button" onClick={() => setAdHoc(rows => [...rows, { name: "", price: "", qty: "" }])}
+          <button type="button" onClick={() => setAdHoc(rows => [...rows, { name: "", price: "", qty: "", promo: null }])}
             style={{ marginTop: 8, fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 5 }}>
             <Plus size={13} /> הוספת שורה
           </button>
