@@ -59,6 +59,39 @@ test("service: 429/5xx/malformed JSON from Gemini map to clear error categories,
   await assert.rejects(badJson(FAKE_KEY, { imageBase64: "x" }), e => e.code === "upstream_error");
 });
 
+test("service: non-ok response logs Gemini's own status/error.message safely (service diagnostics, not user content)", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    const service = createReceiptScanService({
+      fetcher: async () => Response.json({ error: { code: 400, message: "API key not valid", status: "INVALID_ARGUMENT" } }, { status: 400 }),
+      sleep: noSleep,
+    });
+    await assert.rejects(service(FAKE_KEY, { imageBase64: "x" }), e => e.code === "upstream_error");
+    const log = logs.find(l => l.includes("[receipt-scan]"));
+    assert.ok(log, "expected a [receipt-scan] log line");
+    assert.match(log, /status=400/);
+    assert.match(log, /INVALID_ARGUMENT/);
+    assert.match(log, /API key not valid/);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("service: non-ok response without a parseable error body still logs status, doesn't crash", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    const service = createReceiptScanService({ fetcher: async () => new Response("not json", { status: 503 }), sleep: noSleep });
+    await assert.rejects(service(FAKE_KEY, { imageBase64: "x" }), e => e.code === "upstream_error");
+    assert.ok(logs.some(l => l.includes("[receipt-scan]") && l.includes("status=503")));
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 test("service: network error retries once then throws network_error", async () => {
   let calls = 0;
   const service = createReceiptScanService({ fetcher: async () => { calls++; throw new Error("boom"); }, sleep: noSleep });
