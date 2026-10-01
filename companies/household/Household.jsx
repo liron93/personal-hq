@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
+import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
+import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
 import { useStore } from "@/lib/store";
@@ -32,6 +33,38 @@ const ils = v => "₪" + Math.round(v || 0).toLocaleString("he-IL");
 const FILTER_LABEL = { all: "הכול", need: "צריך לקנות", purchased: "נרכש" };
 const PRIORITY_COLOR = { "דחוף": RUST, "חשוב": AMBER, "רגיל": MUTED };
 const ALERT_COLOR = { critical: RUST, warning: AMBER, info: MUTED };
+
+/** מכווץ תמונה (canvas, לא ספרייה חיצונית) לפני שליחה לסריקת AI - תמונת טלפון גולמית יכולה
+    להיות 5-10MB, מיותר ויקר לשלוח ככה. maxDim=1600 מספיק לקריאת טקסט על קבלה. מחזיר base64
+    בלי ה-prefix של data URL (זה מה ש-lib/receipt-scan-service.mjs מצפה לקבל). */
+function compressReceiptImage(file, maxDim = 1600, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error("compress failed")); return; }
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image load failed")); };
+    img.src = url;
+  });
+}
 
 function Pill({ color, children }) {
   return <span style={{ fontSize: 13, color: BG, background: color, borderRadius: 2, padding: "2px 9px", whiteSpace: "nowrap" }}>{children}</span>;
@@ -411,9 +444,50 @@ function ReceiptForm({ g, setGrocery }) {
   const [error, setError] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
   const tracker = useImageTracker([]);
+  // סריקת קבלה עם AI (Gemini, אותו מפתח שכבר משמש את JARVIS - אין הגדרה חדשה נדרשת):
+  // ממלאת אוטומטית את אותם prices/adHoc שהמשתמש/ת היו ממלאים ידנית - לא שומרת כלום
+  // בעצמה. "אישור לפני שמירה" מתקבל בחינם כי זו בדיוק הטופס הקיים, עם שדות שאפשר לערוך/
+  // למחוק לפני לחיצה על "שמירת קבלה" הרגילה.
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const scanInputRef = useRef(null);
 
   const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
-  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]); setSavedMsg(""); };
+  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); };
+
+  const scanReceipt = async file => {
+    setScanning(true); setScanError(""); setError(""); setSavedMsg("");
+    try {
+      const imageBase64 = await compressReceiptImage(file);
+      const response = await apiFetch("/api/household/receipt-scan", {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageBase64, mimeType: "image/jpeg" }),
+      });
+      const value = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(response.status, value.error, "סריקת הקבלה נכשלה."));
+      if (value.store && !store.trim()) setStore(value.store);
+      if (value.date) setDate(value.date);
+      const items = Array.isArray(value.items) ? value.items : [];
+      if (!items.length) { setScanError("לא זוהו פריטים ברורים בתמונה. אפשר למלא ידנית למטה."); return; }
+      // חישוב טהור לפני שקוראים ל-setState (לא בתוך updater של setPrices) - גרסה קודמת
+      // ניסתה לצבור unmatched כתופעת-לוואי מתוך ה-updater וזה לא היה אמין (נתפס בבדיקה
+      // ידנית: פריטים לא-תואמים פשוט לא הגיעו ל-adHoc). g.items הוא מקור האמת ל"קיים
+      // ברשימה", לא prices הקודם - אין תלות במצב הקודם כאן, אז אין צורך ב-updater בכלל.
+      const matchedPrices = {};
+      const unmatchedItems = [];
+      for (const item of items) {
+        const match = findActiveDuplicate(g.items, item.name);
+        if (match) matchedPrices[match.id] = String(item.price); else unmatchedItems.push(item);
+      }
+      if (Object.keys(matchedPrices).length) setPrices(prev => ({ ...prev, ...matchedPrices }));
+      if (unmatchedItems.length) setAdHoc(prev => [...prev, ...unmatchedItems.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "" }))]);
+    } catch (e) {
+      setScanError(e.message || "סריקת הקבלה נכשלה.");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const submit = () => {
     setError(""); setSavedMsg("");
@@ -436,6 +510,17 @@ function ReceiptForm({ g, setGrocery }) {
     <div>
       <h3 style={{ margin: "0 0 4px", fontSize: 18 }}>רישום קבלה</h3>
       <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>אחרי קנייה: מי החנות, מתי, ומה נקנה בפועל (מהרשימה ו/או דברים שלא תוכננו) — כדי לדעת איפה כדאי לקנות.</p>
+
+      <div style={{ ...cardStyle, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>סריקת קבלה עם AI (ניסיוני) — ממלא אוטומטית את הפריטים והמחירים למטה; תמיד אפשר לערוך או למחוק לפני שמירה.</div>
+        <input ref={scanInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
+          onChange={e => { const file = e.target.files?.[0]; if (file) scanReceipt(file); e.target.value = ""; }} />
+        <button type="button" disabled={scanning} onClick={() => scanInputRef.current?.click()}
+          style={{ fontSize: 13, border: `1px solid ${LINE}`, background: "transparent", color: INK, borderRadius: 2, padding: "9px 14px", cursor: scanning ? "not-allowed" : "pointer", opacity: scanning ? 0.6 : 1, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <ScanLine size={15} /> {scanning ? "סורק קבלה…" : "סריקת קבלה עם AI"}
+        </button>
+        {scanError && <p role="alert" style={{ color: RUST, fontSize: 12, margin: "8px 0 0" }}>{scanError}</p>}
+      </div>
 
       <div style={{ ...cardStyle, padding: 14, marginBottom: 14, display: "grid", gap: 10 }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
