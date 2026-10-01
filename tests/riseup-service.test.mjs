@@ -160,6 +160,43 @@ test("service: envelope with no actuals field at all gets an empty array, not a 
   assert.deepEqual(result.envelopes, []);
 });
 
+test("service: logs envelope field names (union across envelopes), never a real value - חקר אם יש שם/קטגוריה מוסתרים", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    const FAKE_CATEGORY_NAME = "קטגוריית-בדיקה-בדויה"; // שם קטגוריה בדוי - לעולם לא אמור להופיע בלוג
+    const body = {
+      ...ROW,
+      envelopes: [
+        { id: "e1", type: "fixed", originalAmount: -1, balancedAmount: -1, categoryName: FAKE_CATEGORY_NAME },
+        { id: "e2", type: "riseupGoal", originalAmount: -1, balancedAmount: -1, icon: "piggy-bank" }, // שדה נוסף שונה - נבדק איחוד
+      ],
+    };
+    const service = createRiseupService({ fetcher: async () => Response.json(body) });
+    await service(FAKE_TOKEN, {});
+    const log = logs.find(l => l.includes("[riseup:envelope-fields]"));
+    assert.ok(log, "expected a [riseup:envelope-fields] log line");
+    assert.match(log, /unknownKeys=categoryName,icon/);
+    assert.ok(!logs.some(l => l.includes(FAKE_CATEGORY_NAME))); // הבדיקה הקריטית: רק שם השדה, לא הערך
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("service: envelope field log handles no envelopes without crashing", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    const service = createRiseupService({ fetcher: async () => Response.json(ROW) }); // envelopes: []
+    await service(FAKE_TOKEN, {});
+    assert.ok(logs.some(l => l.includes("[riseup:envelope-fields]") && l.includes("no-envelopes")));
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 // ---- handler: סדר guard-first, מפתח לא מוגדר, ולידציית month, מיפוי סטטוסים ----
 
 const denyGuard = status => async () => ({ ok: false, response: Response.json({ error: "x" }, { status }) });
