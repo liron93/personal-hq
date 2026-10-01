@@ -17,7 +17,7 @@ test("service: happy path extracts store/date/items, never calls the real Gemini
   const result = await service(FAKE_KEY, { imageBase64: "ZmFrZS1pbWFnZQ==", mimeType: "image/jpeg" });
   assert.equal(result.store, "שופרסל");
   assert.equal(result.date, "2026-09-20");
-  assert.deepEqual(result.items, [{ name: "חלב", price: 6.9, qty: 1 }, { name: "לחם", price: 8, qty: null }]);
+  assert.deepEqual(result.items, [{ name: "חלב", price: 6.9, qty: 1, promo: null }, { name: "לחם", price: 8, qty: null, promo: null }]);
 });
 
 test("service: unclear receipt -> empty items, not an error (never invents data)", async () => {
@@ -37,7 +37,22 @@ test("service: sanitizes malformed items (missing name/invalid price dropped), c
   ];
   const service = createReceiptScanService({ fetcher: async () => geminiJson({ items }), sleep: noSleep });
   const result = await service(FAKE_KEY, { imageBase64: "ZmFrZQ==" });
-  assert.deepEqual(result.items, [{ name: "תקין", price: 5, qty: null }, { name: "עם כמות שלילית", price: 2, qty: null }]);
+  assert.deepEqual(result.items, [{ name: "תקין", price: 5, qty: null, promo: null }, { name: "עם כמות שלילית", price: 2, qty: null, promo: null }]);
+});
+
+test("service: promo field passes through when a real string, sanitized to null otherwise (never invented)", async () => {
+  const items = [
+    { name: "קוטג 5%", price: 20, qty: 2, promo: "2 ב-20" }, // מבצע אמיתי - עובר כמו שהוא
+    { name: "לחם", price: 8, promo: "" }, // מחרוזת ריקה - null
+    { name: "חלב", price: 6, promo: 123 }, // לא מחרוזת - null, לא קורס
+    { name: "ארוך", price: 3, promo: "א".repeat(200) }, // נחתך ל-MAX_PROMO_LEN
+  ];
+  const service = createReceiptScanService({ fetcher: async () => geminiJson({ items }), sleep: noSleep });
+  const result = await service(FAKE_KEY, { imageBase64: "ZmFrZQ==" });
+  assert.equal(result.items[0].promo, "2 ב-20");
+  assert.equal(result.items[1].promo, null);
+  assert.equal(result.items[2].promo, null);
+  assert.equal(result.items[3].promo.length, 120);
 });
 
 test("service: missing apiKey/image rejected before any network call", async () => {

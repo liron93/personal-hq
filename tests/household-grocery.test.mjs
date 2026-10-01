@@ -12,7 +12,7 @@ const HOUSEHOLD_KEY = "hq:household:v1";
 const {
   CATEGORIES, FALLBACK_CATEGORY, PRIORITIES, DEFAULT_CATEGORY_DICT,
   createGroceryState, ensureGroceryState, detectCategory, isGenuineFallback, addCategoryKeyword,
-  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate,
+  quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate, findReceiptMatch, lastPromoForProduct,
   sortItems, groupByRoute, filterEntries,
   monthlySpend, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
@@ -68,6 +68,25 @@ test("findActiveDuplicate: מתעלם מרישיות/רווחים, לא מוצא
   assert.equal(findActiveDuplicate(s0.items, ""), null);
   assert.equal(findActiveDuplicate([], "עגבניות"), null);
   assert.equal(findActiveDuplicate(null, "עגבניות"), null);
+});
+
+test("findReceiptMatch: מתאים שם מהרשימה לשם מפורט יותר מהקבלה (מותג) ולהפך, לא רגיש לכיוון ההכלה", () => {
+  const s0 = quickAddItem(createGroceryState(), "רוטב סויה");
+  // שם הקבלה מפורט יותר (כולל מותג) - כל המילים של "רוטב סויה" מופיעות אצלו.
+  assert.equal(findReceiptMatch(s0.items, "רוטב סויה יאמסה").name, "רוטב סויה");
+  // גם ההפך: הרשימה מפורטת יותר מהקבלה.
+  const s1 = quickAddItem(createGroceryState(), "חלב 3% תנובה");
+  assert.equal(findReceiptMatch(s1.items, "חלב 3%").name, "חלב 3% תנובה");
+  // התאמה מדויקת עדיין עובדת (לא רק פאזי).
+  assert.equal(findReceiptMatch(s0.items, "  רוטב סויה  ").name, "רוטב סויה");
+});
+
+test("findReceiptMatch: מוצרים שונים לגמרי לא מתאימים, שם ריק/רשימה ריקה לא קורסים", () => {
+  const s0 = quickAddItem(createGroceryState(), "עגבניות");
+  assert.equal(findReceiptMatch(s0.items, "מלפפון"), null);
+  assert.equal(findReceiptMatch(s0.items, ""), null);
+  assert.equal(findReceiptMatch([], "עגבניות"), null);
+  assert.equal(findReceiptMatch(null, "עגבניות"), null);
 });
 
 test("addItem: טופס מלא עם קטגוריה ידנית מבטל את הדגל האוטומטי", () => {
@@ -128,6 +147,40 @@ test("updateHistoryEntry: אפשר לתקן מחיר בדיעבד, ההיסטו�
   const s3 = updateHistoryEntry(s2, s2.history[0].id, { price: 7.5 });
   assert.equal(s3.history[0].price, 7.5);
   assert.equal(s3.history.length, 1);
+});
+
+test("markPurchased: שדה promo אופציונלי, מנורמל (טרים), ריק/לא מצוין => null", () => {
+  const s1 = quickAddItem(createGroceryState(), "חלב");
+  const s2 = markPurchased(s1, s1.items[0].id, { price: 6, promo: "  2 ב-20  " });
+  assert.equal(s2.history[0].promo, "2 ב-20");
+  const s3 = quickAddItem(createGroceryState(), "לחם");
+  const s4 = markPurchased(s3, s3.items[0].id); // בלי promo בכלל
+  assert.equal(s4.history[0].promo, null);
+});
+
+test("updateHistoryEntry: אפשר לעדכן/לתקן מבצע בדיעבד, מנורמל בדיוק כמו ב-markPurchased", () => {
+  const s1 = quickAddItem(createGroceryState(), "חלב");
+  const s2 = markPurchased(s1, s1.items[0].id, { price: 6 });
+  assert.equal(s2.history[0].promo, null);
+  const s3 = updateHistoryEntry(s2, s2.history[0].id, { promo: "  מועדון -10%  " });
+  assert.equal(s3.history[0].promo, "מועדון -10%");
+  const s4 = updateHistoryEntry(s3, s3.history[0].id, { promo: "" });
+  assert.equal(s4.history[0].promo, null);
+});
+
+test("lastPromoForProduct: המבצע האחרון (לפי תאריך) לאותו שם מוצר בדיוק, null כשאין בכלל", () => {
+  let s = createGroceryState();
+  s = quickAddItem(s, "קוטג");
+  const id = s.items[0].id;
+  s = markPurchased(s, id, { price: 8, purchasedAt: "2026-08-01T10:00:00.000Z", promo: "מבצע ישן" });
+  s = quickAddItem(s, "קוטג");
+  s = markPurchased(s, s.items[0].id, { price: 7, purchasedAt: "2026-09-01T10:00:00.000Z", promo: "2 ב-14" });
+  const last = lastPromoForProduct(s.history, "קוטג");
+  assert.equal(last.promo, "2 ב-14");
+  assert.equal(last.purchasedAt, "2026-09-01T10:00:00.000Z");
+  assert.equal(lastPromoForProduct(s.history, "מוצר שלא קיים"), null);
+  assert.equal(lastPromoForProduct([], "קוטג"), null);
+  assert.equal(lastPromoForProduct(s.history, ""), null);
 });
 
 // ---------- מיון / קיבוץ לפי מסלול ----------
@@ -440,6 +493,19 @@ test("logReceipt: שורות אד-הוק (לא מהרשימה בכלל) — קט
   assert.equal(choc.category, FALLBACK_CATEGORY); // "שוקולד" לא במילון ברירת המחדל
   const noPrice = next.history.find(h => h.name === "דבר בלי מחיר");
   assert.equal(noPrice.price, null); // לא מומצא
+});
+
+test("logReceipt: promo עובר (ומנורמל) גם משורות רשימה וגם משורות אד-הוק, null כשלא צוין", () => {
+  let s = quickAddItem(createGroceryState(), "קוטג");
+  const item = s.items[0];
+  const { state: next } = logReceipt(s, {
+    store: "שופרסל",
+    listItems: [{ id: item.id, price: 7, promo: "  2 ב-14  " }],
+    adHocItems: [{ name: "שוקולד", price: 8.5, promo: "מועדון" }, { name: "במבה", price: 6 }],
+  });
+  assert.equal(next.history.find(h => h.name === "קוטג").promo, "2 ב-14");
+  assert.equal(next.history.find(h => h.name === "שוקולד").promo, "מועדון");
+  assert.equal(next.history.find(h => h.name === "במבה").promo, null);
 });
 
 test("logReceipt: משלב פריטי רשימה ואד-הוק תחת אותה קבלה (receiptId משותף)", () => {
