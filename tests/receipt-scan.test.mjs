@@ -84,9 +84,9 @@ test("service: non-ok response without a parseable error body still logs status,
   const originalWarn = console.warn;
   console.warn = (...args) => logs.push(args.join(" "));
   try {
-    const service = createReceiptScanService({ fetcher: async () => new Response("not json", { status: 503 }), sleep: noSleep });
+    const service = createReceiptScanService({ fetcher: async () => new Response("not json", { status: 500 }), sleep: noSleep });
     await assert.rejects(service(FAKE_KEY, { imageBase64: "x" }), e => e.code === "upstream_error");
-    assert.ok(logs.some(l => l.includes("[receipt-scan]") && l.includes("status=503")));
+    assert.ok(logs.some(l => l.includes("[receipt-scan]") && l.includes("status=500")));
   } finally {
     console.warn = originalWarn;
   }
@@ -97,6 +97,27 @@ test("service: network error retries once then throws network_error", async () =
   const service = createReceiptScanService({ fetcher: async () => { calls++; throw new Error("boom"); }, sleep: noSleep });
   await assert.rejects(service(FAKE_KEY, { imageBase64: "x" }), e => e.code === "network_error");
   assert.equal(calls, 2); // ניסיון אחד + חזרה אחת, כמו ב-callGemini של jarvis-handler
+});
+
+test("service: persistent 503 (Gemini overloaded) retries with growing backoff, then fails as a distinct 'overloaded' error", async () => {
+  let calls = 0;
+  const delays = [];
+  const recordingSleep = ms => { delays.push(ms); return Promise.resolve(); };
+  const service = createReceiptScanService({ fetcher: async () => { calls++; return new Response("", { status: 503 }); }, sleep: recordingSleep });
+  await assert.rejects(service(FAKE_KEY, { imageBase64: "x" }), e => e.code === "overloaded");
+  assert.equal(calls, 3); // ניסיון ראשון + 2 חזרות (OVERLOAD_BACKOFF_MS) - יותר עמיד מ-JARVIS כי לניתוח תמונה יש ממילא יותר זמן
+  assert.deepEqual(delays, [700, 1500]);
+});
+
+test("service: 503 that clears on retry succeeds without surfacing an error", async () => {
+  let calls = 0;
+  const service = createReceiptScanService({
+    fetcher: async () => { calls++; return calls < 2 ? new Response("", { status: 503 }) : geminiJson({ store: null, date: null, items: [] }); },
+    sleep: noSleep,
+  });
+  const result = await service(FAKE_KEY, { imageBase64: "x" });
+  assert.deepEqual(result, { store: null, date: null, items: [] });
+  assert.equal(calls, 2);
 });
 
 // ---------- handler ----------
@@ -143,7 +164,7 @@ test("handler: 200 happy path, no-store header, configured:true", async () => {
 });
 
 test("handler: ReceiptScanError codes map to the right HTTP status", async () => {
-  const cases = [["bad_request", 400], ["rate_limited", 429], ["upstream_error", 502], ["network_error", 502], ["not_configured", 503]];
+  const cases = [["bad_request", 400], ["rate_limited", 429], ["upstream_error", 502], ["network_error", 502], ["not_configured", 503], ["overloaded", 503]];
   for (const [code, status] of cases) {
     const h = createReceiptScanHandler({ guard: allowGuard, getApiKey: () => FAKE_KEY, service: async () => { throw new ReceiptScanError(code, "הודעה"); } });
     const res = await h(req({ imageBase64: "x" }));
