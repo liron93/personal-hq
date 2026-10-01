@@ -450,13 +450,14 @@ function ReceiptForm({ g, setGrocery }) {
   // למחוק לפני לחיצה על "שמירת קבלה" הרגילה.
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState("");
+  const [scanInfo, setScanInfo] = useState(""); // משוב הצלחה - בלי זה סריקה שמצאה פריטים הייתה "שקטה" לגמרי (באג שדווח: "לא עובד, אין הודעת שגיאה" - בפועל כן עבד, רק בלי משוב)
   const scanInputRef = useRef(null);
 
   const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
-  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); };
+  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
 
   const scanReceipt = async file => {
-    setScanning(true); setScanError(""); setError(""); setSavedMsg("");
+    setScanning(true); setScanError(""); setScanInfo(""); setError(""); setSavedMsg("");
     try {
       const imageBase64 = await compressReceiptImage(file);
       const response = await apiFetch("/api/household/receipt-scan", {
@@ -481,7 +482,18 @@ function ReceiptForm({ g, setGrocery }) {
         if (match) matchedPrices[match.id] = String(item.price); else unmatchedItems.push(item);
       }
       if (Object.keys(matchedPrices).length) setPrices(prev => ({ ...prev, ...matchedPrices }));
-      if (unmatchedItems.length) setAdHoc(prev => [...prev, ...unmatchedItems.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "" }))]);
+      if (unmatchedItems.length) {
+        // דה-דופ לפי שם (לא רגיש לאותיות/רווחים) מול מה שכבר ב-adHoc: אם המשתמש/ת מנסים
+        // לסרוק שוב (למשל כי בפעם הקודמת לא היה משוב והם חשבו שזה לא עבד) - לא נוצרות שורות כפולות.
+        setAdHoc(prev => {
+          const existing = new Set(prev.map(r => r.name.trim().toLowerCase()));
+          const toAdd = unmatchedItems.filter(item => !existing.has(item.name.trim().toLowerCase()));
+          return [...prev, ...toAdd.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "" }))];
+        });
+      }
+      const matchedCount = Object.keys(matchedPrices).length;
+      const unmatchedCount = unmatchedItems.length;
+      setScanInfo(`זוהו ${items.length} פריטים: ${matchedCount} הותאמו לרשימה${unmatchedCount ? `, ${unmatchedCount} נוספו כשורות חדשות למטה` : ""}. אפשר לבדוק ולערוך לפני השמירה.`);
     } catch (e) {
       setScanError(e.message || "סריקת הקבלה נכשלה.");
     } finally {
@@ -490,7 +502,7 @@ function ReceiptForm({ g, setGrocery }) {
   };
 
   const submit = () => {
-    setError(""); setSavedMsg("");
+    setError(""); setSavedMsg(""); setScanError(""); setScanInfo("");
     const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null }));
     const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null }));
     if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
@@ -520,6 +532,7 @@ function ReceiptForm({ g, setGrocery }) {
           <ScanLine size={15} /> {scanning ? "סורק קבלה…" : "סריקת קבלה עם AI"}
         </button>
         {scanError && <p role="alert" style={{ color: RUST, fontSize: 12, margin: "8px 0 0" }}>{scanError}</p>}
+        {scanInfo && <p role="status" style={{ color: GREEN, fontSize: 12, margin: "8px 0 0" }}>{scanInfo}</p>}
       </div>
 
       <div style={{ ...cardStyle, padding: 14, marginBottom: 14, display: "grid", gap: 10 }}>
