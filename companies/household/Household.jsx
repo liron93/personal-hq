@@ -483,6 +483,11 @@ function ReceiptForm({ g, setGrocery }) {
   // לרשימה מאז. כש-isOldReceipt מסומן, הסריקה לא מנסה להתאים לרשימה הפעילה בכלל - הכל
   // נכנס כשורות אד-הוק (נוספות ישירות להיסטוריה, בלי לגעת ב-items).
   const [isOldReceipt, setIsOldReceipt] = useState(false);
+  // התאמות שהסריקה מצאה אבל עדיין לא אושרו: דווח שהתאמה מטושטשת ("פיצה" ברשימה מול "חטיפי
+  // פיצה גבינה" בקבלה - מוצר שונה לגמרי שרק חולק מילה) מולאה בשקט בלי שהמשתמש/ת שמו לב.
+  // עכשיו שום התאמה (גם לא מדויקת-לגמרי) לא ממלאת מחיר לבד - היא מוצגת כהצעה לאישור, ורק
+  // לחיצה מפורשת "כן, אותו מוצר" מחילה אותה (ראו applyMatch/confirmPending/rejectPending).
+  const [pendingMatches, setPendingMatches] = useState([]);
   const [adHoc, setAdHoc] = useState([]);
   const [images, setImages] = useState([]);
   const [error, setError] = useState("");
@@ -498,7 +503,26 @@ function ReceiptForm({ g, setGrocery }) {
   const scanInputRef = useRef(null);
 
   const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
-  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
+  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setPendingMatches([]); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
+
+  // מחיל פריט שנסרק (מהקבלה) על פריט קיים ברשימה - מצטבר (לא דורס) כדי שאם כמה שורות
+  // סרוקות שונות מאשרות לאותו פריט ברשימה, המחיר/כמות שלהן מצטברים יחד, לא מוחלפים.
+  const applyScannedToItem = (itemId, scanned) => {
+    setPrices(prev => ({ ...prev, [itemId]: String(round2((toN(prev[itemId]) || 0) + scanned.price)) }));
+    setScanQtys(prev => ({ ...prev, [itemId]: (toN(prev[itemId]) || 0) + (scanned.qty || 1) }));
+    if (scanned.promo) setScanPromos(prev => ({ ...prev, [itemId]: prev[itemId] ? `${prev[itemId]}; ${scanned.promo}` : scanned.promo }));
+  };
+  const confirmPendingMatch = p => { applyScannedToItem(p.suggested.id, p.scanned); setPendingMatches(prev => prev.filter(x => x.id !== p.id)); };
+  const rejectPendingMatch = p => {
+    // "לא אותו מוצר" - הפריט הסרוק הוא בכל זאת פריט אמיתי מהקבלה, רק לא זה שברשימה - נכנס
+    // כשורה חדשה (אד-הוק), בדיוק כמו פריט שמעולם לא היה לו מועמד התאמה. אותו דה-דופ לפי שם.
+    setAdHoc(prev => {
+      const key = p.scanned.name.trim().toLowerCase();
+      if (prev.some(r => r.name.trim().toLowerCase() === key)) return prev;
+      return [...prev, { name: p.scanned.name, price: String(p.scanned.price), qty: p.scanned.qty != null ? String(p.scanned.qty) : "", promo: p.scanned.promo || null }];
+    });
+    setPendingMatches(prev => prev.filter(x => x.id !== p.id));
+  };
 
   const scanReceipt = async file => {
     setScanning(true); setScanError(""); setScanInfo(""); setError(""); setSavedMsg("");
@@ -515,35 +539,24 @@ function ReceiptForm({ g, setGrocery }) {
       if (value.date) setDate(value.date);
       const items = Array.isArray(value.items) ? value.items : [];
       if (!items.length) { setScanError("לא זוהו פריטים ברורים בתמונה. אפשר למלא ידנית למטה."); return; }
-      // חישוב טהור לפני שקוראים ל-setState (לא בתוך updater של setPrices) - גרסה קודמת
-      // ניסתה לצבור unmatched כתופעת-לוואי מתוך ה-updater וזה לא היה אמין (נתפס בבדיקה
-      // ידנית: פריטים לא-תואמים פשוט לא הגיעו ל-adHoc). g.items הוא מקור האמת ל"קיים
+      // חישוב טהור לפני שקוראים ל-setState (לא בתוך updater) - גרסה קודמת ניסתה לצבור
+      // unmatched כתופעת-לוואי מתוך updater וזה לא היה אמין. g.items הוא מקור האמת ל"קיים
       // ברשימה", לא prices הקודם - אין תלות במצב הקודם כאן, אז אין צורך ב-updater בכלל.
       // findReceiptMatch (לא findActiveDuplicate המדויק) - כדי ש"רוטב סויה" ברשימה יתאים
       // ל"רוטב סויה יאמסה" בקבלה (שם עם מותג), ראו ההסבר ב-grocery-model.js. קבלה ישנה:
       // לא מתאימים בכלל לרשימה הפעילה (ראו הסבר ליד isOldReceipt).
-      // צבירה (לא דריסה!) לפי match.id: קבלה אמיתית לפעמים מדפיסה את אותו מוצר כשתי שורות
-      // נפרדות (למשל שני יחידות באותו מחיר) במקום שורה אחת עם qty - בלי צבירה היינו מאבדים
-      // את השורה הראשונה כשהשנייה דורסת אותה באותו מפתח.
-      const matchedPrices = {};
-      const matchedQtys = {};
-      const matchedPromos = {};
+      // דווח: "פיצה" ברשימה הותאמה בשקט ל"חטיפי פיצה גבינה" בקבלה - מוצר שונה שרק חולק
+      // מילה. שום התאמה (גם לא מדויקת-לגמרי) כבר לא ממלאת מחיר לבד - כל התאמה הופכת ל"ממתין
+      // לאישור" (pending), ורק פריט בלי שום מועמד התאמה נכנס ישר כשורה חדשה (אד-הוק) - אין
+      // מה "לאשר" שם, זה כבר ברור שזה פריט חדש.
+      const pending = [];
       const unmatchedItems = [];
       for (const item of items) {
         const match = !isOldReceipt ? findReceiptMatch(g.items, item.name) : null;
-        if (match) {
-          matchedPrices[match.id] = round2((matchedPrices[match.id] || 0) + item.price);
-          matchedQtys[match.id] = (matchedQtys[match.id] || 0) + (item.qty || 1);
-          if (item.promo) matchedPromos[match.id] = matchedPromos[match.id] ? `${matchedPromos[match.id]}; ${item.promo}` : item.promo;
-        } else {
-          unmatchedItems.push(item);
-        }
+        if (match) pending.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, scanned: item, suggested: match });
+        else unmatchedItems.push(item);
       }
-      if (Object.keys(matchedPrices).length) {
-        setPrices(prev => { const next = { ...prev }; for (const id in matchedPrices) next[id] = String(matchedPrices[id]); return next; });
-        setScanQtys(prev => ({ ...prev, ...matchedQtys }));
-      }
-      if (Object.keys(matchedPromos).length) setScanPromos(prev => ({ ...prev, ...matchedPromos }));
+      if (pending.length) setPendingMatches(prev => [...prev, ...pending]);
       if (unmatchedItems.length) {
         // דה-דופ לפי שם (לא רגיש לאותיות/רווחים) מול מה שכבר ב-adHoc: אם המשתמש/ת מנסים
         // לסרוק שוב (למשל כי בפעם הקודמת לא היה משוב והם חשבו שזה לא עבד) - לא נוצרות שורות כפולות.
@@ -553,11 +566,9 @@ function ReceiptForm({ g, setGrocery }) {
           return [...prev, ...toAdd.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "", promo: item.promo || null }))];
         });
       }
-      const matchedCount = Object.keys(matchedPrices).length;
-      const unmatchedCount = unmatchedItems.length;
       setScanInfo(isOldReceipt
         ? `זוהו ${items.length} פריטים, כולם נוספו כשורות חדשות למטה (קבלה ישנה - לא הותאם לרשימה הנוכחית). אפשר לבדוק ולערוך לפני השמירה.`
-        : `זוהו ${items.length} פריטים: ${matchedCount} הותאמו לרשימה${unmatchedCount ? `, ${unmatchedCount} נוספו כשורות חדשות למטה` : ""}. אפשר לבדוק ולערוך לפני השמירה.`);
+        : `זוהו ${items.length} פריטים: ${pending.length} ממתינים לאישור התאמה למעלה${unmatchedItems.length ? `, ${unmatchedItems.length} נוספו כשורות חדשות למטה` : ""}.`);
     } catch (e) {
       setScanError(e.message || "סריקת הקבלה נכשלה.");
     } finally {
@@ -567,6 +578,7 @@ function ReceiptForm({ g, setGrocery }) {
 
   const submit = () => {
     setError(""); setSavedMsg(""); setScanError(""); setScanInfo("");
+    if (pendingMatches.length > 0) { setError(`יש ${pendingMatches.length} התאמות שממתינות לאישור למעלה - אשרו או סמנו כ"פריט נפרד" לפני השמירה.`); return; }
     const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null, promo: scanPromos[id] || null, qty: toN(scanQtys[id]) || null }));
     const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null, promo: r.promo || null }));
     if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
@@ -576,7 +588,7 @@ function ReceiptForm({ g, setGrocery }) {
     const withImages = images.length ? updateReceiptImages(next, receiptId, images) : next;
     tracker.settle(images, true);
     setGrocery(withImages);
-    tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setAdHoc([]); setImages([]);
+    tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setPendingMatches([]); setAdHoc([]); setImages([]);
     setSavedMsg("הקבלה נשמרה, ועברה להיסטוריית הרכישות.");
   };
 
@@ -588,7 +600,7 @@ function ReceiptForm({ g, setGrocery }) {
       <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>אחרי קנייה: מי החנות, מתי, ומה נקנה בפועל (מהרשימה ו/או דברים שלא תוכננו) — כדי לדעת איפה כדאי לקנות.</p>
 
       <div style={{ ...cardStyle, padding: 14, marginBottom: 14 }}>
-        <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>סריקת קבלה עם AI (ניסיוני) — ממלא אוטומטית את הפריטים והמחירים למטה; תמיד אפשר לערוך או למחוק לפני שמירה.</div>
+        <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>סריקת קבלה עם AI (ניסיוני) — כל התאמה לרשימה דורשת אישור שלכם (למטה), ופריטים חדשים נוספים ישירות; תמיד אפשר לערוך או למחוק לפני שמירה.</div>
         <input ref={scanInputRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }}
           onChange={e => { const file = e.target.files?.[0]; if (file) scanReceipt(file); e.target.value = ""; }} />
         <button type="button" disabled={scanning} onClick={() => scanInputRef.current?.click()}
@@ -602,6 +614,24 @@ function ReceiptForm({ g, setGrocery }) {
         {scanError && <p role="alert" style={{ color: RUST, fontSize: 12, margin: "8px 0 0" }}>{scanError}</p>}
         {scanInfo && <p role="status" style={{ color: GREEN, fontSize: 12, margin: "8px 0 0" }}>{scanInfo}</p>}
       </div>
+
+      {pendingMatches.length > 0 && (
+        <div style={{ ...cardStyle, padding: 14, marginBottom: 14, borderColor: AMBER }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>לאשר התאמה ({pendingMatches.length})</div>
+          <p style={{ fontSize: 12, color: MUTED, margin: "0 0 10px" }}>הסריקה מצאה דמיון בין מה שבקבלה למה שברשימה, אבל זה לא תמיד אותו מוצר באמת - למשל "פיצה" ברשימה מול "חטיפי פיצה גבינה" בקבלה. אשרו רק אם זה באמת אותו דבר.</p>
+          {pendingMatches.map(p => (
+            <div key={p.id} style={{ borderBottom: `1px solid ${LINE}`, padding: "8px 0" }}>
+              <div style={{ fontSize: 13, overflowWrap: "anywhere" }}>
+                בקבלה: <strong>{p.scanned.name}</strong> ({ils(p.scanned.price)}) — זה <strong>{p.suggested.name}</strong> מהרשימה?
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => confirmPendingMatch(p)} style={{ fontSize: 12, color: BG, background: GREEN, border: "none", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>כן, אותו מוצר</button>
+                <button type="button" onClick={() => rejectPendingMatch(p)} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>לא, פריט נפרד</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ ...cardStyle, padding: 14, marginBottom: 14, display: "grid", gap: 10 }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
