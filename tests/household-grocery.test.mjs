@@ -598,6 +598,48 @@ test("logReceipt: מזהה פריט רשימה שלא קיים (id זר) מתע�
   assert.equal(next.items.length, 1); // הפריט המקורי לא נגע בו
 });
 
+test("logReceipt: historyUpdates - ממלא מחיר על רכישה שכבר סומנה 'נרכש' בלי מחיר (הזרימה: סימון בזמן הקנייה, סריקת קבלה אחר כך)", () => {
+  let s = quickAddItem(createGroceryState(), "פיצה");
+  s = markPurchased(s, s.items[0].id); // סומן "נרכש" בלי מחיר (צ'קבוקס בזמן הקנייה) - בדיוק התרחיש שLiron תיאר
+  const historyId = s.history[0].id;
+  assert.equal(s.history[0].price, null);
+  assert.equal(s.history[0].receiptId, null);
+  const { state: next, receiptId } = logReceipt(s, { store: "חצי חינם", date: "2026-10-03", historyUpdates: [{ id: historyId, price: 12, qty: 1, promo: "2 ב-20" }] });
+  assert.ok(receiptId);
+  assert.equal(next.history.length, 1); // לא נוצרה שורה כפולה - אותה רשומה עודכנה
+  assert.equal(next.history[0].id, historyId);
+  assert.equal(next.history[0].price, 12);
+  assert.equal(next.history[0].promo, "2 ב-20");
+  assert.equal(next.history[0].store, "חצי חינם");
+  assert.equal(next.history[0].receiptId, receiptId);
+  assert.equal(next.receipts[0].store, "חצי חינם");
+});
+
+test("logReceipt: historyUpdates משולב עם listItems/adHocItems תחת אותה קבלה; id זר מתעלם בשקט", () => {
+  let s = quickAddItem(createGroceryState(), "פיצה");
+  s = markPurchased(s, s.items[0].id);
+  const historyId = s.history[0].id;
+  s = quickAddItem(s, "חלב");
+  const activeId = s.items[0].id;
+  const { state: next, receiptId } = logReceipt(s, {
+    store: "חצי חינם",
+    listItems: [{ id: activeId, price: 6 }],
+    adHocItems: [{ name: "שוקולד", price: 8 }],
+    historyUpdates: [{ id: historyId, price: 12 }, { id: "לא-קיים", price: 99 }],
+  });
+  assert.equal(next.history.length, 3);
+  assert.ok(next.history.every(h => h.receiptId === receiptId && h.store === "חצי חינם"));
+  assert.equal(next.history.find(h => h.id === historyId).price, 12);
+  assert.equal(next.items.length, 0); // "חלב" ירד מהרשימה הפעילה
+});
+
+test("logReceipt: historyUpdates לבדו (בלי listItems/adHocItems) מספיק כדי לרשום קבלה", () => {
+  let s = quickAddItem(createGroceryState(), "פיצה");
+  s = markPurchased(s, s.items[0].id);
+  const { receiptId } = logReceipt(s, { store: "חצי חינם", historyUpdates: [{ id: s.history[0].id, price: 12 }] });
+  assert.ok(receiptId);
+});
+
 test("updateReceiptImages: מעדכן את מערך התמונות של קבלה קיימת בלבד", () => {
   let s = createGroceryState();
   const { state: withReceipt, receiptId } = logReceipt(s, { store: "שופרסל", adHocItems: [{ name: "לחם", price: 10 }] });
