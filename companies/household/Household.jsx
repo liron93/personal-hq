@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
+import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag, Ticket } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { toN } from "@/lib/format";
@@ -15,6 +15,7 @@ import {
   groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
 } from "./grocery-model";
+import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
 // אין fallback ל-base64, ו"לא מופעל" הוא ההתנהגות הצפויה כל עוד Storage לא הופעל בפרודקשן.
 // ייבוא חוצה-חברות מקובל כאן כי זה widget UI גנרי, לא לוגיקת דומיין; הזזה ל-lib/ תיעשה בנפרד בעתיד.
@@ -718,9 +719,102 @@ function ByStore({ g }) {
   );
 }
 
+/** שורת שובר בודד: שם, סכום מקורי, סכום שנוצל (עריכה), יתרה מחושבת, וצ'קבוקס "נוצל במלואו"
+    (מסמן יתרה כ-0 בתצוגה בלי למחוק את השובר או לשנות usedAmount). */
+function VoucherRow({ voucher, onUpdate, onRemove }) {
+  const [used, setUsed] = useState(String(voucher.usedAmount ?? 0));
+  const [confirmDel, setConfirmDel] = useState(false);
+  const remaining = remainingAmount(voucher);
+  return (
+    <div style={{ borderBottom: `1px solid ${LINE}`, padding: "10px 0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 15, overflowWrap: "anywhere", textDecoration: voucher.fullyUsed ? "line-through" : "none", opacity: voucher.fullyUsed ? 0.55 : 1 }}>
+            {voucher.name}
+          </div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+            סכום מקורי {ils(voucher.originalAmount)}
+            {voucher.usedAmount > 0 ? ` · נוצל ${ils(voucher.usedAmount)}` : ""}
+          </div>
+        </div>
+        <Pill color={remaining > 0 ? GREEN : voucher.fullyUsed ? MUTED : RUST}>יתרה {ils(remaining)}</Pill>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>סכום שנוצל (₪)</div>
+          <input className="hq-field" value={used} onChange={e => setUsed(e.target.value)}
+            onBlur={() => onUpdate({ usedAmount: toN(used) })}
+            disabled={voucher.fullyUsed} style={{ ...inputStyle, width: 100 }} />
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", paddingTop: 14 }}>
+          <input type="checkbox" checked={voucher.fullyUsed} onChange={e => onUpdate({ fullyUsed: e.target.checked })} />
+          נוצל במלואו
+        </label>
+        <div style={{ flex: 1 }} />
+        {!confirmDel ? (
+          <button onClick={() => setConfirmDel(true)} style={{ fontSize: 12, color: RUST, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>מחק שובר</button>
+        ) : (
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: RUST }}>למחוק לצמיתות?</span>
+            <button onClick={onRemove} style={{ fontSize: 12, color: BG, background: RUST, border: "none", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>מחק</button>
+            <button onClick={() => setConfirmDel(false)} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>ביטול</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** לשונית "שוברים": שוברים/כרטיסי מתנה - סכום מקורי, סכום שנוצל, יתרה מחושבת אוטומטית,
+    וסימון "נוצל במלואו" בלי מחיקה (למשל שארית קטנה שהחנות לא מחזירה כעודף). */
+function Vouchers({ g, setGrocery }) {
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const vouchers = sortVouchers(g.vouchers);
+  const patch = fn => setGrocery(fn);
+
+  const submit = () => {
+    setFormError("");
+    const original = toN(amount);
+    if (!name.trim()) { setFormError("הזינו שם לשובר."); return; }
+    if (!original || original <= 0) { setFormError("הזינו סכום מקורי תקין."); return; }
+    patch(prev => addVoucher(prev, { name, originalAmount: original }));
+    setName(""); setAmount("");
+  };
+
+  return (
+    <div>
+      <h3 style={{ margin: "0 0 4px", fontSize: 18 }}>שוברים</h3>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>שוברים וכרטיסי מתנה - כמה נשאר בכל אחד, בלי לחשב ידנית.</p>
+
+      <div style={{ ...cardStyle, padding: 14, marginBottom: 14, display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 8 }}>
+          <input className="hq-field" placeholder="שם השובר (למשל: שובר BUYME 200)" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+          <input className="hq-field" placeholder="סכום מקורי ₪" value={amount} onChange={e => setAmount(e.target.value)} style={inputStyle} />
+        </div>
+        {formError && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>{formError}</p>}
+        <button onClick={submit} style={{ border: "none", background: INK, color: BG, borderRadius: 2, padding: "8px 0", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <Plus size={15} /> הוספת שובר
+        </button>
+      </div>
+
+      <div style={cardStyle}>
+        {vouchers.length === 0 && <div style={{ padding: 16, fontSize: 14, color: MUTED, lineHeight: 1.7 }}>אין עדיין שוברים. הוסיפו שובר למעלה.</div>}
+        {vouchers.map(v => (
+          <VoucherRow key={v.id} voucher={v}
+            onUpdate={p => patch(prev => updateVoucher(prev, v.id, p))}
+            onRemove={() => patch(prev => removeVoucher(prev, v.id))} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Household() {
   const { data: d, setData: setD, ready } = useStore(STORE_KEY, INIT);
-  const [sub, setSub] = useState("list"); // list | receipt | byStore | savings
+  const [sub, setSub] = useState("list"); // list | receipt | byStore | savings | vouchers
 
   // תאימות אחורה: משלים שדות חסרים בנתונים ישנים בלי לדרוס שום דבר קיים.
   useEffect(() => {
@@ -734,17 +828,19 @@ export default function Household() {
 
   return (
     <div style={{ minWidth: 0 }}>
-      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, קבלות עם חנות ותמונה, ניתוח חיסכון ולפי חנות — v1: סופר בלבד.</p>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, קבלות עם חנות ותמונה, ניתוח חיסכון ולפי חנות, ושוברים — v1: סופר בלבד (מלבד שוברים, שלא קשורים דווקא לסופר).</p>
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => setSub("list")} style={tabBtn(sub === "list")}><ShoppingBasket size={13} style={{ marginLeft: 5 }} />רשימת קניות</button>
         <button onClick={() => setSub("receipt")} style={tabBtn(sub === "receipt")}><Receipt size={13} style={{ marginLeft: 5 }} />קבלה</button>
         <button onClick={() => setSub("byStore")} style={tabBtn(sub === "byStore")}><Store size={13} style={{ marginLeft: 5 }} />לפי חנות</button>
         <button onClick={() => setSub("savings")} style={tabBtn(sub === "savings")}>חיסכון</button>
+        <button onClick={() => setSub("vouchers")} style={tabBtn(sub === "vouchers")}><Ticket size={13} style={{ marginLeft: 5 }} />שוברים</button>
       </div>
       {sub === "list" && <ShoppingList g={g} setGrocery={setD} />}
       {sub === "receipt" && <ReceiptForm g={g} setGrocery={setD} />}
       {sub === "byStore" && <ByStore g={g} />}
       {sub === "savings" && <Savings g={g} setGrocery={setD} />}
+      {sub === "vouchers" && <Vouchers g={g} setGrocery={setD} />}
     </div>
   );
 }

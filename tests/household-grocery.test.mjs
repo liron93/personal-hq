@@ -387,6 +387,20 @@ test("summarize: קלט חסר/undefined לא קורס — נופל ל-INIT", ()
   assert.doesNotThrow(() => model.summarize(null));
 });
 
+// ---------- model.js: ensureHousehold (שוברים) ----------
+test("ensureHousehold: INIT כולל vouchers ריק; נתונים ישנים בלי השדה מקבלים מערך ריק, שאר השדות נשארים", () => {
+  assert.deepEqual(model.INIT.vouchers, []);
+  const old = { items: [], history: [], categoryDict: {}, monthlyBudget: 50, receipts: [] }; // מלפני פיצ'ר השוברים
+  const next = model.ensureHousehold(old);
+  assert.deepEqual(next.vouchers, []);
+  assert.equal(next.monthlyBudget, 50); // שום דבר קיים לא נדרס
+});
+
+test("ensureHousehold: נתונים שכבר תקינים (כולל vouchers) מוחזרים כמו שהם - בלי אובייקט חדש", () => {
+  const valid = { ...model.INIT, vouchers: [{ id: "x" }] };
+  assert.equal(model.ensureHousehold(valid), valid);
+});
+
 // ---------- הרשאות/נראות: household עצמאית מ-beit-hadash/כספים, שקד מוחרגת ----------
 // #79 מוזג ל-main (b37a65c) ותוסף tests/company-visibility-matrix.test.mjs שם כבר כולל "household"
 // ברמת lib/workspace.js (visibleCompanySlugs/canViewCompany/isHqVisible/isCompanyReadOnly) —
