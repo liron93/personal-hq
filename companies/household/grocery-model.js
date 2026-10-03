@@ -378,6 +378,26 @@ export function monthlySpend(history, month) {
   return { hasData: true, total: round2(priced.reduce((s, e) => s + e.price, 0)), itemCount: entries.length, pricedCount: priced.length };
 }
 
+/**
+ * פירוט רכישות החודש לפי מוצר - בניגוד ל-mostPurchasedProducts (לכל ההיסטוריה, בלי הגבלת
+ * זמן), זה עונה בדיוק על "מה קניתי החודש, כמה פעמים, וכמה זה עלה": לכל מוצר שנרכש בחודש
+ * הנתון - כמה פעמים (count), וסך ההוצאה עליו באותו חודש (total, רק מרשומות עם מחיר תקין -
+ * pricedCount אומר מתוך כמה רכישות זה חושב). ממוין מהגבוה בהוצאה.
+ */
+export function monthlyProductBreakdown(history, month = nowMonth()) {
+  const byName = new Map();
+  for (const h of history || []) {
+    if (monthKeyOf(h.purchasedAt) !== month) continue;
+    const key = norm(h.name).toLowerCase();
+    if (!key) continue;
+    const row = byName.get(key) || { name: h.name, count: 0, total: 0, pricedCount: 0 };
+    row.count += 1;
+    if (hasValidPrice(h)) { row.total = round2(row.total + h.price); row.pricedCount += 1; }
+    byName.set(key, row);
+  }
+  return [...byName.values()].sort((a, b) => b.total - a.total || b.count - a.count || heCompare(a.name, b.name));
+}
+
 /** תקציב מול בפועל לחודש נתון. budget=null (לא הוגדר) או spend.hasData=false => over=false, בלי לבדות מספר. */
 export function budgetVsActual(state, { referenceMonth = nowMonth() } = {}) {
   const budget = isValidNonNegativeNumber(state?.monthlyBudget) ? state.monthlyBudget : null;

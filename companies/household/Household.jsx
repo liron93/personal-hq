@@ -14,6 +14,7 @@ import {
   budgetVsActual, budgetTrend, repeatProducts, repeatCategories, pricePerUnit,
   groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
+  monthlyProductBreakdown, nowMonth,
 } from "./grocery-model";
 import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
@@ -690,16 +691,41 @@ function ReceiptForm({ g, setGrocery }) {
 }
 
 function ByStore({ g }) {
+  const month = nowMonth();
+  const monthly = monthlyProductBreakdown(g.history, month);
   const totals = storeTotals(g.history);
   const products = mostPurchasedProducts(g.history);
   const cats = mostPurchasedCategories(g.history);
   const cheapest = cheapestStoreSeen(g.history);
+  const cheapestByName = new Map(cheapest.map(c => [c.name.toLowerCase(), c]));
 
   return (
     <div>
-      <h3 style={{ margin: "0 0 10px", fontSize: 18 }}>לפי חנות</h3>
-      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>איפה קונים הכי הרבה, ומה עולה יותר או פחות בכל חנות — לפי מה שתועד בפועל, בלי נתוני מחירים חיצוניים.</p>
+      <h3 style={{ margin: "0 0 10px", fontSize: 18 }}>היסטוריית הזמנות</h3>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>מה קניתם החודש, כמה פעמים, וכמה זה עלה — ואיפה הכי כדאי לקנות כל מוצר, לפי מה שתועד בפועל.</p>
 
+      <Sec title={`החודש (${month})`} />
+      <div style={cardStyle}>
+        {monthly.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — עדיין אין רכישות מתועדות החודש.</div>}
+        {monthly.map(p => {
+          const cheapestForProduct = cheapestByName.get(p.name.toLowerCase());
+          return (
+            <div key={p.name} style={{ padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.name}</span>
+                <span style={{ color: MUTED, flexShrink: 0 }}>{p.count} פעמים{p.pricedCount > 0 ? ` · ${ils(p.total)}` : ""}</span>
+              </div>
+              {cheapestForProduct && (
+                <div style={{ color: GREEN, fontSize: 12, marginTop: 2 }}>
+                  הכי זול שראינו: {cheapestForProduct.cheapestStore} ({ils(cheapestForProduct.cheapestPrice)})
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 14, fontWeight: 600, margin: "22px 0 4px", paddingTop: 10, borderTop: `1px solid ${LINE}` }}>לאורך זמן (כל ההיסטוריה)</div>
       <Sec title="סך הוצאה לפי חנות" />
       <div style={cardStyle}>
         {totals.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — עדיין אין רכישות עם חנות ומחיר.</div>}
@@ -895,11 +921,11 @@ export default function Household() {
 
   return (
     <div style={{ minWidth: 0 }}>
-      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, קבלות עם חנות ותמונה, ניתוח חיסכון ולפי חנות, ושוברים — v1: סופר בלבד (מלבד שוברים, שלא קשורים דווקא לסופר).</p>
+      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, קבלות עם חנות ותמונה, היסטוריית הזמנות, ניתוח חיסכון, ושוברים — v1: סופר בלבד (מלבד שוברים, שלא קשורים דווקא לסופר).</p>
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         <button onClick={() => setSub("list")} style={tabBtn(sub === "list")}><ShoppingBasket size={13} style={{ marginLeft: 5 }} />רשימת קניות</button>
         <button onClick={() => setSub("receipt")} style={tabBtn(sub === "receipt")}><Receipt size={13} style={{ marginLeft: 5 }} />קבלה</button>
-        <button onClick={() => setSub("byStore")} style={tabBtn(sub === "byStore")}><Store size={13} style={{ marginLeft: 5 }} />לפי חנות</button>
+        <button onClick={() => setSub("byStore")} style={tabBtn(sub === "byStore")}><Store size={13} style={{ marginLeft: 5 }} />היסטוריית הזמנות</button>
         <button onClick={() => setSub("savings")} style={tabBtn(sub === "savings")}>חיסכון</button>
         <button onClick={() => setSub("vouchers")} style={tabBtn(sub === "vouchers")}><Ticket size={13} style={{ marginLeft: 5 }} />שוברים</button>
       </div>

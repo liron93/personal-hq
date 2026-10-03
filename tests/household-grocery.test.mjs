@@ -14,7 +14,7 @@ const {
   createGroceryState, ensureGroceryState, detectCategory, isGenuineFallback, addCategoryKeyword,
   quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate, findReceiptMatch, lastPromoForProduct,
   sortItems, groupByRoute, filterEntries,
-  monthlySpend, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
+  monthlySpend, monthlyProductBreakdown, nowMonth, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
 } = grocery;
@@ -241,6 +241,35 @@ test("monthlySpend: מחושב רק מרשומות עם מחיר תקין, hasDa
   const empty = monthlySpend(history, "2026-07");
   assert.equal(empty.hasData, false);
   assert.equal(empty.total, 0);
+});
+
+test("monthlyProductBreakdown: לכל מוצר - כמה פעמים נרכש החודש וכמה עלה, רק לחודש הנתון, ממוין מהגבוה בהוצאה", () => {
+  const history = [
+    { name: "חלב", price: 6, purchasedAt: "2026-08-01T00:00:00.000Z" },
+    { name: "חלב", price: 6.5, purchasedAt: "2026-08-15T00:00:00.000Z" },
+    { name: "עגבניות", price: 10, purchasedAt: "2026-08-10T00:00:00.000Z" },
+    { name: "חלב", price: 5.9, purchasedAt: "2026-07-01T00:00:00.000Z" }, // חודש אחר - לא נספר
+  ];
+  const aug = monthlyProductBreakdown(history, "2026-08");
+  assert.equal(aug.length, 2);
+  assert.equal(aug[0].name, "חלב"); // סך הוצאה 12.5 > 10 של עגבניות - ממוין מהגבוה
+  assert.equal(aug.find(p => p.name === "חלב").count, 2);
+  assert.equal(aug.find(p => p.name === "חלב").total, 12.5);
+  assert.equal(aug.find(p => p.name === "חלב").pricedCount, 2);
+  assert.equal(aug.find(p => p.name === "עגבניות").count, 1);
+  assert.equal(aug.find(p => p.name === "עגבניות").total, 10);
+});
+
+test("monthlyProductBreakdown: ברירת מחדל לחודש הנוכחי; פריט בלי מחיר נספר ב-count אבל לא ב-total; אין נתונים => רשימה ריקה", () => {
+  const thisMonth = nowMonth();
+  const history = [{ name: "לחם", price: null, purchasedAt: `${thisMonth}-05T00:00:00.000Z` }];
+  const current = monthlyProductBreakdown(history);
+  assert.equal(current.length, 1);
+  assert.equal(current[0].count, 1);
+  assert.equal(current[0].total, 0);
+  assert.equal(current[0].pricedCount, 0);
+  assert.deepEqual(monthlyProductBreakdown([], "2026-08"), []);
+  assert.deepEqual(monthlyProductBreakdown(null, "2026-08"), []);
 });
 
 test("pricePerUnit: רק כששניהם (מחיר וכמות) מספרים תקינים", () => {
