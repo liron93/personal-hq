@@ -30,8 +30,19 @@ const NAV = [
   ["learning", "למידה"],
 ];
 const blankProfile = { full_name: "", job_title: "", years_experience: "", experience_areas: "", looking_for: "", target_companies: "", strengths: "", improvement_areas: "", additional_notes: "" };
-const blankJob = { company_name: "", role_title: "", job_url: "", job_description: "", status: "considering", next_action: "", next_action_at: "", notes: "" };
+const blankJob = { company_name: "", role_title: "", job_url: "", job_description: "", status: "considering", next_action: "", next_action_at: "", notes: "", applied_at: "", rejected_at: "", closed_at: "" };
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+/** החלת שינוי סטטוס + מילוי ברירת מחדל (היום) לתאריך אבן-הדרך המתאים, רק אם הוא עוד ריק -
+    אפשר לדרוס ידנית בכל שלב. "שהסוכן יזין" (Issue #7): אותם שדות (applied_at/rejected_at/
+    closed_at, ראו supabase/proposed/career/001_job_milestone_dates.sql) משמשים גם למילוי
+    ידני בטופס וגם לכתיבה ישירה מסוכן חיצוני ל-career_jobs (כמו career_communications היום). */
+function applyStatusChange(draft, value) {
+  const next = { ...draft, status: value };
+  if (value === "applied" && !next.applied_at) next.applied_at = today();
+  if (value === "rejected" && !next.rejected_at) next.rejected_at = today();
+  if (value === "withdrawn" && !next.closed_at) next.closed_at = today();
+  return next;
+}
 const arrayValue = value => value.split(",").map(item => item.trim()).filter(Boolean);
 const profileForm = profile => ({ ...blankProfile, ...profile, years_experience: profile?.years_experience ?? "", experience_areas: (profile?.experience_areas || []).join(", "), target_companies: (profile?.target_companies || []).join(", ") });
 
@@ -171,7 +182,8 @@ function Jobs({ jobs, flags, onSave, onOpen }) {
         <div className={styles.formGrid}><Field label="חברה" value={draft.company_name} onChange={value => setDraft({...draft, company_name:value})} required /><Field label="תפקיד" value={draft.role_title} onChange={value => setDraft({...draft, role_title:value})} required /></div>
         <Field label="קישור למשרה" type="url" value={draft.job_url} onChange={value => setDraft({...draft, job_url:value})} placeholder="נשמר כקישור בלבד; לא מבוצעת משיכה אוטומטית" />
         <Field label="תיאור המשרה" multiline value={draft.job_description} onChange={value => setDraft({...draft, job_description:value})} />
-        <div className={styles.formGrid}><SelectStatus value={draft.status} onChange={value => setDraft({...draft, status:value})} /><Field label="הפעולה הבאה" value={draft.next_action} onChange={value => setDraft({...draft, next_action:value})} /><Field label="מועד" type="date" value={draft.next_action_at} onChange={value => setDraft({...draft, next_action_at:value})} /></div>
+        <div className={styles.formGrid}><SelectStatus value={draft.status} onChange={value => setDraft(d => applyStatusChange(d, value))} /><Field label="הפעולה הבאה" value={draft.next_action} onChange={value => setDraft({...draft, next_action:value})} /><Field label="מועד" type="date" value={draft.next_action_at} onChange={value => setDraft({...draft, next_action_at:value})} /></div>
+        <div className={styles.formGrid}><Field label="תאריך הגשה" type="date" value={draft.applied_at} onChange={value => setDraft({...draft, applied_at:value})} /><Field label="תאריך דחייה" type="date" value={draft.rejected_at} onChange={value => setDraft({...draft, rejected_at:value})} /><Field label="תאריך סגירה" type="date" value={draft.closed_at} onChange={value => setDraft({...draft, closed_at:value})} /></div>
         {message && <Notice kind="error">{message}</Notice>}<button className={styles.primary}>שמירת משרה</button>
       </form>}
       <div className={styles.listTools}><input aria-label="חיפוש משרות" placeholder="חיפוש חברה או תפקיד" value={query} onChange={event => setQuery(event.target.value)} /><select aria-label="סינון סטטוס" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">כל הסטטוסים</option>{Object.entries(STATUS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></div>
@@ -190,14 +202,15 @@ function Jobs({ jobs, flags, onSave, onOpen }) {
 }
 
 function JobDetail({ job, flags, onClose, onSave }) {
-  const [draft, setDraft] = useState({...blankJob, ...job, status: effectiveStatus(job, flags), next_action_at: job.next_action_at || ""});
+  const [draft, setDraft] = useState({...blankJob, ...job, status: effectiveStatus(job, flags), next_action_at: job.next_action_at || "", applied_at: job.applied_at || "", rejected_at: job.rejected_at || "", closed_at: job.closed_at || ""});
   const [message, setMessage] = useState("");
   const save = async event => { event.preventDefault(); const result = await onSave(draft, job.id); if (result.error) setMessage(result.error); else onClose(); };
   const qs = Array.isArray(job.tailored_questions) ? job.tailored_questions : [];
   return <div className={styles.sheetBackdrop} role="dialog" aria-modal="true" aria-label="פרטי משרה"><section className={styles.sheet}>
     <div className={styles.sectionTitle}><div><p>{job.company_name}</p><h2>{job.role_title}</h2></div><button className={styles.close} onClick={onClose}>סגירה</button></div>
     <form className={styles.form} onSubmit={save}>
-      <div className={styles.formGrid}><SelectStatus value={draft.status} onChange={value => setDraft({...draft, status:value})} /><Field label="פעולה הבאה" value={draft.next_action} onChange={value => setDraft({...draft, next_action:value})} /><Field label="מועד" type="date" value={draft.next_action_at} onChange={value => setDraft({...draft, next_action_at:value})} /></div>
+      <div className={styles.formGrid}><SelectStatus value={draft.status} onChange={value => setDraft(d => applyStatusChange(d, value))} /><Field label="פעולה הבאה" value={draft.next_action} onChange={value => setDraft({...draft, next_action:value})} /><Field label="מועד" type="date" value={draft.next_action_at} onChange={value => setDraft({...draft, next_action_at:value})} /></div>
+      <div className={styles.formGrid}><Field label="תאריך הגשה" type="date" value={draft.applied_at} onChange={value => setDraft({...draft, applied_at:value})} /><Field label="תאריך דחייה" type="date" value={draft.rejected_at} onChange={value => setDraft({...draft, rejected_at:value})} /><Field label="תאריך סגירה" type="date" value={draft.closed_at} onChange={value => setDraft({...draft, closed_at:value})} /></div>
       <Field label="הערות" multiline value={draft.notes || ""} onChange={value => setDraft({...draft, notes:value})} />
       <Field label="קישור למשרה" type="url" value={draft.job_url || ""} onChange={value => setDraft({...draft, job_url:value})} />
       {message && <Notice kind="error">{message}</Notice>}<button className={styles.primary}>שמירת עדכון</button>
