@@ -516,6 +516,10 @@ function ReceiptForm({ g, setGrocery }) {
   // עכשיו שום התאמה (גם לא מדויקת-לגמרי) לא ממלאת מחיר לבד - היא מוצגת כהצעה לאישור, ורק
   // לחיצה מפורשת "כן, אותו מוצר" מחילה אותה (ראו applyMatch/confirmPending/rejectPending).
   const [pendingMatches, setPendingMatches] = useState([]);
+  // אישורי התאמה שכבר הוחלו - לפידבק רואים (בעיקר כש-suggested הוא רכישה שכבר הוצאה
+  // מ-g.items ואז אין לה שום ייצוג חזותי אחר בטופס הזה, בניגוד לפריט פעיל שמופיע ב"מתוך
+  // הרשימה" עם צ'קבוקס מסומן). לא נשמר ב-state הכללי - רק תצוגת "מה קרה" לסשן הזה.
+  const [resolvedMatches, setResolvedMatches] = useState([]);
   const [adHoc, setAdHoc] = useState([]);
   const [images, setImages] = useState([]);
   const [error, setError] = useState("");
@@ -531,7 +535,7 @@ function ReceiptForm({ g, setGrocery }) {
   const scanInputRef = useRef(null);
 
   const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
-  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setPendingMatches([]); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
+  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setPendingMatches([]); setResolvedMatches([]); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
 
   // מחיל פריט שנסרק (מהקבלה) על פריט קיים ברשימה - מצטבר (לא דורס) כדי שאם כמה שורות
   // סרוקות שונות מאשרות לאותו פריט ברשימה, המחיר/כמות שלהן מצטברים יחד, לא מוחלפים.
@@ -540,7 +544,11 @@ function ReceiptForm({ g, setGrocery }) {
     setScanQtys(prev => ({ ...prev, [itemId]: (toN(prev[itemId]) || 0) + (scanned.qty || 1) }));
     if (scanned.promo) setScanPromos(prev => ({ ...prev, [itemId]: prev[itemId] ? `${prev[itemId]}; ${scanned.promo}` : scanned.promo }));
   };
-  const confirmPendingMatch = p => { applyScannedToItem(p.suggested.id, p.scanned); setPendingMatches(prev => prev.filter(x => x.id !== p.id)); };
+  const confirmPendingMatch = p => {
+    applyScannedToItem(p.suggested.id, p.scanned);
+    setResolvedMatches(prev => [...prev, p]);
+    setPendingMatches(prev => prev.filter(x => x.id !== p.id));
+  };
   const rejectPendingMatch = p => {
     // "לא אותו מוצר" - הפריט הסרוק הוא בכל זאת פריט אמיתי מהקבלה, רק לא זה שברשימה - נכנס
     // כשורה חדשה (אד-הוק), בדיוק כמו פריט שמעולם לא היה לו מועמד התאמה. אותו דה-דופ לפי שם.
@@ -577,10 +585,17 @@ function ReceiptForm({ g, setGrocery }) {
       // מילה. שום התאמה (גם לא מדויקת-לגמרי) כבר לא ממלאת מחיר לבד - כל התאמה הופכת ל"ממתין
       // לאישור" (pending), ורק פריט בלי שום מועמד התאמה נכנס ישר כשורה חדשה (אד-הוק) - אין
       // מה "לאשר" שם, זה כבר ברור שזה פריט חדש.
+      // מאגר ההתאמה הוא לא רק הרשימה הפעילה (g.items): דווח ש"פיצה" לא הותאמה כי הזרימה
+      // האמיתית היא לסמן "נרכש" בזמן הקנייה (צ'קבוקס, בלי מחיר עדיין) ורק אחר כך לסרוק את
+      // הקבלה - אז עד שסורקים, "פיצה" כבר לא ברשימה הפעילה, היא כבר ב-history בלי מחיר
+      // (receiptId==null). מחפשים גם שם: רכישות "ממתינות למחיר" קודם (קרובות יותר בזמן/כוונה
+      // לקבלה הזו מאשר פריט עתידי ברשימה), ואז הרשימה הפעילה.
+      const unpricedHistory = g.history.filter(h => h.receiptId == null && h.price == null);
+      const matchPool = [...unpricedHistory, ...g.items];
       const pending = [];
       const unmatchedItems = [];
       for (const item of items) {
-        const match = !isOldReceipt ? findReceiptMatch(g.items, item.name) : null;
+        const match = !isOldReceipt ? findReceiptMatch(matchPool, item.name) : null;
         if (match) pending.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, scanned: item, suggested: match });
         else unmatchedItems.push(item);
       }
@@ -607,16 +622,28 @@ function ReceiptForm({ g, setGrocery }) {
   const submit = () => {
     setError(""); setSavedMsg(""); setScanError(""); setScanInfo("");
     if (pendingMatches.length > 0) { setError(`יש ${pendingMatches.length} התאמות שממתינות לאישור למעלה - אשרו או סמנו כ"פריט נפרד" לפני השמירה.`); return; }
-    const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null, promo: scanPromos[id] || null, qty: toN(scanQtys[id]) || null }));
+    // prices עשוי להכיל גם itemId של פריט פעיל (ברשימה) וגם id של רכישה שכבר סומנה "נרכש"
+    // בלי מחיר (הותאמה דרך התאמה מאושרת מתוך unpricedHistory למעלה) - מפצלים לפי המקור
+    // האמיתי (g.items מול g.history), כי logReceipt מטפל בכל אחד אחרת (מעבר vs עדכון מקומי).
+    const activeIds = new Set(g.items.map(i => i.id));
+    const historyIds = new Set(g.history.map(h => h.id));
+    const listItems = [];
+    const historyUpdates = [];
+    for (const [id, p] of Object.entries(prices)) {
+      const entry = { id, price: toN(p) || null, promo: scanPromos[id] || null, qty: toN(scanQtys[id]) || null };
+      if (activeIds.has(id)) listItems.push(entry);
+      else if (historyIds.has(id)) historyUpdates.push(entry);
+      // אחרת: הפריט נמחק/שונה בינתיים - מתעלמים בשקט, לא קורס.
+    }
     const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null, promo: r.promo || null }));
     if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
-    if (listItems.length === 0 && adHocItems.length === 0) { setError("בחרו לפחות פריט אחד מהרשימה, או הוסיפו שורה ידנית."); return; }
-    const { state: next, receiptId } = logReceipt(g, { store, date, listItems, adHocItems });
+    if (listItems.length === 0 && adHocItems.length === 0 && historyUpdates.length === 0) { setError("בחרו לפחות פריט אחד מהרשימה, או הוסיפו שורה ידנית."); return; }
+    const { state: next, receiptId } = logReceipt(g, { store, date, listItems, adHocItems, historyUpdates });
     if (!receiptId) { setError("לא הצלחנו לרשום את הקבלה — בדקו את הפרטים."); return; }
     const withImages = images.length ? updateReceiptImages(next, receiptId, images) : next;
     tracker.settle(images, true);
     setGrocery(withImages);
-    tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setPendingMatches([]); setAdHoc([]); setImages([]);
+    tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setPendingMatches([]); setResolvedMatches([]); setAdHoc([]); setImages([]);
     setSavedMsg("הקבלה נשמרה, ועברה להיסטוריית הרכישות.");
   };
 
@@ -647,15 +674,29 @@ function ReceiptForm({ g, setGrocery }) {
         <div style={{ ...cardStyle, padding: 14, marginBottom: 14, borderColor: AMBER }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>לאשר התאמה ({pendingMatches.length})</div>
           <p style={{ fontSize: 12, color: MUTED, margin: "0 0 10px" }}>הסריקה מצאה דמיון בין מה שבקבלה למה שברשימה, אבל זה לא תמיד אותו מוצר באמת - למשל "פיצה" ברשימה מול "חטיפי פיצה גבינה" בקבלה. אשרו רק אם זה באמת אותו דבר.</p>
-          {pendingMatches.map(p => (
-            <div key={p.id} style={{ borderBottom: `1px solid ${LINE}`, padding: "8px 0" }}>
-              <div style={{ fontSize: 13, overflowWrap: "anywhere" }}>
-                בקבלה: <strong>{p.scanned.name}</strong> ({ils(p.scanned.price)}) — זה <strong>{p.suggested.name}</strong> מהרשימה?
+          {pendingMatches.map(p => {
+            const fromList = g.items.some(i => i.id === p.suggested.id);
+            return (
+              <div key={p.id} style={{ borderBottom: `1px solid ${LINE}`, padding: "8px 0" }}>
+                <div style={{ fontSize: 13, overflowWrap: "anywhere" }}>
+                  בקבלה: <strong>{p.scanned.name}</strong> ({ils(p.scanned.price)}) — זה <strong>{p.suggested.name}</strong> {fromList ? "מהרשימה" : "שכבר סומן כנרכש"}?
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  <button type="button" onClick={() => confirmPendingMatch(p)} style={{ fontSize: 12, color: BG, background: GREEN, border: "none", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>כן, אותו מוצר</button>
+                  <button type="button" onClick={() => rejectPendingMatch(p)} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>לא, פריט נפרד</button>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                <button type="button" onClick={() => confirmPendingMatch(p)} style={{ fontSize: 12, color: BG, background: GREEN, border: "none", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>כן, אותו מוצר</button>
-                <button type="button" onClick={() => rejectPendingMatch(p)} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>לא, פריט נפרד</button>
-              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {resolvedMatches.length > 0 && (
+        <div style={{ ...cardStyle, padding: 14, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: GREEN }}>אושרו ({resolvedMatches.length})</div>
+          {resolvedMatches.map(p => (
+            <div key={p.id} style={{ fontSize: 13, padding: "4px 0", overflowWrap: "anywhere" }}>
+              ✓ {p.scanned.name} ({ils(p.scanned.price)}) → {p.suggested.name}
             </div>
           ))}
         </div>

@@ -268,17 +268,23 @@ export function createReceiptRecord({ store, date = new Date().toISOString().sli
 }
 
 /**
- * רישום קבלה: גם פריטים שנבחרו מהרשימה הפעילה (listItems: [{id, price, qty?}]) וגם שורות אד-הוק
- * שלא היו ברשימה (adHocItems: [{name, price, qty, unit, category}]) — קבלות אמיתיות כוללות תמיד
- * גם דברים שלא תוכננו. price/qty אופציונליים בכל שורה (בדיוק כמו markPurchased) — לעולם לא בודים מחיר.
- * לא עושה כלום אם אין שם חנות תקין או ששתי הרשימות ריקות (אין מה לרשום).
+ * רישום קבלה: פריטים שנבחרו מהרשימה הפעילה (listItems: [{id, price, qty?, promo?}]), שורות
+ * אד-הוק שלא היו ברשימה (adHocItems: [{name, price, qty, unit, category, promo?}]) - קבלות
+ * אמיתיות כוללות תמיד גם דברים שלא תוכננו - וגם עדכון מחיר על רכישות שכבר סומנו כנרכשו בלי
+ * מחיר (historyUpdates: [{id, price, qty?, promo?}]). השימוש האחרון קיים כי הזרימה הטבעית
+ * היא: מסמנים "נרכש" בזמן הקנייה (צ'קבוקס, בלי מחיר עדיין - markPurchased בלי פרמטרים) ורק
+ * אחר כך סורקים את הקבלה כדי למלא מחירים בדיעבד - findReceiptMatch (ב-Household.jsx) מחפש
+ * גם ברשימה הפעילה וגם ברכישות כאלה (receiptId==null, price==null), לא רק ברשימה הפעילה.
+ * price/qty אופציונליים בכל שורה (בדיוק כמו markPurchased) — לעולם לא בודים מחיר.
+ * לא עושה כלום אם אין שם חנות תקין או ששלוש הרשימות ריקות (אין מה לרשום).
  * @returns {{state:object, receiptId:string|null}}
  */
-export function logReceipt(state, { store, date = new Date().toISOString().slice(0, 10), listItems = [], adHocItems = [] } = {}) {
+export function logReceipt(state, { store, date = new Date().toISOString().slice(0, 10), listItems = [], adHocItems = [], historyUpdates = [] } = {}) {
   const receipt = createReceiptRecord({ store, date });
   const validList = (listItems || []).filter(li => li && typeof li.id === "string" && (state.items || []).some(i => i.id === li.id));
   const validAdHoc = (adHocItems || []).filter(a => isValidName(a?.name));
-  if (!receipt || (validList.length === 0 && validAdHoc.length === 0)) return { state, receiptId: null };
+  const validHistoryUpdates = (historyUpdates || []).filter(hu => hu && typeof hu.id === "string" && (state.history || []).some(h => h.id === hu.id));
+  if (!receipt || (validList.length === 0 && validAdHoc.length === 0 && validHistoryUpdates.length === 0)) return { state, receiptId: null };
   const purchasedAt = `${date}T12:00:00.000Z`;
   const pickedIds = new Set(validList.map(li => li.id));
   const fromList = validList.map(li => {
@@ -296,11 +302,23 @@ export function logReceipt(state, { store, date = new Date().toISOString().slice
     note: norm(a.note), price: isValidNonNegativeNumber(a.price) ? a.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
     promo: normPromo(a.promo),
   }));
+  const updatesById = new Map(validHistoryUpdates.map(hu => [hu.id, hu]));
+  const history = state.history.map(h => {
+    const hu = updatesById.get(h.id);
+    if (!hu) return h;
+    return {
+      ...h,
+      price: isValidNonNegativeNumber(hu.price) ? hu.price : h.price,
+      qty: isValidPositiveNumber(hu.qty) ? hu.qty : h.qty,
+      promo: hu.promo != null ? normPromo(hu.promo) : h.promo,
+      store: receipt.store, receiptId: receipt.id,
+    };
+  });
   return {
     state: {
       ...state,
       items: state.items.filter(i => !pickedIds.has(i.id)),
-      history: [...state.history, ...fromList, ...fromAdHoc],
+      history: [...history, ...fromList, ...fromAdHoc],
       receipts: [...(state.receipts || []), receipt],
     },
     receiptId: receipt.id,
