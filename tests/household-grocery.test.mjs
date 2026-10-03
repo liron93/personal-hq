@@ -16,7 +16,7 @@ const {
   sortItems, groupByRoute, filterEntries,
   monthlySpend, monthlyProductBreakdown, nowMonth, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
-  knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
+  knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
 } = grocery;
 
 // ---------- זיהוי קטגוריה ----------
@@ -606,6 +606,24 @@ test("updateReceiptImages: מעדכן את מערך התמונות של קבלה
   assert.deepEqual(next.receipts[0].images, [img]);
   const unchanged = updateReceiptImages(withReceipt, "לא-קיים", [img]);
   assert.deepEqual(unchanged.receipts, withReceipt.receipts); // receiptId זר: לא עושה כלום, לא זורק
+});
+
+test("removeReceiptRecord: מוחק את הקבלה וכל שורות ההיסטוריה המקושרות אליה, לא נוגע בשום דבר אחר", () => {
+  let s = quickAddItem(createGroceryState(), "משהו אחר");
+  const otherId = s.items[0].id;
+  s = markPurchased(s, otherId, { price: 99 }); // רכישה לא קשורה - חייבת להישאר
+  const { state: s2, receiptId } = logReceipt(s, { store: "חצי חינם", adHocItems: [{ name: "חטיפי פיצה גבינה", price: 12 }] });
+  assert.equal(s2.receipts.length, 1);
+  assert.equal(s2.history.length, 2);
+  const s3 = removeReceiptRecord(s2, receiptId);
+  assert.equal(s3.receipts.length, 0);
+  assert.equal(s3.history.length, 1);
+  assert.equal(s3.history[0].name, "משהו אחר"); // הרכישה הלא-קשורה נשארה בדיוק כמו שהייתה
+});
+
+test("removeReceiptRecord: receiptId לא קיים - לא עושה כלום, לא זורק", () => {
+  const s = createGroceryState();
+  assert.equal(removeReceiptRecord(s, "לא-קיים"), s);
 });
 
 // ---------- ניתוח לפי חנות ----------
