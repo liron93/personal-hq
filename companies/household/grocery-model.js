@@ -316,6 +316,21 @@ export function updateReceiptImages(state, receiptId, images) {
   return { ...state, receipts };
 }
 
+/**
+ * מחיקה לצמיתות של קבלה שלמה - רשומת הקבלה עצמה וכל שורות ההיסטוריה שמקושרות אליה
+ * (receiptId). לשימוש "התחלה מחדש" כשקבלה נרשמה לא נכון (למשל לפני PR #144, כש-התאמות
+ * שגויות נכנסו בשקט). עם אישור בממשק; לא נוגע בשום פריט/רכישה אחרים. תמונות הקבלה
+ * (Storage) מטופלות בצד ה-UI עם purgeImages לפני הקריאה לכאן - קובץ טהור, בלי side effects חיצוניים.
+ */
+export function removeReceiptRecord(state, receiptId) {
+  if (!(state.receipts || []).some(r => r.id === receiptId)) return state;
+  return {
+    ...state,
+    receipts: state.receipts.filter(r => r.id !== receiptId),
+    history: (state.history || []).filter(h => h.receiptId !== receiptId),
+  };
+}
+
 // ---------- מיון / קיבוץ ----------
 const heCompare = (a, b) => String(a).localeCompare(String(b), "he");
 

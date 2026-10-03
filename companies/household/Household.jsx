@@ -13,14 +13,14 @@ import {
   groupByRoute, filterEntries, detectCategory, addCategoryKeyword, restoreToList,
   budgetVsActual, budgetTrend, repeatProducts, repeatCategories, pricePerUnit,
   groceryAlerts, INSUFFICIENT_DATA,
-  knownStores, logReceipt, updateReceiptImages, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
+  knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
   monthlyProductBreakdown, nowMonth,
 } from "./grocery-model";
 import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
 // אין fallback ל-base64, ו"לא מופעל" הוא ההתנהגות הצפויה כל עוד Storage לא הופעל בפרודקשן.
 // ייבוא חוצה-חברות מקובל כאן כי זה widget UI גנרי, לא לוגיקת דומיין; הזזה ל-lib/ תיעשה בנפרד בעתיד.
-import ImageAttachments, { ImageStrip, useImageTracker } from "@/companies/beit-hadash/ImageAttachments";
+import ImageAttachments, { ImageStrip, useImageTracker, purgeImages } from "@/companies/beit-hadash/ImageAttachments";
 import { imagesOf } from "@/companies/beit-hadash/images";
 
 /*
@@ -470,6 +470,34 @@ function AdHocRow({ row, onChange, onRemove }) {
   );
 }
 
+/** שורת קבלה ב"קבלות אחרונות", עם מחיקה (ואישור) - "התחלה מחדש" לקבלה שנרשמה לא נכון
+    (למשל לפני PR #144, כש-התאמות שגויות נכנסו בשקט ללא אפשרות לתקן). מוחקת את כל שורות
+    ההיסטוריה המקושרות לקבלה הזו, לא נוגעת בשום רכישה אחרת. */
+function ReceiptRow({ receipt, lines, total, onRemove }) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  return (
+    <div style={{ padding: "8px 0", borderBottom: `1px solid ${LINE}`, display: "grid", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, alignItems: "center" }}>
+        <span><b>{receipt.store}</b> · {new Date(receipt.date).toLocaleDateString("he-IL")} · {lines.length} פריטים</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span style={{ color: MUTED }}>{total > 0 ? ils(total) : ""}</span>
+          {!confirmDel ? (
+            <button type="button" onClick={() => setConfirmDel(true)} aria-label={`מחיקת הקבלה מ${receipt.store}`} style={{ border: "none", background: "transparent", color: RUST, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28 }}><X size={15} /></button>
+          ) : null}
+        </span>
+      </div>
+      {imagesOf(receipt).length > 0 && <ImageStrip entry={receipt} size={56} />}
+      {confirmDel && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: RUST }}>למחוק את הקבלה הזו לצמיתות (כולל {lines.length} שורות ברכישות)?</span>
+          <button onClick={onRemove} style={{ fontSize: 12, color: BG, background: RUST, border: "none", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>מחק</button>
+          <button onClick={() => setConfirmDel(false)} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>ביטול</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** טופס "קבלה": שם חנות + תאריך, בחירה ממה שברשימה (עם מחיר לכל פריט) ושורות אד-הוק, ותמונה אופציונלית. */
 function ReceiptForm({ g, setGrocery }) {
   const stores = knownStores(g);
@@ -706,13 +734,8 @@ function ReceiptForm({ g, setGrocery }) {
           const lines = g.history.filter(h => h.receiptId === r.id);
           const total = lines.filter(h => h.price != null).reduce((s, h) => s + h.price, 0);
           return (
-            <div key={r.id} style={{ padding: "8px 0", borderBottom: `1px solid ${LINE}`, display: "grid", gap: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13 }}>
-                <span><b>{r.store}</b> · {new Date(r.date).toLocaleDateString("he-IL")} · {lines.length} פריטים</span>
-                <span style={{ color: MUTED, flexShrink: 0 }}>{total > 0 ? ils(total) : ""}</span>
-              </div>
-              {imagesOf(r).length > 0 && <ImageStrip entry={r} size={56} />}
-            </div>
+            <ReceiptRow key={r.id} receipt={r} lines={lines} total={total}
+              onRemove={() => { purgeImages(r.images); setGrocery(prev => removeReceiptRecord(prev, r.id)); }} />
           );
         })}
       </div>
