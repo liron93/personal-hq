@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag, Ticket } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
+import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag, Ticket, Eye, EyeOff } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { toN } from "@/lib/format";
@@ -764,6 +764,9 @@ function ByStore({ g }) {
     (מסמן יתרה כ-0 בתצוגה בלי למחוק את השובר או לשנות usedAmount). */
 function VoucherRow({ voucher, onUpdate, onRemove }) {
   const [used, setUsed] = useState(String(voucher.usedAmount ?? 0));
+  const [expiry, setExpiry] = useState(voucher.expiry ?? "");
+  const [cvv, setCvv] = useState(voucher.cvv ?? "");
+  const [showCvv, setShowCvv] = useState(false); // קוד אבטחה מוסתר כברירת מחדל - לא פרטי תשלום אמיתיים, אבל עדיין לא משהו שרוצים גלוי על המסך בלי כוונה
   const [confirmDel, setConfirmDel] = useState(false);
   const remaining = remainingAmount(voucher);
   return (
@@ -776,18 +779,35 @@ function VoucherRow({ voucher, onUpdate, onRemove }) {
           <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
             סכום מקורי {ils(voucher.originalAmount)}
             {voucher.usedAmount > 0 ? ` · נוצל ${ils(voucher.usedAmount)}` : ""}
+            {voucher.expiry ? ` · תוקף ${voucher.expiry}` : ""}
           </div>
         </div>
         <Pill color={remaining > 0 ? GREEN : voucher.fullyUsed ? MUTED : RUST}>יתרה {ils(remaining)}</Pill>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>סכום שנוצל (₪)</div>
           <input className="hq-field" value={used} onChange={e => setUsed(e.target.value)}
             onBlur={() => onUpdate({ usedAmount: toN(used) })}
             disabled={voucher.fullyUsed} style={{ ...inputStyle, width: 100 }} />
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", paddingTop: 14 }}>
+        <div>
+          <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>תוקף</div>
+          <input className="hq-field" placeholder="למשל 12/27" value={expiry} onChange={e => setExpiry(e.target.value)}
+            onBlur={() => onUpdate({ expiry })} style={{ ...inputStyle, width: 90 }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>קוד אבטחה (CVV)</div>
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <input className="hq-field" type={showCvv ? "text" : "password"} placeholder="‎—" value={cvv} onChange={e => setCvv(e.target.value)}
+              onBlur={() => onUpdate({ cvv })} style={{ ...inputStyle, width: 90, paddingLeft: 28 }} />
+            <button type="button" aria-label={showCvv ? "הסתרת קוד" : "הצגת קוד"} onClick={() => setShowCvv(s => !s)}
+              style={{ position: "absolute", left: 4, border: "none", background: "transparent", color: MUTED, cursor: "pointer", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {showCvv ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", paddingBottom: 8 }}>
           <input type="checkbox" checked={voucher.fullyUsed} onChange={e => onUpdate({ fullyUsed: e.target.checked })} />
           נוצל במלואו
         </label>
@@ -811,6 +831,8 @@ function VoucherRow({ voucher, onUpdate, onRemove }) {
 function Vouchers({ g, setGrocery }) {
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvv, setCvv] = useState("");
   const [formError, setFormError] = useState("");
 
   const vouchers = sortVouchers(g.vouchers);
@@ -821,8 +843,8 @@ function Vouchers({ g, setGrocery }) {
     const original = toN(amount);
     if (!name.trim()) { setFormError("הזינו שם לשובר."); return; }
     if (!original || original <= 0) { setFormError("הזינו סכום מקורי תקין."); return; }
-    patch(prev => addVoucher(prev, { name, originalAmount: original }));
-    setName(""); setAmount("");
+    patch(prev => addVoucher(prev, { name, originalAmount: original, expiry, cvv }));
+    setName(""); setAmount(""); setExpiry(""); setCvv("");
   };
 
   return (
@@ -834,6 +856,10 @@ function Vouchers({ g, setGrocery }) {
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 8 }}>
           <input className="hq-field" placeholder="שם השובר (למשל: שובר BUYME 200)" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
           <input className="hq-field" placeholder="סכום מקורי ₪" value={amount} onChange={e => setAmount(e.target.value)} style={inputStyle} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
+          <input className="hq-field" placeholder="תוקף (אופציונלי, למשל 12/27)" value={expiry} onChange={e => setExpiry(e.target.value)} style={inputStyle} />
+          <input className="hq-field" placeholder="קוד אבטחה / CVV (אופציונלי)" value={cvv} onChange={e => setCvv(e.target.value)} style={inputStyle} />
         </div>
         {formError && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>{formError}</p>}
         <button onClick={submit} style={{ border: "none", background: INK, color: BG, borderRadius: 2, padding: "8px 0", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>

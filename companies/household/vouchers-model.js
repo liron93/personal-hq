@@ -12,13 +12,25 @@ const isValidPositiveNumber = v => typeof v === "number" && Number.isFinite(v) &
 const isValidNonNegativeNumber = v => typeof v === "number" && Number.isFinite(v) && v >= 0;
 const round2 = n => Math.round(n * 100) / 100;
 
+// תוקף וקוד אבטחה (CVV) הם טקסט חופשי בכוונה, לא ולידציה/פורמט תאריך נוקשה: תוקף על שובר
+// לרוב מודפס כ"חודש/שנה" (למשל "12/27") או "תוקף עד DD.MM.YYYY" ולא כתאריך מלא אחיד, וקוד
+// אבטחה יכול להיות 3-4 ספרות או שילוב אותיות-ספרות תלוי המנפיק - שומרים בדיוק כמו שהוזן.
+const MAX_EXPIRY_LEN = 20;
+const MAX_CVV_LEN = 20;
+const normExpiry = v => { const s = norm(v); return s ? s.slice(0, MAX_EXPIRY_LEN) : null; };
+const normCvv = v => { const s = norm(v); return s ? s.slice(0, MAX_CVV_LEN) : null; };
+
 /** שובר חדש: שם וסכום מקורי חובה (אחרת null - שם ריק/סכום לא חוקי לא בודים שובר). usedAmount
-    מתחיל מ-0 (אפשר לעדכן בהמשך ב-updateVoucher), fullyUsed מתחיל כ-false. */
-export function createVoucher({ name, originalAmount } = {}) {
+    מתחיל מ-0 (אפשר לעדכן בהמשך ב-updateVoucher), fullyUsed מתחיל כ-false. expiry/cvv
+    אופציונליים ביצירה - אפשר להוסיף/לערוך גם מאוחר יותר דרך updateVoucher. */
+export function createVoucher({ name, originalAmount, expiry, cvv } = {}) {
   const n = norm(name);
   if (!n || !isValidPositiveNumber(originalAmount)) return null;
   const now = new Date().toISOString();
-  return { id: uid(), name: n, originalAmount, usedAmount: 0, fullyUsed: false, createdAt: now, updatedAt: now };
+  return {
+    id: uid(), name: n, originalAmount, usedAmount: 0, fullyUsed: false,
+    expiry: normExpiry(expiry), cvv: normCvv(cvv), createdAt: now, updatedAt: now,
+  };
 }
 
 export function addVoucher(state, fields) {
@@ -46,6 +58,8 @@ export function updateVoucher(state, id, patch) {
   if (Object.prototype.hasOwnProperty.call(patch, "name")) {
     next.name = norm(patch.name) || current.name; // שם ריק לא דורס שם קיים
   }
+  if (Object.prototype.hasOwnProperty.call(patch, "expiry")) next.expiry = normExpiry(patch.expiry);
+  if (Object.prototype.hasOwnProperty.call(patch, "cvv")) next.cvv = normCvv(patch.cvv);
   vouchers[idx] = next;
   return { ...state, vouchers };
 }
