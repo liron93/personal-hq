@@ -84,11 +84,12 @@ export function remainingAmount(voucher) {
 
 const heCompare = (a, b) => String(a).localeCompare(String(b), "he");
 
-/** שוברים פעילים (לא נוצלו במלואם) קודם, ממוינים מהחדש לישן; נוצלו במלואם בסוף, גם הם מהחדש לישן. */
+/** שוברים פעילים (לא נוצלו במלואם) קודם, ממוינים מהישן לחדש (שובר חדש מתווסף לתחתית
+    הרשימה - פידבק מפורש, לא לראש הרשימה); נוצלו במלואם בסוף, גם הם מהישן לחדש. */
 export function sortVouchers(vouchers) {
   return [...(vouchers || [])].sort((a, b) => {
     if (a.fullyUsed !== b.fullyUsed) return a.fullyUsed ? 1 : -1;
-    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
     return heCompare(a.name, b.name);
   });
 }
