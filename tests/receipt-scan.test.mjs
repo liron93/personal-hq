@@ -74,6 +74,38 @@ test("service: 429/5xx/malformed JSON from Gemini map to clear error categories,
   await assert.rejects(badJson(FAKE_KEY, { imageBase64: "x" }), e => e.code === "upstream_error");
 });
 
+test("service: unparseable JSON from a 200 response logs finishReason/length safely, never the text itself", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    // מדמה פלט שנחתך באמצע (למשל MAX_TOKENS) - JSON לא שלם, לא parse-able.
+    const truncatedText = '{"store":"שופרסל","items":[{"name":"חל';
+    const truncated = { candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: truncatedText }] } }] };
+    const service = createReceiptScanService({ fetcher: async () => Response.json(truncated), sleep: noSleep });
+    await assert.rejects(service(FAKE_KEY, { imageBase64: "x" }), e => e.code === "upstream_error");
+    const log = logs.find(l => l.includes("[receipt-scan]"));
+    assert.ok(log, "expected a [receipt-scan] log line");
+    assert.match(log, /finishReason=MAX_TOKENS/);
+    assert.doesNotMatch(log, /שופרסל/); // לעולם לא רושמים את התוכן עצמו
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test("service: parsed JSON that isn't an object (e.g. a bare array/number) is rejected, logged safely", async () => {
+  const logs = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => logs.push(args.join(" "));
+  try {
+    const service = createReceiptScanService({ fetcher: async () => geminiJson(42), sleep: noSleep }); // JSON.stringify(42) === "42" - parse-able, אבל לא אובייקט
+    await assert.rejects(service(FAKE_KEY, { imageBase64: "x" }), e => e.code === "upstream_error");
+    assert.ok(logs.some(l => l.includes("[receipt-scan]") && l.includes("parsed JSON is not an object")));
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 test("service: non-ok response logs Gemini's own status/error.message safely (service diagnostics, not user content)", async () => {
   const logs = [];
   const originalWarn = console.warn;
