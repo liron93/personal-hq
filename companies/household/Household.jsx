@@ -456,7 +456,9 @@ function Savings({ g, setGrocery }) {
 
 /** שורת פריט אד-הוק בטופס הקבלה: דבר שלא היה ברשימה (קבלות אמיתיות כוללות תמיד גם כאלה).
     row.promo (אם קיים - תמיד מגיע מסריקת AI, לא שדה שמוזן ידנית) מוצג כטקסט בלבד. */
-function AdHocRow({ row, onChange, onRemove }) {
+/** linkOptions: [{id,label}] - פריטים פעילים + רכישות "ממתינות למחיר" (אותו מאגר ש-findReceiptMatch
+    מחפש בו בסריקה) - כדי לקשר ידנית שורה שהסריקה לא הצליחה לשייך לבד. */
+function AdHocRow({ row, onChange, onRemove, linkOptions }) {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto", gap: 6, alignItems: "center" }}>
@@ -470,6 +472,15 @@ function AdHocRow({ row, onChange, onRemove }) {
         <Tag size={12} color={AMBER} style={{ flexShrink: 0 }} />
         <input className="hq-field" placeholder="מבצע (אופציונלי, אם היה ולא זוהה אוטומטית)" value={row.promo || ""} onChange={e => onChange({ ...row, promo: e.target.value })} style={{ ...inputStyle, minWidth: 0, flex: 1, fontSize: 12 }} />
       </div>
+      {/* שיוך ידני: דווח שהסריקה לא תמיד מזהה פריט שכן קיים ברשימה/כבר סומן כנרכש - אפשרות
+          לקשר ידנית במקום להשאיר כפריט חדש עצמאי. */}
+      {linkOptions.length > 0 && (
+        <select value={row.linkedId || ""} onChange={e => onChange({ ...row, linkedId: e.target.value || null })}
+          style={{ ...inputStyle, width: "100%", fontSize: 12, marginTop: 4 }}>
+          <option value="">פריט חדש (לא קשור לרשימה)</option>
+          {linkOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+        </select>
+      )}
     </div>
   );
 }
@@ -505,6 +516,9 @@ function ReceiptRow({ receipt, lines, total, onRemove }) {
 /** טופס "קבלה": שם חנות + תאריך, בחירה ממה שברשימה (עם מחיר לכל פריט) ושורות אד-הוק, ותמונה אופציונלית. */
 function ReceiptForm({ g, setGrocery }) {
   const stores = knownStores(g);
+  // רכישות "ממתינות למחיר" - אותו מאגר בדיוק ש-findReceiptMatch מחפש בו בסריקה (ראו
+  // scanReceipt), וגם משמש לשיוך ידני של שורת אד-הוק שהסריקה לא הצליחה לשייך לבד.
+  const unpricedHistory = g.history.filter(h => h.receiptId == null && h.price == null);
   const [store, setStore] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [prices, setPrices] = useState({}); // itemId -> price string, נוכח = נבחר
@@ -592,9 +606,8 @@ function ReceiptForm({ g, setGrocery }) {
       // מאגר ההתאמה הוא לא רק הרשימה הפעילה (g.items): דווח ש"פיצה" לא הותאמה כי הזרימה
       // האמיתית היא לסמן "נרכש" בזמן הקנייה (צ'קבוקס, בלי מחיר עדיין) ורק אחר כך לסרוק את
       // הקבלה - אז עד שסורקים, "פיצה" כבר לא ברשימה הפעילה, היא כבר ב-history בלי מחיר
-      // (receiptId==null). מחפשים גם שם: רכישות "ממתינות למחיר" קודם (קרובות יותר בזמן/כוונה
-      // לקבלה הזו מאשר פריט עתידי ברשימה), ואז הרשימה הפעילה.
-      const unpricedHistory = g.history.filter(h => h.receiptId == null && h.price == null);
+      // (receiptId==null). מחפשים גם שם: רכישות "ממתינות למחיר" (unpricedHistory, מוגדר
+      // למעלה) קודם - קרובות יותר בזמן/כוונה לקבלה הזו מאשר פריט עתידי ברשימה.
       const matchPool = [...unpricedHistory, ...g.items];
       const pending = [];
       const unmatchedItems = [];
@@ -639,7 +652,15 @@ function ReceiptForm({ g, setGrocery }) {
       else if (historyIds.has(id)) historyUpdates.push(entry);
       // אחרת: הפריט נמחק/שונה בינתיים - מתעלמים בשקט, לא קורס.
     }
-    const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null, promo: r.promo || null }));
+    // שורות אד-הוק: אם שויכו ידנית (row.linkedId, ראו AdHocRow) לפריט קיים/רכישה ממתינה -
+    // מתנהגות בדיוק כמו התאמה שאושרה (listItems/historyUpdates), לא כפריט חדש עצמאי.
+    const adHocItems = [];
+    for (const r of adHoc) {
+      const entry = { price: toN(r.price) || null, qty: toN(r.qty) || null, promo: r.promo || null };
+      if (r.linkedId && activeIds.has(r.linkedId)) listItems.push({ id: r.linkedId, ...entry });
+      else if (r.linkedId && historyIds.has(r.linkedId)) historyUpdates.push({ id: r.linkedId, ...entry });
+      else if (r.name.trim()) adHocItems.push({ name: r.name, ...entry });
+    }
     if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
     if (listItems.length === 0 && adHocItems.length === 0 && historyUpdates.length === 0) { setError("בחרו לפחות פריט אחד מהרשימה, או הוסיפו שורה ידנית."); return; }
     const { state: next, receiptId } = logReceipt(g, { store, date, listItems, adHocItems, historyUpdates });
@@ -652,6 +673,12 @@ function ReceiptForm({ g, setGrocery }) {
   };
 
   const activeItems = g.items;
+  // לשיוך ידני של שורת אד-הוק שהסריקה לא הצליחה לשייך לבד ("אין לי אופציה לשייך את המוצרים
+  // שהוא לא זיהה") - אותם מועמדים בדיוק כמו matchPool בסריקה (unpricedHistory למעלה + g.items).
+  const linkOptions = [
+    ...unpricedHistory.map(h => ({ id: h.id, label: `${h.name} (כבר סומן כנרכש)` })),
+    ...g.items.map(i => ({ id: i.id, label: i.name })),
+  ];
 
   return (
     <div>
@@ -684,6 +711,13 @@ function ReceiptForm({ g, setGrocery }) {
               <div key={p.id} style={{ borderBottom: `1px solid ${LINE}`, padding: "8px 0" }}>
                 <div style={{ fontSize: 13, overflowWrap: "anywhere" }}>
                   בקבלה: <strong>{p.scanned.name}</strong> ({ils(p.scanned.price)}) — זה <strong>{p.suggested.name}</strong> {fromList ? "מהרשימה" : "שכבר סומן כנרכש"}?
+                </div>
+                {/* מבצע: ניתן לעריכה ידנית גם כאן, לפני האישור - אם הסריקה לא זיהתה מבצע על הפריט הזה. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6 }}>
+                  <Tag size={12} color={AMBER} style={{ flexShrink: 0 }} />
+                  <input className="hq-field" placeholder="מבצע (אופציונלי, אם היה ולא זוהה אוטומטית)" value={p.scanned.promo || ""}
+                    onChange={e => setPendingMatches(prev => prev.map(x => x.id === p.id ? { ...x, scanned: { ...x.scanned, promo: e.target.value } } : x))}
+                    style={{ ...inputStyle, minWidth: 0, flex: 1, fontSize: 12 }} />
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                   <button type="button" onClick={() => confirmPendingMatch(p)} style={{ fontSize: 12, color: BG, background: GREEN, border: "none", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit" }}>כן, אותו מוצר</button>
@@ -759,10 +793,10 @@ function ReceiptForm({ g, setGrocery }) {
           <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>שורות נוספות (דברים שלא היו ברשימה)</div>
           <div style={{ display: "grid", gap: 6 }}>
             {adHoc.map((row, i) => (
-              <AdHocRow key={i} row={row} onChange={r => setAdHoc(rows => rows.map((x, idx) => (idx === i ? r : x)))} onRemove={() => setAdHoc(rows => rows.filter((_, idx) => idx !== i))} />
+              <AdHocRow key={i} row={row} linkOptions={linkOptions} onChange={r => setAdHoc(rows => rows.map((x, idx) => (idx === i ? r : x)))} onRemove={() => setAdHoc(rows => rows.filter((_, idx) => idx !== i))} />
             ))}
           </div>
-          <button type="button" onClick={() => setAdHoc(rows => [...rows, { name: "", price: "", qty: "", promo: null }])}
+          <button type="button" onClick={() => setAdHoc(rows => [...rows, { name: "", price: "", qty: "", promo: null, linkedId: null }])}
             style={{ marginTop: 8, fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 5 }}>
             <Plus size={13} /> הוספת שורה
           </button>
