@@ -13,11 +13,22 @@ test("createVoucher: שם וסכום מקורי חובה, אחרת null - לא �
   assert.equal(v.originalAmount, 200);
   assert.equal(v.usedAmount, 0);
   assert.equal(v.fullyUsed, false);
+  assert.equal(v.expiry, null);
+  assert.equal(v.cvv, null);
   assert.equal(createVoucher({ name: "", originalAmount: 200 }), null);
   assert.equal(createVoucher({ name: "שובר", originalAmount: 0 }), null);
   assert.equal(createVoucher({ name: "שובר", originalAmount: -5 }), null);
   assert.equal(createVoucher({ name: "שובר" }), null);
   assert.equal(createVoucher(), null);
+});
+
+test("createVoucher: תוקף/CVV אופציונליים - טקסט חופשי מנורמל (טרים), ריק => null", () => {
+  const v = createVoucher({ name: "שובר", originalAmount: 100, expiry: "  12/27  ", cvv: "  0472  " });
+  assert.equal(v.expiry, "12/27");
+  assert.equal(v.cvv, "0472"); // לא מאבד אפס מוביל - זו מחרוזת, לא מספר
+  const v2 = createVoucher({ name: "שובר", originalAmount: 100, expiry: "", cvv: "" });
+  assert.equal(v2.expiry, null);
+  assert.equal(v2.cvv, null);
 });
 
 test("addVoucher: מוסיף שובר תקין, לא משנה כלום כשהקלט לא תקין", () => {
@@ -39,6 +50,17 @@ test("updateVoucher: usedAmount/originalAmount מנורמלים - ערך לא ח
   const s4 = updateVoucher(s3, id, { name: "" }); // שם ריק - נשאר כמו שהיה
   assert.equal(s4.vouchers[0].name, "שובר A");
   assert.equal(updateVoucher(s0, "לא קיים", { usedAmount: 5 }), s0);
+});
+
+test("updateVoucher: אפשר להוסיף/לעדכן/לנקות תוקף ו-CVV בדיעבד", () => {
+  const s0 = addVoucher(emptyState(), { name: "שובר A", originalAmount: 100 });
+  const id = s0.vouchers[0].id;
+  const s1 = updateVoucher(s0, id, { expiry: "12/27", cvv: "123" });
+  assert.equal(s1.vouchers[0].expiry, "12/27");
+  assert.equal(s1.vouchers[0].cvv, "123");
+  const s2 = updateVoucher(s1, id, { expiry: "", cvv: "" }); // ניקוי מפורש - מותר, לא "נדרס בטעות"
+  assert.equal(s2.vouchers[0].expiry, null);
+  assert.equal(s2.vouchers[0].cvv, null);
 });
 
 test("removeVoucher: מוחק לצמיתות, לא משנה כלום אם ה-id לא קיים", () => {
