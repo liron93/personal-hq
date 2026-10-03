@@ -230,16 +230,22 @@ export function updateHistoryEntry(state, id, patch) {
   return { ...state, history };
 }
 
-/** המבצע האחרון שראינו למוצר הזה (לפי שם מדויק, לא רגיש לרישיות/רווחים - פריט פעיל שנוצר
-    מההיסטוריה הזו אמור לשאת את אותו שם) - למשל להציג אייקון ברשימת "צריך לקנות" שמזכיר
-    שבפעם הקודמת המוצר היה במבצע. null אם מעולם לא נרשם מבצע למוצר הזה. */
+/**
+ * המבצע/עסקת-כמות האחרונה שראינו למוצר הזה (לפי שם מדויק, לא רגיש לרישיות/רווחים - פריט
+ * פעיל שנוצר מההיסטוריה הזו אמור לשאת את אותו שם) - למשל להציג אייקון ברשימת "צריך לקנות".
+ * "שווה הצגה" = יש promo מפורש שנקרא מהקבלה, או שנרכשו כמה יחידות יחד במחיר כולל ידוע (גם
+ * בלי שהקבלה סימנה את זה כ"מבצע" בפירוש - "2 יחידות ב-22" זה מידע שימושי כשלעצמו). ה-UI
+ * (Household.jsx) מרכיב את הטקסט הסופי מ-promo אם יש, אחרת מ-qty/price (ils/pricePerUnit
+ * שייכים ל-UI, לא לקובץ הטהור הזה). null אם אין שום דבר רלוונטי להציג.
+ */
 export function lastPromoForProduct(history, name) {
   const n = norm(name).toLowerCase();
   if (!n) return null;
-  const matches = (history || []).filter(h => h.promo && norm(h.name).toLowerCase() === n);
+  const worthShowing = h => h.promo || (isValidPositiveNumber(h.qty) && h.qty > 1 && isValidNonNegativeNumber(h.price));
+  const matches = (history || []).filter(h => norm(h.name).toLowerCase() === n && worthShowing(h));
   if (!matches.length) return null;
   const latest = [...matches].sort((a, b) => (a.purchasedAt < b.purchasedAt ? 1 : -1))[0];
-  return { promo: latest.promo, purchasedAt: latest.purchasedAt, store: latest.store };
+  return { promo: latest.promo, qty: latest.qty, price: latest.price, purchasedAt: latest.purchasedAt, store: latest.store };
 }
 
 /** רשימת שמות חנויות שהוזנו בעבר (מהיסטוריה + מקבלות), למיון/הצעה בטופס — רשימה מקומית פשוטה, בלי API חיצוני. */
