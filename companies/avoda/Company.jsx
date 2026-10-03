@@ -17,6 +17,7 @@ const STATUS = {
   withdrawn: "נסגרה",
   irrelevant: "לא רלוונטי",
 };
+const STATUS_ORDER = Object.keys(STATUS); // סדר הצינור - משמש למיון רשימת המשרות (ראו Jobs)
 const NAV = [
   ["today", "היום"],
   ["jobs", "משרות"],
@@ -137,9 +138,10 @@ function Today({ jobs, flags, onOpen, onNavigate }) {
 function Jobs({ jobs, flags, onSave, onOpen }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
-  // דיפולטיבית מוסתר - פידבק מפורש. לא מוחל כשהמשתמש/ת בוחר/ת במפורש לסנן לפי "נדחתה" -
+  // דיפולטיבית מוסתר - פידבק מפורש. לא מוחל כשהמשתמש/ת בוחר/ת במפורש לסנן לפי "נדחתה"/"נסגרה" -
   // אחרת אין טעם בסינון הזה (0 תוצאות תמיד), סותר את הכוונה המפורשת של הבחירה.
   const [hideRejected, setHideRejected] = useState(true);
+  const [hideWithdrawn, setHideWithdrawn] = useState(true); // "נסגרה" (withdrawn) - פידבק מפורש, אותו עיקרון כמו hideRejected
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState(blankJob);
   const [message, setMessage] = useState("");
@@ -147,7 +149,13 @@ function Jobs({ jobs, flags, onSave, onOpen }) {
     const status = effectiveStatus(job, flags);
     if (filter !== "all" && status !== filter) return false;
     if (hideRejected && filter !== "rejected" && status === "rejected") return false;
+    if (hideWithdrawn && filter !== "withdrawn" && status === "withdrawn") return false;
     return (job.company_name + " " + job.role_title).toLowerCase().includes(query.toLowerCase());
+  }).sort((a, b) => {
+    // סדר לפי שלב בצינור (STATUS מוגדר כבר בסדר הזה: לבדיקה -> הוגשה -> ראיון -> הצעה ->
+    // נדחתה/נסגרה/לא רלוונטי) - פידבק מפורש: "לבדיקה" קודם, "הוגשה" אחריה, לא סדר הכנסה גולמי.
+    const order = STATUS_ORDER.indexOf(effectiveStatus(a, flags)) - STATUS_ORDER.indexOf(effectiveStatus(b, flags));
+    return order; // sort יציב ב-JS מודרני - שומר על הסדר היחסי בתוך אותו סטטוס
   });
   const create = async event => {
     event.preventDefault(); setMessage("");
@@ -170,6 +178,10 @@ function Jobs({ jobs, flags, onSave, onOpen }) {
       <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475467", margin: "10px 0" }}>
         <input type="checkbox" checked={hideRejected} onChange={event => setHideRejected(event.target.checked)} />
         <span>הסתר משרות שנדחו</span>
+      </label>
+      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475467", margin: "0 0 10px" }}>
+        <input type="checkbox" checked={hideWithdrawn} onChange={event => setHideWithdrawn(event.target.checked)} />
+        <span>הסתר משרות שנסגרו</span>
       </label>
       <div className={styles.jobList}>{visible.map(job => <button onClick={() => onOpen(job)} key={job.id} className={styles.jobCard}><span className={styles.jobIdentity}><strong>{job.role_title}</strong><small>{job.company_name}</small></span><span><Status value={effectiveStatus(job, flags)} /><small>{job.next_action_at || "ללא מועד"}</small></span></button>)}</div>
       {!visible.length && <Empty label={jobs.length ? "לא נמצאו משרות בסינון הזה" : "עדיין אין משרות במרכז הקריירה"} action="הוספת המשרה הראשונה" onClick={() => setAdding(true)} />}
