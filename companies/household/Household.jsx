@@ -30,6 +30,15 @@ import { imagesOf } from "@/companies/beit-hadash/images";
 */
 
 const ils = v => "₪" + Math.round(v || 0).toLocaleString("he-IL");
+const round2 = n => Math.round(n * 100) / 100;
+/** טקסט לאייקון "מבצע": המבצע כפי שנקרא מהקבלה אם קיים, אחרת (כמה יחידות באותה רכישה,
+    גם בלי שהקבלה סימנה הנחה בפירוש) תיאור מחיר ליחידה - ראו lastPromoForProduct. */
+const describePromo = entry => {
+  if (!entry) return "";
+  if (entry.promo) return entry.promo;
+  const perUnit = pricePerUnit(entry);
+  return perUnit != null ? `${entry.qty} יח' ב-${ils(entry.price)} (${ils(perUnit)} ליח')` : "";
+};
 const FILTER_LABEL = { all: "הכול", need: "צריך לקנות", purchased: "נרכש" };
 const PRIORITY_COLOR = { "דחוף": RUST, "חשוב": AMBER, "רגיל": MUTED };
 const ALERT_COLOR = { critical: RUST, warning: AMBER, info: MUTED };
@@ -107,9 +116,11 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
   const [price, setPrice] = useState(item.price ?? "");
   const [store, setStore] = useState(item.store ?? "");
   const [showPromo, setShowPromo] = useState(false);
-  // פריט שנרכש: המבצע (אם היה) שייך ישירות לרשומת ההיסטוריה הזו. פריט פעיל (עדיין לא נרכש):
-  // אין לו promo משלו (עוד לא נרכש!) - lastPromo הוא מה שהתקבל מההיסטוריה (ראה lastPromoForProduct).
-  const promoInfo = purchased ? (item.promo ? { promo: item.promo, purchasedAt: item.purchasedAt, store: item.store } : null) : lastPromo;
+  // פריט שנרכש: אם יש promo מפורש או שנרכשו כמה יחידות יחד (גם בלי סימון מבצע מפורש) -
+  // שייך ישירות לרשומת ההיסטוריה הזו. פריט פעיל (עדיין לא נרכש): אין לו נתונים משלו עדיין -
+  // lastPromo הוא מה שהתקבל מההיסטוריה (ראה lastPromoForProduct, אותו קריטריון בדיוק).
+  const purchasedWorthShowing = item.promo || (item.qty > 1 && item.price != null);
+  const promoInfo = purchased ? (purchasedWorthShowing ? { promo: item.promo, qty: item.qty, price: item.price, purchasedAt: item.purchasedAt, store: item.store } : null) : lastPromo;
   // לחיצה ארוכה על השם פותחת עריכה שלו - פידבק מפורש (אין דרך אחרת לשנות שם פריט קיים).
   // לא ג'סטורת גרירה/כיוון - רק טיימר, בלי כל מחלקת הבאגים שהייתה עם הסליידר. תזוזה קטנה
   // בזמן הלחיצה (למשל תחילת גלילה) מבטלת את הטיימר כרגיל, בלי להתערב בגלילה עצמה.
@@ -181,7 +192,7 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
           </div>
           {showPromo && promoInfo && (
             <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
-              {promoInfo.promo}
+              {describePromo(promoInfo)}
               {!purchased && (promoInfo.store || promoInfo.purchasedAt) && (
                 <> · בפעם האחרונה{promoInfo.store ? ` ב${promoInfo.store}` : ""}{promoInfo.purchasedAt ? ` (${new Date(promoInfo.purchasedAt).toLocaleDateString("he-IL")})` : ""}</>
               )}
@@ -464,6 +475,12 @@ function ReceiptForm({ g, setGrocery }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [prices, setPrices] = useState({}); // itemId -> price string, נוכח = נבחר
   const [scanPromos, setScanPromos] = useState({}); // itemId -> promo string, רק לפריטים שהותאמו מסריקת AI
+  const [scanQtys, setScanQtys] = useState({}); // itemId -> כמות שזוהתה בסריקה (למשל 2 אם המוצר הופיע פעמיים/במבצע)
+  // קבלה ישנה: דווח שסריקת קבלה ישנה "חיברה" בטעות פריטים שנרכשו בעבר לפריטים ברשימת
+  // "צריך לקנות" הנוכחית (סימון אוטומטי כאילו נקנו עכשיו) - למשל אם אותו מוצר נוסף שוב
+  // לרשימה מאז. כש-isOldReceipt מסומן, הסריקה לא מנסה להתאים לרשימה הפעילה בכלל - הכל
+  // נכנס כשורות אד-הוק (נוספות ישירות להיסטוריה, בלי לגעת ב-items).
+  const [isOldReceipt, setIsOldReceipt] = useState(false);
   const [adHoc, setAdHoc] = useState([]);
   const [images, setImages] = useState([]);
   const [error, setError] = useState("");
@@ -479,7 +496,7 @@ function ReceiptForm({ g, setGrocery }) {
   const scanInputRef = useRef(null);
 
   const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
-  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
+  const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
 
   const scanReceipt = async file => {
     setScanning(true); setScanError(""); setScanInfo(""); setError(""); setSavedMsg("");
@@ -501,16 +518,29 @@ function ReceiptForm({ g, setGrocery }) {
       // ידנית: פריטים לא-תואמים פשוט לא הגיעו ל-adHoc). g.items הוא מקור האמת ל"קיים
       // ברשימה", לא prices הקודם - אין תלות במצב הקודם כאן, אז אין צורך ב-updater בכלל.
       // findReceiptMatch (לא findActiveDuplicate המדויק) - כדי ש"רוטב סויה" ברשימה יתאים
-      // ל"רוטב סויה יאמסה" בקבלה (שם עם מותג), ראו ההסבר ב-grocery-model.js.
+      // ל"רוטב סויה יאמסה" בקבלה (שם עם מותג), ראו ההסבר ב-grocery-model.js. קבלה ישנה:
+      // לא מתאימים בכלל לרשימה הפעילה (ראו הסבר ליד isOldReceipt).
+      // צבירה (לא דריסה!) לפי match.id: קבלה אמיתית לפעמים מדפיסה את אותו מוצר כשתי שורות
+      // נפרדות (למשל שני יחידות באותו מחיר) במקום שורה אחת עם qty - בלי צבירה היינו מאבדים
+      // את השורה הראשונה כשהשנייה דורסת אותה באותו מפתח.
       const matchedPrices = {};
+      const matchedQtys = {};
       const matchedPromos = {};
       const unmatchedItems = [];
       for (const item of items) {
-        const match = findReceiptMatch(g.items, item.name);
-        if (match) { matchedPrices[match.id] = String(item.price); if (item.promo) matchedPromos[match.id] = item.promo; }
-        else unmatchedItems.push(item);
+        const match = !isOldReceipt ? findReceiptMatch(g.items, item.name) : null;
+        if (match) {
+          matchedPrices[match.id] = round2((matchedPrices[match.id] || 0) + item.price);
+          matchedQtys[match.id] = (matchedQtys[match.id] || 0) + (item.qty || 1);
+          if (item.promo) matchedPromos[match.id] = matchedPromos[match.id] ? `${matchedPromos[match.id]}; ${item.promo}` : item.promo;
+        } else {
+          unmatchedItems.push(item);
+        }
       }
-      if (Object.keys(matchedPrices).length) setPrices(prev => ({ ...prev, ...matchedPrices }));
+      if (Object.keys(matchedPrices).length) {
+        setPrices(prev => { const next = { ...prev }; for (const id in matchedPrices) next[id] = String(matchedPrices[id]); return next; });
+        setScanQtys(prev => ({ ...prev, ...matchedQtys }));
+      }
       if (Object.keys(matchedPromos).length) setScanPromos(prev => ({ ...prev, ...matchedPromos }));
       if (unmatchedItems.length) {
         // דה-דופ לפי שם (לא רגיש לאותיות/רווחים) מול מה שכבר ב-adHoc: אם המשתמש/ת מנסים
@@ -523,7 +553,9 @@ function ReceiptForm({ g, setGrocery }) {
       }
       const matchedCount = Object.keys(matchedPrices).length;
       const unmatchedCount = unmatchedItems.length;
-      setScanInfo(`זוהו ${items.length} פריטים: ${matchedCount} הותאמו לרשימה${unmatchedCount ? `, ${unmatchedCount} נוספו כשורות חדשות למטה` : ""}. אפשר לבדוק ולערוך לפני השמירה.`);
+      setScanInfo(isOldReceipt
+        ? `זוהו ${items.length} פריטים, כולם נוספו כשורות חדשות למטה (קבלה ישנה - לא הותאם לרשימה הנוכחית). אפשר לבדוק ולערוך לפני השמירה.`
+        : `זוהו ${items.length} פריטים: ${matchedCount} הותאמו לרשימה${unmatchedCount ? `, ${unmatchedCount} נוספו כשורות חדשות למטה` : ""}. אפשר לבדוק ולערוך לפני השמירה.`);
     } catch (e) {
       setScanError(e.message || "סריקת הקבלה נכשלה.");
     } finally {
@@ -533,7 +565,7 @@ function ReceiptForm({ g, setGrocery }) {
 
   const submit = () => {
     setError(""); setSavedMsg(""); setScanError(""); setScanInfo("");
-    const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null, promo: scanPromos[id] || null }));
+    const listItems = Object.entries(prices).map(([id, p]) => ({ id, price: toN(p) || null, promo: scanPromos[id] || null, qty: toN(scanQtys[id]) || null }));
     const adHocItems = adHoc.filter(r => r.name.trim()).map(r => ({ name: r.name, price: toN(r.price) || null, qty: toN(r.qty) || null, promo: r.promo || null }));
     if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
     if (listItems.length === 0 && adHocItems.length === 0) { setError("בחרו לפחות פריט אחד מהרשימה, או הוסיפו שורה ידנית."); return; }
@@ -542,7 +574,7 @@ function ReceiptForm({ g, setGrocery }) {
     const withImages = images.length ? updateReceiptImages(next, receiptId, images) : next;
     tracker.settle(images, true);
     setGrocery(withImages);
-    tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setAdHoc([]); setImages([]);
+    tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setAdHoc([]); setImages([]);
     setSavedMsg("הקבלה נשמרה, ועברה להיסטוריית הרכישות.");
   };
 
@@ -561,6 +593,10 @@ function ReceiptForm({ g, setGrocery }) {
           style={{ fontSize: 13, border: `1px solid ${LINE}`, background: "transparent", color: INK, borderRadius: 2, padding: "9px 14px", cursor: scanning ? "not-allowed" : "pointer", opacity: scanning ? 0.6 : 1, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
           <ScanLine size={15} /> {scanning ? "סורק קבלה…" : "סריקת קבלה עם AI"}
         </button>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: MUTED, marginTop: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={isOldReceipt} onChange={e => setIsOldReceipt(e.target.checked)} />
+          קבלה ישנה — אל תתאימו אוטומטית לרשימת הקניות הנוכחית (כל הפריטים ייכנסו כשורות חדשות למטה)
+        </label>
         {scanError && <p role="alert" style={{ color: RUST, fontSize: 12, margin: "8px 0 0" }}>{scanError}</p>}
         {scanInfo && <p role="status" style={{ color: GREEN, fontSize: 12, margin: "8px 0 0" }}>{scanInfo}</p>}
       </div>
@@ -592,7 +628,12 @@ function ReceiptForm({ g, setGrocery }) {
                       <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
                       <span style={{ overflowWrap: "anywhere" }}>{item.name}{item.qty != null && ` (${item.qty})`}</span>
                     </label>
-                    {checked && <input className="hq-field" placeholder="מחיר ₪" value={prices[item.id]} onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 90, flexShrink: 0 }} />}
+                    {checked && (
+                      <>
+                        <input className="hq-field" placeholder="מחיר ₪" value={prices[item.id]} onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 90, flexShrink: 0 }} />
+                        <input className="hq-field" placeholder="כמות" value={scanQtys[item.id] ?? ""} onChange={e => setScanQtys(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 64, flexShrink: 0 }} />
+                      </>
+                    )}
                   </div>
                 );
               })}

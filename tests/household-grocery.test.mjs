@@ -183,6 +183,19 @@ test("lastPromoForProduct: המבצע האחרון (לפי תאריך) לאות�
   assert.equal(lastPromoForProduct(s.history, ""), null);
 });
 
+test("lastPromoForProduct: גם בלי טקסט מבצע מפורש - כמה יחידות יחד במחיר כולל ידוע נחשב 'שווה הצגה'", () => {
+  const s0 = quickAddItem(createGroceryState(), "חומוס");
+  const { state: s } = logReceipt(s0, { store: "שופרסל", listItems: [{ id: s0.items[0].id, price: 22, qty: 2 }] });
+  const last = lastPromoForProduct(s.history, "חומוס");
+  assert.equal(last.promo, null);
+  assert.equal(last.qty, 2);
+  assert.equal(last.price, 22);
+  // יחידה בודדת (qty=1 או לא ידוע) בלי promo - לא "שווה הצגה"
+  const s1 = quickAddItem(createGroceryState(), "לחם");
+  const s2 = markPurchased(s1, s1.items[0].id, { price: 8, purchasedAt: "2026-09-01T10:00:00.000Z" });
+  assert.equal(lastPromoForProduct(s2.history, "לחם"), null);
+});
+
 // ---------- מיון / קיבוץ לפי מסלול ----------
 test("groupByRoute: סדר הקבוצות תואם את מסלול הקנייה, קטגוריות ריקות לא מוצגות", () => {
   let s = createGroceryState();
