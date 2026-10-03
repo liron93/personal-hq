@@ -79,14 +79,14 @@ test("remainingAmount: originalAmount-usedAmount; fullyUsed מציג 0 תמיד 
   assert.equal(remainingAmount(null), 0);
 });
 
-test("sortVouchers: פעילים (לא נוצלו במלואם) קודם, מהחדש לישן; נוצלו במלואם בסוף", () => {
+test("sortVouchers: פעילים (לא נוצלו במלואם) קודם, מהישן לחדש (חדש מתווסף לתחתית); נוצלו במלואם בסוף", () => {
   const vouchers = [
     { id: "a", name: "ישן פעיל", fullyUsed: false, createdAt: "2026-01-01T00:00:00.000Z" },
     { id: "b", name: "נוצל", fullyUsed: true, createdAt: "2026-03-01T00:00:00.000Z" },
     { id: "c", name: "חדש פעיל", fullyUsed: false, createdAt: "2026-02-01T00:00:00.000Z" },
   ];
   const sorted = sortVouchers(vouchers);
-  assert.deepEqual(sorted.map(v => v.id), ["c", "a", "b"]);
+  assert.deepEqual(sorted.map(v => v.id), ["a", "c", "b"]);
 });
 
 test("totalRemaining: סוכם רק על שוברים פעילים (לא נוצלו במלואם)", () => {
