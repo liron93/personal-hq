@@ -465,7 +465,11 @@ function AdHocRow({ row, onChange, onRemove }) {
         <input className="hq-field" placeholder="כמות" value={row.qty} onChange={e => onChange({ ...row, qty: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
         <button type="button" aria-label="הסרת שורה" onClick={onRemove} style={{ border: "none", background: "transparent", color: MUTED, cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><X size={15} /></button>
       </div>
-      {row.promo && <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11, color: AMBER, marginTop: 2 }}><Tag size={11} /> {row.promo}</div>}
+      {/* מבצע: תמיד ניתן לעריכה ידנית, לא רק כשהסריקה זיהתה - דווח שהזיהוי האוטומטי לא תמיד תופס מבצע אמיתי על הקבלה. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+        <Tag size={12} color={AMBER} style={{ flexShrink: 0 }} />
+        <input className="hq-field" placeholder="מבצע (אופציונלי, אם היה ולא זוהה אוטומטית)" value={row.promo || ""} onChange={e => onChange({ ...row, promo: e.target.value })} style={{ ...inputStyle, minWidth: 0, flex: 1, fontSize: 12 }} />
+      </div>
     </div>
   );
 }
@@ -724,16 +728,25 @@ function ReceiptForm({ g, setGrocery }) {
               {activeItems.map(item => {
                 const checked = item.id in prices;
                 return (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, fontSize: 13, cursor: "pointer" }}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
-                      <span style={{ overflowWrap: "anywhere" }}>{item.name}{item.qty != null && ` (${item.qty})`}</span>
-                    </label>
+                  <div key={item.id} style={{ display: "grid", gap: 4, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, fontSize: 13, cursor: "pointer" }}>
+                        <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
+                        <span style={{ overflowWrap: "anywhere" }}>{item.name}{item.qty != null && ` (${item.qty})`}</span>
+                      </label>
+                      {checked && (
+                        <>
+                          <input className="hq-field" placeholder="מחיר ₪" value={prices[item.id]} onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 90, flexShrink: 0 }} />
+                          <input className="hq-field" placeholder="כמות" value={scanQtys[item.id] ?? ""} onChange={e => setScanQtys(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 64, flexShrink: 0 }} />
+                        </>
+                      )}
+                    </div>
+                    {/* מבצע: תמיד ניתן לעריכה ידנית, לא רק כשהסריקה זיהתה - הזיהוי האוטומטי לא תמיד תופס מבצע אמיתי על הקבלה. */}
                     {checked && (
-                      <>
-                        <input className="hq-field" placeholder="מחיר ₪" value={prices[item.id]} onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 90, flexShrink: 0 }} />
-                        <input className="hq-field" placeholder="כמות" value={scanQtys[item.id] ?? ""} onChange={e => setScanQtys(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 64, flexShrink: 0 }} />
-                      </>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, paddingRight: 26 }}>
+                        <Tag size={12} color={AMBER} style={{ flexShrink: 0 }} />
+                        <input className="hq-field" placeholder="מבצע (אופציונלי, אם היה ולא זוהה אוטומטית)" value={scanPromos[item.id] || ""} onChange={e => setScanPromos(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, minWidth: 0, flex: 1, fontSize: 12 }} />
+                      </div>
                     )}
                   </div>
                 );
