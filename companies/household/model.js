@@ -4,12 +4,18 @@ import {
 
 export const STORE_KEY = "hq:household:v1";
 
-// v1 scope = "סופר" בלבד: רשימת קניות משותפת + היסטוריית רכישות + חיסכון. שדות נוספים
-// (משימות בית אחרות, לוח ניקיון וכד') יצטרפו כאן בעתיד, לצד — לא בתוך — companies/kesef.
-export const INIT = createGroceryState();
+// v1 scope = "סופר" + שוברים: רשימת קניות משותפת + היסטוריית רכישות + חיסכון + שוברים
+// (vouchers, ראה vouchers-model.js - לא קשור לסופר ספציפית, לכן שדה אחים ל-items/history,
+// לא בתוך grocery-model.js עצמו). שדות נוספים (משימות בית אחרות, לוח ניקיון וכד') יצטרפו
+// כאן בעתיד, לצד — לא בתוך — companies/kesef.
+export const INIT = { ...createGroceryState(), vouchers: [] };
 
-// תאימות אחורה: מוסיף שדות רשימת-קניות תקינים לנתונים ישנים בלי הפיצ'ר הזה (למשל אחרי migration עתידי).
-export const ensureHousehold = ensureGroceryState;
+/** תאימות אחורה: מוסיף שדות רשימת-קניות תקינים (ensureGroceryState) ושדה vouchers (לנתונים
+    ישנים מלפני הפיצ'ר הזה) לנתונים ישנים/חלקיים, בלי לדרוס שום דבר קיים. */
+export function ensureHousehold(d) {
+  const g = ensureGroceryState(d);
+  return Array.isArray(g.vouchers) ? g : { ...g, vouchers: [] };
+}
 
 /*
   ערוץ הקריאה של שבתאי/כספים לנתון המצרפי של הוצאות הסופר (ראה docs/PR): summarize() מחזירה
