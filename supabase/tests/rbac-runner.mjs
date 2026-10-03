@@ -2,7 +2,7 @@
 // שימוש (חד-פעמי, בלי לשנות package.json):   npm i --no-save @electric-sql/pglite   ואז   node supabase/tests/rbac-runner.mjs
 // מה הוא עושה: מדמה את מה ש-Supabase נותן (תפקידים anon/authenticated, סכמת auth, storage, ברירות מחדל של הרשאות),
 // מריץ את הקבצים האמיתיים של הריפו (schema.sql + מיגרציות הקריירה), אחר כך את ה-patch המוצע, ואז את המטריצה.
-// הדמיות (shims) הן רק לצורך הבדיקה. **career_jobs אינה בשום migration בריפו**: כאן היא טבלת stand-in עם אותה policy
+// הדמיות (shims) הן רק לצורך הבדיקה. **career_jobs ו-career_communications אינן בשום migration בריפו**: הן stand-in (supabase/tests/staging/010) עם אותה policy
 // שהקוד מצפה לה. יש לוודא מול ה-DB החי (rollout/000_preflight_checks.sql) שה-RLS האמיתי שלה זהה.
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,7 @@ export const SHIMS = `
   create function auth.uid() returns uuid language sql stable as $$
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
-  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text, owner uuid, owner_id text);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text, owner uuid, owner_id text, metadata jsonb);
   alter table storage.objects enable row level security;
   -- כמו ההגדרה של Supabase: מחזירה את התיקיות בלבד, בלי שם הקובץ האחרון בנתיב.
   create function storage.foldername(name text) returns text[] language sql immutable as $$
@@ -30,10 +30,6 @@ export const SHIMS = `
   -- Supabase נותן כברירת מחדל הרשאות מלאות על כל טבלה חדשה ב-public; ה-RLS הוא שמגן. מדמים את זה כדי שה-revoke שב-patch יבחן באמת.
   alter default privileges in schema public grant all on tables to anon, authenticated;
   alter default privileges in schema public grant all on functions to anon, authenticated;
-  -- stand-in ל-career_jobs (אין migration בריפו): אותו דפוס owner-only שהקוד מניח.
-  create table public.career_jobs (id uuid primary key default gen_random_uuid(), user_id uuid not null default auth.uid() references auth.users (id) on delete cascade, company_name text);
-  alter table public.career_jobs enable row level security;
-  create policy career_jobs_owner on public.career_jobs for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 `;
 
 /** בונה DB נקי עם הכול חוץ מה-patch של RBAC. */
@@ -41,6 +37,8 @@ export async function buildBase(PGlite) {
   const db = new PGlite();
   await db.exec(SHIMS);
   await db.exec(await read("supabase/schema.sql"));
+  // career_jobs / career_communications אינן ב-migration: stand-in סינתטי משותף עם בסיס ה-staging.
+  await db.exec(await read("supabase/tests/staging/010_synthetic_career_base.sql"));
   await db.exec(await read("supabase/migrations/202609120001_career_foundation.sql"));
   await db.exec(await read("supabase/migrations/202609120002_career_learning_and_interviews.sql"));
   return db;
