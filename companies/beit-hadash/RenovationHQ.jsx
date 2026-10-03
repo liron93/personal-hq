@@ -319,6 +319,8 @@ function Inspirations({ data, setData }) {
   const categories = data.inspirationCategories || [];
   const [draft, setDraft] = useState(emptyInspiration(categories[0])); const [error, setError] = useState("");
   const [newCategory, setNewCategory] = useState(""); const [categoryError, setCategoryError] = useState("");
+  const [openCats, setOpenCats] = useState({}); // קטגוריות סגורות כברירת מחדל (פידבק מפורש) - נפתחות בלחיצה, אחת-אחת
+  const toggleCat = g => setOpenCats(o => ({ ...o, [g]: !o[g] }));
   const [me, setMe] = useState(null); // { id, email } של המשתמש/ת המחוברים, לתיעוד מי הגיב/ה
   const tracker = useImageTracker([]);
   useEffect(() => { let alive = true; supabase.auth.getSession().then(({ data: s }) => { const u = s?.session?.user; if (alive && u) setMe({ id: u.id, email: u.email || "" }); }).catch(() => {}); return () => { alive = false; }; }, []);
@@ -382,10 +384,14 @@ function Inspirations({ data, setData }) {
         <div style={{ display: "flex", justifyContent: "end", gap: 8 }}>{(editing || (draft.images || []).length > 0) && <Btn secondary onClick={() => startDraft(emptyInspiration(categories[0]))}>ביטול</Btn>}<Btn>{editing ? "שמירה" : <><Plus size={18} />הוספה</>}</Btn></div>
       </form>
     </Card>
-    {sections.map(([g, rows]) => rows.length ? <div key={g} style={{ display: "grid", gap: 12 }}>
-      <h3 style={{ margin: 0 }}>{g} <span style={{ color: "#63716A", fontWeight: 400, fontSize: 14 }}>({rows.length})</span></h3>
-      {rows.map(card)}
-    </div> : null)}
+    {sections.map(([g, rows]) => { const isOpen = !!openCats[g]; return rows.length ? <div key={g} style={{ display: "grid", gap: 12 }}>
+      <button type="button" onClick={() => toggleCat(g)} aria-expanded={isOpen} style={{ display: "flex", alignItems: "center", gap: 8, border: 0, background: "transparent", font: "inherit", cursor: "pointer", padding: 0, textAlign: "start", minHeight: 44 }}>
+        <span style={{ fontSize: 18, fontWeight: 700 }}>{g}</span>
+        <span style={{ color: "#63716A", fontWeight: 400, fontSize: 14 }}>({rows.length})</span>
+        <ChevronDown size={18} style={{ marginInlineStart: "auto", transform: isOpen ? "rotate(180deg)" : "none", color: "#63716A" }} />
+      </button>
+      {isOpen && rows.map(card)}
+    </div> : null; })}
     {!items.length && <Card><p style={{ margin: 0, color: "#63716A" }}>עדיין אין השראות. הוסף כותרת, תיאור וקישור למעלה.</p></Card>}
     <Card>
       <h3 style={{ marginTop: 0 }}>קטגוריות</h3>
