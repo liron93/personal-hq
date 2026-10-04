@@ -6,10 +6,14 @@
 -- (SUPABASE_SERVICE_ROLE_KEY, ראה lib/supabase-admin.mjs), שמסננים תמיד לפי user_id
 -- מה-session המאומת בלבד.
 --
--- RLS מופעל כהגנת-עומק בלבד (הגנה בפועל היא בקוד ה-handler, לא כאן): גם אם מישהו ישאל
--- את הטבלה הזו ישירות עם ה-anon key, owner יכול רק לראות/לגעת בשורה של עצמו - ולא דרך
--- מדיניות INSERT/UPDATE בכלל (שמירה קורית רק אחרי אימות המפתח מול Hevy בקוד השרת,
--- ראה lib/hevy-handler.mjs - אין צורך שה-client יוכל לכתוב ישירות).
+-- RLS מופעל בלי שום policy בכוונה - deny-by-default מוחלט: אין גישת קריאה/כתיבה מהלקוח
+-- (anon/authenticated) לטבלה הזו בכלל, אפילו לא לשורה של עצמך. תיקון מ-review של עמית:
+-- גרסה קודמת כללה policy ל-select של "השורה של עצמי" שחשב ל"הגנת-עומק" - אבל RLS הוא
+-- ברמת שורה, לא עמודה, אז זה היה מאפשר למשתמש מחובר לקרוא ישירות את ה-encrypted_api_key
+-- המוצפן של עצמו. זה לא חושף את מפתח Hevy הגולמי (הוא מוצפן), אבל זו חשיפה מיותרת שלא
+-- תואמת את העיקרון שהוגדר: הטבלה הזו נקראת/נכתבת אך ורק דרך service-role
+-- (SUPABASE_SERVICE_ROLE_KEY, lib/supabase-admin.mjs) בקוד השרת, שמסנן תמיד לפי user_id
+-- מה-session המאומת - אף פעם לא דרך ה-client הרגיל, גם לא לציפר-טקסט.
 -- ============================================================================
 
 begin;
@@ -25,12 +29,7 @@ create table public.health_hevy_connection (
 
 alter table public.health_hevy_connection enable row level security;
 
--- הגנת-עומק בלבד: קריאת הסטטוס של עצמך (לא כולל encrypted_api_key - אין column-level
--- privilege כאן בכוונה כי הגישה האמיתית היא תמיד דרך service-role, לא הלקוח).
-create policy health_hevy_connection_select_own on public.health_hevy_connection
-  for select using (auth.uid() = user_id);
-
--- אין policies ל-insert/update/delete: רק service-role (שעוקף RLS) כותב לטבלה הזו,
--- אחרי שהמפתח כבר אומת מול Hevy בקוד השרת.
+-- במכוון: אין שום policy. RLS מופעל בלי אף מדיניות = אין גישה בכלל ל-anon/authenticated,
+-- גם לא לשורה של עצמך. רק service-role (עוקף RLS) נוגע בטבלה הזו.
 
 commit;
