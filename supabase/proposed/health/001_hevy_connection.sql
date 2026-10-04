@@ -32,4 +32,9 @@ alter table public.health_hevy_connection enable row level security;
 -- במכוון: אין שום policy. RLS מופעל בלי אף מדיניות = אין גישה בכלל ל-anon/authenticated,
 -- גם לא לשורה של עצמך. רק service-role (עוקף RLS) נוגע בטבלה הזו.
 
+-- חיזוק נוסף (review שני של עמית): גם אם ל-anon/authenticated יש הרשאת table-level כלשהי
+-- בברירת המחדל של הסכימה (grant רוחבי על public), היא לא תעזור להם לקרוא כלום בפועל (RLS
+-- בלי policy כבר חוסם) - אבל שוללים אותה גם במפורש, כך שאין תלות שקטה ב-RLS בלבד.
+revoke all on table public.health_hevy_connection from anon, authenticated;
+
 commit;
