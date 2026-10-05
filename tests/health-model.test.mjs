@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { INIT, importHevyWorkouts, summarize } from "../companies/health/model.js";
+import { historyList } from "../companies/health/history.mjs";
 
 const hevy = (id, title, date) => ({ hevySourceId: id, title, date, exercises: [{ name: "לחיצת חזה", sets: [{ reps: 10, weightKg: 60 }] }] });
 
-test("importHevyWorkouts: מוסיף אימונים חדשים עם שדות תואמים-אחורה (name/date/id) שסייכום קיים כבר יודע לקרוא", () => {
+test("importHevyWorkouts: מוסיף אימונים חדשים עם log.exercises[].sets[].{weight,reps} - אותה צורה בדיוק כמו live.mjs/finishLive", () => {
   const { state, importedCount, skippedCount } = importHevyWorkouts(INIT, [hevy("w1", "בוקר", "2026-10-01")]);
   assert.equal(importedCount, 1);
   assert.equal(skippedCount, 0);
@@ -15,7 +16,17 @@ test("importHevyWorkouts: מוסיף אימונים חדשים עם שדות ת�
   assert.equal(entry.source, "hevy");
   assert.equal(entry.hevySourceId, "w1");
   assert.ok(entry.id);
-  assert.equal(entry.exercises.length, 1);
+  assert.equal(entry.log.exercises.length, 1);
+  assert.equal(entry.log.exercises[0].name, "לחיצת חזה");
+  assert.deepEqual(entry.log.exercises[0].sets, [{ weight: 60, reps: 10 }]);
+});
+
+test("importHevyWorkouts: דווח שהייבוא 'הגיע לעמוד ריק' - אימון מיובא חייב להופיע ב-historyList (התקדמות), לא רק להישמר", () => {
+  const { state } = importHevyWorkouts(INIT, [hevy("w1", "בוקר", "2026-10-01")]);
+  const list = historyList(state.workouts);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].name, "לחיצת חזה");
+  assert.equal(list[0].best.weight, 60);
 });
 
 test("importHevyWorkouts: אידמפוטנטי - ייבוא חוזר של אותם hevySourceId לא יוצר כפילויות", () => {

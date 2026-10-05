@@ -20,12 +20,14 @@ export function summarize(data) {
 }
 
 /**
- * מוסיף אימונים שיובאו מ-Hevy (ראה lib/hevy-service.mjs) ל-state.workouts הקיים - תואם
- * אחורה לחלוטין: שדות name/date/id נצרכים כבר היום ע"י summarize()/Journal, source/
- * hevySourceId/exercises הם שדות חדשים שקוד קיים פשוט מתעלם מהם.
- * אידמפוטנטי בכוונה (דרישת עמית, Issue #7): dedupe לפי hevySourceId היציב של Hevy עצמו -
- * קריאה חוזרת עם אותם אימונים (או לחיצה כפולה על "אישור יבוא") לא יוצרת כפילויות, רק
- * מדווחת כמה נוספו וכמה כבר היו קיימים.
+ * מוסיף אימונים שיובאו מ-Hevy (ראה lib/hevy-service.mjs) ל-state.workouts הקיים.
+ * דווח (Issue #7, P0 המשך): ייבוא "הגיע לעמוד ריק" - השורש האמיתי היה שה-log.exercises
+ * (companies/health/history.mjs: exerciseHistory מצפה ל-w.log.exercises[].sets[].{weight,reps},
+ * בדיוק כמו finishLive ב-live.mjs) לא היה קיים בצורה הזו בגרסה הקודמת - אימונים שיובאו
+ * היו "בלתי נראים" לתצוגות ההתקדמות/היסטוריית התרגילים הקיימות. עכשיו הצורה תואמת בדיוק,
+ * כך שאימון מיובא מופיע מיד ב"התקדמות" לצד אימונים שנרשמו ידנית - בלי מסך חדש.
+ * אידמפוטנטי בכוונה (דרישת עמית): dedupe לפי hevySourceId היציב של Hevy עצמו - קריאה חוזרת
+ * עם אותם אימונים (או לחיצה כפולה על "אישור יבוא") לא יוצרת כפילויות, רק מדווחת כמה נוספו.
  */
 export function importHevyWorkouts(state, hevyWorkouts) {
   const d = state || INIT;
@@ -35,9 +37,15 @@ export function importHevyWorkouts(state, hevyWorkouts) {
   if (!toAdd.length) return { state: d, importedCount: 0, skippedCount: incoming.length };
   const now = new Date().toISOString();
   const entries = toAdd.map(w => ({
-    id: uid(), name: w.title || "אימון Hevy", date: w.date || todayISO(), note: "",
-    source: "hevy", hevySourceId: w.hevySourceId, exercises: Array.isArray(w.exercises) ? w.exercises : [],
-    createdAt: now,
+    id: uid(), name: w.title || "אימון Hevy", date: w.date || todayISO(), session: null, short: false,
+    duration: "", note: "", feeling: "", source: "hevy", hevySourceId: w.hevySourceId, createdAt: now,
+    log: {
+      startedAt: null, finishedAt: null,
+      exercises: (Array.isArray(w.exercises) ? w.exercises : []).map(ex => ({
+        name: ex.name, status: "done",
+        sets: (Array.isArray(ex.sets) ? ex.sets : []).map(s => ({ weight: s.weightKg ?? null, reps: s.reps ?? null })),
+      })),
+    },
   }));
   return { state: { ...d, workouts: [...entries, ...d.workouts] }, importedCount: entries.length, skippedCount: incoming.length - entries.length };
 }
