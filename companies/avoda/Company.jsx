@@ -6,6 +6,7 @@ import styles from "./career.module.css";
 import { useStore } from "@/lib/store";
 import { DEFAULT_PREFS, normalizePrefs } from "./practice-tracks";
 import { effectiveStatus, isActiveJob, statusForSave, withFlag } from "./job-status";
+import { buildActionQueue, queueReason } from "./job-queue";
 import { PracticeHub, HistoryHub, InterviewHub, LearningHub, CommunicationsHub } from "./CareerExpansion";
 
 const STATUS = {
@@ -109,28 +110,49 @@ function useCareerData() {
 function Notice({ children, kind = "info" }) { return <p className={kind === "error" ? styles.error : styles.notice} role={kind === "error" ? "alert" : undefined}>{children}</p>; }
 function Status({ value }) { return <span className={styles["status_" + value] || styles.status}>{STATUS[value] || value}</span>; }
 
-function Today({ jobs, flags, onOpen, onNavigate }) {
+// דווח משתמש (Issue #7, P0): "תור פעולות" הציג 102 מועמדויות פעילות (כל מה שלא נדחה/נסגר),
+// כולל שורות ישנות בשבועות - לא שימושי, פגע באמון. buildActionQueue (job-queue.mjs) מחליף
+// את ה-due/missing הישנים: רק מה שבאמת דורש טיפול עכשיו/השבוע, עם סיבה ברורה לכל שורה
+// ופעולת השלמה/דחייה מהירה - בלי לחכות לפתוח את הכרטיס המלא. "לכל המשרות" (Jobs) נשאר
+// המקום לארכיון/חיפוש - שום דבר לא נמחק או מוסתר, רק לא דוחק את מה שדחוף.
+function QueueRow({ job, today, onOpen, onDone, onSnooze }) {
+  const reason = queueReason(job, today);
+  return <div className={styles.actionRow}>
+    <button className={styles.actionRowMain} onClick={() => onOpen(job)}>
+      <span><strong>{job.next_action || reason}</strong><small>{job.company_name} · {job.role_title} · {reason}</small></span>
+      <time>{job.next_action_at || "—"}</time>
+    </button>
+    <span className={styles.actionRowButtons}>
+      <button className={styles.textButton} onClick={() => onDone(job)} aria-label={`סימון "${job.next_action || reason}" כבוצע עבור ${job.company_name}`}>בוצע</button>
+      <button className={styles.textButton} onClick={() => onSnooze(job)} aria-label={`דחיית הפעולה עבור ${job.company_name} בשבוע`}>דחייה בשבוע</button>
+    </span>
+  </div>;
+}
+
+function Today({ jobs, flags, onOpen, onNavigate, onSave }) {
   const day = today();
-  const active = jobs.filter(job => isActiveJob(job, flags));
-  const due = active.filter(job => job.next_action_at && job.next_action_at <= day).sort((a,b) => (a.next_action_at || "").localeCompare(b.next_action_at || ""));
-  const missing = active.filter(job => !job.next_action || !job.next_action_at);
-  const focus = due[0] || missing[0];
+  const result = useMemo(() => buildActionQueue(jobs, flags, day), [jobs, flags, day]);
+  const focus = result.queue[0];
+  const markDone = job => onSave({ ...job, next_action: "", next_action_at: "" }, job.id);
+  const snoozeWeek = job => { const d = new Date(day); d.setDate(d.getDate() + 7); onSave({ ...job, next_action_at: d.toISOString().slice(0, 10) }, job.id); };
   return <div className={styles.stack}>
     <section className={styles.hero}>
       <span>מרכז הפיקוד של הקריירה</span>
-      <h2>{focus ? "יש פעולה אחת שכדאי לקדם עכשיו." : "הצינור שלך מסודר לעכשיו."}</h2>
-      <p>{focus ? focus.company_name + " · " + focus.role_title : "אפשר להוסיף משרה או לעדכן את הפעולה הבאה בכל תהליך פתוח."}</p>
-      {focus && <button className={styles.primary} onClick={() => onOpen(focus)}>להמשיך במשרה</button>}
+      <h2>{focus ? "יש פעולה אחת שכדאי לקדם עכשיו." : "אין לך פעולה דחופה כרגע."}</h2>
+      <p>{focus ? focus.company_name + " · " + focus.role_title : "אפשר לעיין בכל המשרות הפעילות, או להוסיף מעקב חדש."}</p>
+      {focus ? <button className={styles.primary} onClick={() => onOpen(focus)}>להמשיך במשרה</button> : <button className={styles.primary} onClick={() => onNavigate("jobs")}>למשרות הפעילות</button>}
     </section>
     <section className={styles.kpis}>
-      <Metric label="פעילות" value={active.length} />
-      <Metric label="ראיונות" value={active.filter(job => job.status === "interview").length} />
-      <Metric label="דורש טיפול" value={due.length} warn={due.length > 0} />
-      <Metric label="ללא צעד הבא" value={missing.length} />
+      <Metric label="לטיפול היום" value={result.dueToday.length} warn={result.dueToday.length > 0} />
+      <Metric label="השבוע" value={result.dueThisWeek.length} />
+      <Metric label="ממתין לתשובה" value={result.awaitingReplyCount} />
+      <Metric label="ארכיון" value={result.archiveCount} />
     </section>
     <section className={styles.panel}>
-      <div className={styles.sectionTitle}><div><p>תור הפעולות</p><h3>מה יקדם אותך השבוע</h3></div><button className={styles.textButton} onClick={() => onNavigate("jobs")}>לכל המשרות</button></div>
-      {due.length ? due.slice(0,5).map(job => <button className={styles.actionRow} onClick={() => onOpen(job)} key={job.id}><span><strong>{job.next_action}</strong><small>{job.company_name} · {job.role_title}</small></span><time>{job.next_action_at}</time></button>) : <Empty label="אין פעולה דחופה כרגע" action="הוספת משרה" onClick={() => onNavigate("jobs")} />}
+      <div className={styles.sectionTitle}><div><p>תור הפעולות</p><h3>מה דורש טיפול עכשיו או השבוע</h3></div><button className={styles.textButton} onClick={() => onNavigate("jobs")}>לכל המשרות ({result.activeCount} פעילות)</button></div>
+      {result.queue.length
+        ? result.queue.map(job => <QueueRow key={job.id} job={job} today={day} onOpen={onOpen} onDone={markDone} onSnooze={snoozeWeek} />)
+        : <Empty label="אין לך פעולה דחופה כרגע" action="למשרות הפעילות" onClick={() => onNavigate("jobs")} />}
     </section>
   </div>;
 }
@@ -250,7 +272,7 @@ export default function Company() {
   return <div className={styles.root} dir="rtl">
     <aside className={styles.sidebar}><div className={styles.brand}><span>HQ</span><strong>קריירה</strong></div><nav aria-label="מחלקות קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav><div className={styles.user}>{data.user.email}</div></aside>
     <main className={styles.main}><nav className={styles.mobileNav} aria-label="ניווט קריירה">{NAV.map(([id,label]) => <button key={id} className={view === id ? styles.navActive : ""} onClick={() => setView(id)}>{label}</button>)}</nav>
-      {view === "today" && <Today jobs={data.jobs} flags={prefs.irrelevantJobs} onOpen={setSelected} onNavigate={setView}/>}
+      {view === "today" && <Today jobs={data.jobs} flags={prefs.irrelevantJobs} onOpen={setSelected} onNavigate={setView} onSave={saveJobWithFlag}/>}
       {view === "jobs" && <Jobs jobs={data.jobs} flags={prefs.irrelevantJobs} onOpen={setSelected} onSave={saveJobWithFlag}/>}
       {view === "updates" && <CommunicationsHub user={data.user}/>}
       {view === "profile" && <Profile profile={data.profile} onSave={data.saveProfile}/>}
