@@ -9,8 +9,12 @@ const EXAMPLE = `A
 B
 Exercise Name (Variant) | 2 | 10 | 12.5`;
 
-// בונה תוכנית: הזנה/ייבוא מהיר מטקסט (למשל נתונים שיגיעו מ-Hevy), או בנייה ידנית בעורך.
-// לא מכיל תרגילים או משקלים משלו.
+// בונה תוכנית A/B/C: הזנה/הדבקה של טקסט מתוכנן (לא היסטוריית אימונים!), או בנייה ידנית
+// בעורך. לא מכיל תרגילים או משקלים משלו.
+// דווח (Issue #7): הניסוח הקודם הזכיר "נתונים שיגיעו מ-Hevy" כדוגמה - בלבל בין זה (בניית
+// תבנית A/B/C מטקסט מודבק) לבין חיבור Hevy האמיתי (companies/health/v2/HevyConnect.jsx,
+// שמביא היסטוריית אימונים אמיתית מה-API, לא תבנית). שני דברים שונים לגמרי בכוונה -
+// תוכנית אימונים מתוכננת מראש מול מה שבאמת בוצע בעבר.
 export default function PlanBuilder({ onLoad, onManual, onClose, hasExisting }) {
   const [confirm, setConfirm] = useState(false);
   const [text, setText] = useState("");

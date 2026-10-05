@@ -8,7 +8,7 @@ import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { importHevyWorkouts } from "../model";
 import css from "./health-v2.module.css";
 
-export default function HevyConnect({ d, setD, onClose }) {
+export default function HevyConnect({ d, setD, onClose, onImported }) {
   const [status, setStatus] = useState(null); // {configured, connected, lastCheckedAt, lastCheckOk} | null = בטעינה
   const [statusError, setStatusError] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -102,6 +102,9 @@ export default function HevyConnect({ d, setD, onClose }) {
     setD(next);
     setPreview(null);
     setActionMsg(skippedCount > 0 ? `יובאו ${importedCount} אימונים חדשים (${skippedCount} כבר יובאו בעבר).` : `יובאו ${importedCount} אימונים חדשים.`);
+    // דווח (Issue #7): ייבוא בלי המשך ברור הרגיש כמו "עמוד ריק" - אחרי אישור, עוברים ישר
+    // ל"התקדמות" כדי לראות את האימונים שיובאו בתוך ההיסטוריה האמיתית, לא נשארים כאן.
+    if (importedCount > 0 && onImported) onImported();
   };
 
   return (
@@ -137,7 +140,7 @@ export default function HevyConnect({ d, setD, onClose }) {
           <div className={css.onboardingActions}>
             {!status.connected && <button className={css.primary} disabled={busy === "connect"} onClick={connect}><Link2 size={16} /> {busy === "connect" ? "מתחבר…" : "התחברות"}</button>}
             {status.connected && <button className={css.secondary} disabled={busy === "test"} onClick={test}><RefreshCw size={16} /> {busy === "test" ? "בודק…" : "בדיקת חיבור"}</button>}
-            {status.connected && <button className={css.secondary} disabled={busy === "import"} onClick={fetchPreview}>{busy === "import" ? "טוען אימונים…" : "ייבוא אימונים"}</button>}
+            {status.connected && <button className={css.secondary} disabled={busy === "import"} onClick={fetchPreview}>{busy === "import" ? "טוען אימונים…" : "ייבוא היסטוריית אימונים מ-Hevy"}</button>}
             {status.connected && <button className={css.status + " " + css.skipped} disabled={busy === "disconnect"} onClick={disconnect}><Link2Off size={16} /> {busy === "disconnect" ? "מנתק…" : "ניתוק"}</button>}
           </div>
         </div>
