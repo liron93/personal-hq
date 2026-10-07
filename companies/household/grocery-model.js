@@ -61,6 +61,32 @@ export function ensureGroceryState(d) {
 
 const norm = s => String(s || "").trim();
 
+// ---------- זהות מוצר (Issue #7, P0 "זיהוי מוצר נכון") ----------
+// עד כאן זיהוי פריט היה שם חופשי בלבד - "מגבונים" כללי ו"מגבונים אריאל 72 יח'" נחשבו אותו
+// מוצר בכל חישוב השוואה/היסטוריה, כי הקיבוץ היה לפי norm(name) בלבד. brand/variant הם
+// שדות אופציונליים חדשים (שם מותג, גודל/כמות-אריזה/וריאנט אחר) - productKey הוא מפתח הזהות
+// המלא (שם+מותג+וריאנט, תמיד שלושתם, גם כשהשניים האחרונים ריקים) שמשמש מעכשיו לכל קיבוץ/
+// השוואה/היסטוריה. פריט ישן בלי brand/variant ממשיך לקבץ אך ורק מול פריטים אחרים בלי
+// brand/variant באותו שם (לא "נבלע" לתוך/לא "בולע" גרסה ממותגת חדשה בטעות) - זה בדיוק מה
+// שמבטיח "מגבונים כלליים יוצגו כפריט כללי ולא ישויכו אוטומטית למותג/וריאנט חדש".
+export function productKey(entry) {
+  const name = norm(entry?.name).toLowerCase();
+  const brand = norm(entry?.brand).toLowerCase();
+  const variant = norm(entry?.variant).toLowerCase();
+  return `${name}|${brand}|${variant}`;
+}
+
+/** שם לתצוגה: השם עצמו, ועוד מותג/וריאנט בסוגריים-עם-נקודה אם קיימים. */
+export function productDisplayName(entry) {
+  const parts = [norm(entry?.brand), norm(entry?.variant)].filter(Boolean);
+  const name = norm(entry?.name);
+  return parts.length ? `${name} · ${parts.join(" · ")}` : name;
+}
+
+/** true כש-אין מותג ואין וריאנט - "פריט כללי": השוואת מחיר עליו היא כללית בכוונה, לא ספציפית
+    למוצר מדויק - ה-UI חייב לציין את זה במפורש (לא לשתוק), לפי דרישת עמית. */
+export const isGenericIdentity = entry => !norm(entry?.brand) && !norm(entry?.variant);
+
 /** קטגוריה מזוהה אוטומטית לפי שם, מהמילון (ברירת מחדל או שנערך). התאמה ראשונה, נופלת ל"אחר". */
 export function detectCategory(name, dict = DEFAULT_CATEGORY_DICT) {
   const n = norm(name);
@@ -86,7 +112,7 @@ export const isValidPositiveNumber = v => typeof v === "number" && Number.isFini
 export const isValidNonNegativeNumber = v => typeof v === "number" && Number.isFinite(v) && v >= 0;
 
 // ---------- פריטים ----------
-export function newGroceryItem({ name, qty = null, unit = "", category, priority = DEFAULT_PRIORITY, note = "", dict } = {}) {
+export function newGroceryItem({ name, qty = null, unit = "", category, priority = DEFAULT_PRIORITY, note = "", brand = "", variant = "", dict } = {}) {
   const n = norm(name);
   const categoryAuto = category === undefined || category === null || category === "";
   const resolvedCategory = categoryAuto ? detectCategory(n, dict) : category;
@@ -100,18 +126,24 @@ export function newGroceryItem({ name, qty = null, unit = "", category, priority
     categoryAuto,
     priority: PRIORITIES.includes(priority) ? priority : DEFAULT_PRIORITY,
     note: norm(note),
+    brand: norm(brand),
+    variant: norm(variant),
     purchased: false,
     createdAt: now,
     updatedAt: now,
   };
 }
 
-/** פריט פעיל (לא נרכש) עם אותו שם (לא רגיש לאותיות רישיות/רווחים מובילים-עוקבים) אם קיים -
-    כדי להזהיר לפני הוספת כפילות בטעות, במקום ליצור שורה כפולה בשקט. */
-export function findActiveDuplicate(items, name) {
-  const n = norm(name).toLowerCase();
+/** פריט פעיל (לא נרכש) עם אותה זהות מוצר בדיוק (שם+מותג+וריאנט, לא רגיש לרישיות/רווחים) אם
+    קיים - כדי להזהיר לפני הוספת כפילות בטעות, במקום ליצור שורה כפולה בשקט. identity
+    אופציונלי (brand/variant) - כשריק (כמו ב-QuickAdd, שאין בו שדות מותג) מתאים רק מול
+    פריטים אחרים שגם הם בלי מותג/וריאנט, לא "בולע" בטעות גרסה ממותגת קיימת - בכוונה: הוספת
+    "מגבונים אריאל" לא אמורה להיחסם כי יש כבר "מגבונים" כללי ברשימה, וההפך. */
+export function findActiveDuplicate(items, name, identity = {}) {
+  const n = norm(name);
   if (!n) return null;
-  return (items || []).find(i => norm(i.name).toLowerCase() === n) || null;
+  const key = productKey({ name: n, brand: identity.brand, variant: identity.variant });
+  return (items || []).find(i => productKey(i) === key) || null;
 }
 
 const tokensOf = name => norm(name).toLowerCase().split(/[\s,.-]+/).filter(Boolean);
@@ -162,7 +194,10 @@ export function updateItem(state, id, patch) {
   const categoryAuto = Object.prototype.hasOwnProperty.call(patch, "categoryAuto")
     ? patch.categoryAuto
     : Object.prototype.hasOwnProperty.call(patch, "category") ? false : wasAuto;
-  items[idx] = { ...items[idx], ...patch, categoryAuto, updatedAt: new Date().toISOString() };
+  const normalizedPatch = { ...patch };
+  if (Object.prototype.hasOwnProperty.call(patch, "brand")) normalizedPatch.brand = norm(patch.brand);
+  if (Object.prototype.hasOwnProperty.call(patch, "variant")) normalizedPatch.variant = norm(patch.variant);
+  items[idx] = { ...items[idx], ...normalizedPatch, categoryAuto, updatedAt: new Date().toISOString() };
   return { ...state, items };
 }
 
@@ -187,7 +222,8 @@ export function markPurchased(state, id, { price = null, purchasedAt = new Date(
   const item = state.items[idx];
   const entry = {
     id: item.id, name: item.name, qty: item.qty, unit: item.unit, category: item.category, priority: item.priority,
-    note: item.note, price: isValidNonNegativeNumber(price) ? price : null, purchasedAt, store: normStore(store),
+    note: item.note, brand: item.brand || "", variant: item.variant || "",
+    price: isValidNonNegativeNumber(price) ? price : null, purchasedAt, store: normStore(store),
     receiptId: null, promo: normPromo(promo),
   };
   return {
@@ -210,6 +246,7 @@ export function restoreToList(state, id) {
   const item = {
     id: crypto.randomUUID ? crypto.randomUUID() : uid(), name: entry.name, qty: entry.qty, unit: entry.unit,
     category: entry.category, categoryAuto: false, priority: entry.priority || DEFAULT_PRIORITY, note: entry.note || "",
+    brand: entry.brand || "", variant: entry.variant || "",
     purchased: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   };
   const history = state.history.filter(h => h.id !== id);
@@ -226,6 +263,8 @@ export function updateHistoryEntry(state, id, patch) {
   const next = { ...history[idx], ...patch };
   if (Object.prototype.hasOwnProperty.call(patch, "store")) next.store = normStore(patch.store);
   if (Object.prototype.hasOwnProperty.call(patch, "promo")) next.promo = normPromo(patch.promo);
+  if (Object.prototype.hasOwnProperty.call(patch, "brand")) next.brand = norm(patch.brand);
+  if (Object.prototype.hasOwnProperty.call(patch, "variant")) next.variant = norm(patch.variant);
   history[idx] = next;
   return { ...state, history };
 }
@@ -238,11 +277,13 @@ export function updateHistoryEntry(state, id, patch) {
  * (Household.jsx) מרכיב את הטקסט הסופי מ-promo אם יש, אחרת מ-qty/price (ils/pricePerUnit
  * שייכים ל-UI, לא לקובץ הטהור הזה). null אם אין שום דבר רלוונטי להציג.
  */
-export function lastPromoForProduct(history, name) {
-  const n = norm(name).toLowerCase();
-  if (!n) return null;
+/** identity: אובייקט {name, brand?, variant?} (או פריט עצמו) - זהות מוצר מדויקת, לא רק שם,
+    כדי שלא יוצג "המבצע האחרון" של מותג/גודל אחר לגמרי שרק חולק שם גנרי. */
+export function lastPromoForProduct(history, identity) {
+  if (!norm(identity?.name)) return null;
+  const key = productKey(identity);
   const worthShowing = h => h.promo || (isValidPositiveNumber(h.qty) && h.qty > 1 && isValidNonNegativeNumber(h.price));
-  const matches = (history || []).filter(h => norm(h.name).toLowerCase() === n && worthShowing(h));
+  const matches = (history || []).filter(h => productKey(h) === key && worthShowing(h));
   if (!matches.length) return null;
   const latest = [...matches].sort((a, b) => (a.purchasedAt < b.purchasedAt ? 1 : -1))[0];
   return { promo: latest.promo, qty: latest.qty, price: latest.price, purchasedAt: latest.purchasedAt, store: latest.store };
@@ -292,6 +333,7 @@ export function logReceipt(state, { store, date = new Date().toISOString().slice
     return {
       id: item.id, name: item.name, qty: isValidPositiveNumber(li.qty) ? li.qty : item.qty, unit: item.unit,
       category: item.category, priority: item.priority, note: item.note,
+      brand: item.brand || "", variant: item.variant || "",
       price: isValidNonNegativeNumber(li.price) ? li.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
       promo: normPromo(li.promo),
     };
@@ -299,7 +341,8 @@ export function logReceipt(state, { store, date = new Date().toISOString().slice
   const fromAdHoc = validAdHoc.map(a => ({
     id: uid(), name: norm(a.name), qty: isValidPositiveNumber(a.qty) ? a.qty : null, unit: norm(a.unit),
     category: CATEGORIES.includes(a.category) ? a.category : detectCategory(a.name, state.categoryDict), priority: DEFAULT_PRIORITY,
-    note: norm(a.note), price: isValidNonNegativeNumber(a.price) ? a.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
+    note: norm(a.note), brand: norm(a.brand), variant: norm(a.variant),
+    price: isValidNonNegativeNumber(a.price) ? a.price : null, purchasedAt, store: receipt.store, receiptId: receipt.id,
     promo: normPromo(a.promo),
   }));
   const updatesById = new Map(validHistoryUpdates.map(hu => [hu.id, hu]));
@@ -311,6 +354,8 @@ export function logReceipt(state, { store, date = new Date().toISOString().slice
       price: isValidNonNegativeNumber(hu.price) ? hu.price : h.price,
       qty: isValidPositiveNumber(hu.qty) ? hu.qty : h.qty,
       promo: hu.promo != null ? normPromo(hu.promo) : h.promo,
+      brand: hu.brand != null ? norm(hu.brand) : h.brand,
+      variant: hu.variant != null ? norm(hu.variant) : h.variant,
       store: receipt.store, receiptId: receipt.id,
     };
   });
@@ -418,17 +463,17 @@ export function monthlySpend(history, month) {
  * pricedCount אומר מתוך כמה רכישות זה חושב). ממוין מהגבוה בהוצאה.
  */
 export function monthlyProductBreakdown(history, month = nowMonth()) {
-  const byName = new Map();
+  const byKey = new Map();
   for (const h of history || []) {
     if (monthKeyOf(h.purchasedAt) !== month) continue;
-    const key = norm(h.name).toLowerCase();
-    if (!key) continue;
-    const row = byName.get(key) || { name: h.name, count: 0, total: 0, pricedCount: 0 };
+    if (!norm(h.name)) continue;
+    const key = productKey(h);
+    const row = byKey.get(key) || { key, name: productDisplayName(h), generic: isGenericIdentity(h), count: 0, total: 0, pricedCount: 0 };
     row.count += 1;
     if (hasValidPrice(h)) { row.total = round2(row.total + h.price); row.pricedCount += 1; }
-    byName.set(key, row);
+    byKey.set(key, row);
   }
-  return [...byName.values()].sort((a, b) => b.total - a.total || b.count - a.count || heCompare(a.name, b.name));
+  return [...byKey.values()].sort((a, b) => b.total - a.total || b.count - a.count || heCompare(a.name, b.name));
 }
 
 /** תקציב מול בפועל לחודש נתון. budget=null (לא הוגדר) או spend.hasData=false => over=false, בלי לבדות מספר. */
@@ -454,18 +499,19 @@ export function budgetTrend(history, { referenceMonth = nowMonth(), baselineMont
   return { available: true, baselineAvg, baselineMonths: baseline, current: current.total, deltaPercent };
 }
 
-/** מוצרים חוזרים על פני יותר מחודש אחד (ברירת מחדל: לפחות 2 חודשים שונים). */
+/** מוצרים חוזרים על פני יותר מחודש אחד (ברירת מחדל: לפחות 2 חודשים שונים). לפי זהות מוצר
+    מדויקת (productKey) - מוצר ממותג ומוצר כללי עם אותו שם נספרים בנפרד. */
 export function repeatProducts(history, { minMonths = 2 } = {}) {
-  const byName = new Map();
+  const byKey = new Map();
   for (const h of history || []) {
-    const key = norm(h.name).toLowerCase();
-    if (!key) continue;
-    const months = byName.get(key) || new Set();
-    months.add(monthKeyOf(h.purchasedAt));
-    byName.set(key, months);
+    if (!norm(h.name)) continue;
+    const key = productKey(h);
+    const row = byKey.get(key) || { name: productDisplayName(h), months: new Set() };
+    row.months.add(monthKeyOf(h.purchasedAt));
+    byKey.set(key, row);
   }
-  return [...byName.entries()]
-    .map(([name, months]) => ({ name, months: [...months].sort(), count: months.size }))
+  return [...byKey.entries()]
+    .map(([key, row]) => ({ key, name: row.name, months: [...row.months].sort(), count: row.months.size }))
     .filter(r => r.count >= minMonths)
     .sort((a, b) => b.count - a.count || heCompare(a.name, b.name));
 }
@@ -511,45 +557,104 @@ export function storeTotals(history) {
  * (רק מרשומות עם מחיר תקין). שתי רשימות נפרדות כי הן עונות על שאלות שונות ("מה קונים הכי הרבה"
  * מול "על מה מוציאים הכי הרבה כסף") ולא תמיד אותו מוצר מוביל בשתיהן.
  */
-function mostPurchasedBy(history, keyOf, { limit = 10 } = {}) {
-  const freq = new Map(), spend = new Map();
+function mostPurchasedBy(history, keyOf, labelOf, { limit = 10 } = {}) {
+  const freq = new Map(), spend = new Map(), labels = new Map();
   for (const h of history || []) {
     const key = keyOf(h);
     if (!key) continue;
+    if (!labels.has(key)) labels.set(key, labelOf(h));
     freq.set(key, (freq.get(key) || 0) + 1);
     if (hasValidPrice(h)) spend.set(key, round2((spend.get(key) || 0) + h.price));
   }
-  const byFrequency = [...freq.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count || heCompare(a.key, b.key)).slice(0, limit);
-  const bySpend = [...spend.entries()].map(([key, total]) => ({ key, total })).sort((a, b) => b.total - a.total || heCompare(a.key, b.key)).slice(0, limit);
+  const byFrequency = [...freq.entries()].map(([key, count]) => ({ key, name: labels.get(key), count })).sort((a, b) => b.count - a.count || heCompare(a.name, b.name)).slice(0, limit);
+  const bySpend = [...spend.entries()].map(([key, total]) => ({ key, name: labels.get(key), total })).sort((a, b) => b.total - a.total || heCompare(a.name, b.name)).slice(0, limit);
   return { byFrequency, bySpend };
 }
 
-export const mostPurchasedProducts = (history, opts) => mostPurchasedBy(history, h => norm(h.name).toLowerCase() ? h.name : "", opts);
-export const mostPurchasedCategories = (history, opts) => mostPurchasedBy(history, h => h.category || "", opts);
+// זהות מוצר מדויקת (productKey) - לא שם בלבד, כך שמוצר ממותג ומוצר כללי עם אותו שם לא מתערבבים.
+export const mostPurchasedProducts = (history, opts) => mostPurchasedBy(history, h => norm(h.name) ? productKey(h) : "", h => productDisplayName(h), opts);
+export const mostPurchasedCategories = (history, opts) => mostPurchasedBy(history, h => h.category || "", h => h.category, opts);
 
 /**
  * "החנות הזולה ביותר שראינו" למוצר X: קריאה עובדתית טהורה מתוך היסטוריית מחירים — לא המלצה, לא
  * השוואת מחירים חיה. מופיע רק כשיש נתוני מחיר מ-2 חנויות שונות לפחות לאותו מוצר (אחרת אין בסיס
  * להשוואה, ולא בודים "הכי זול" משחנות אחת).
  */
+/** "החנות הזולה ביותר שראינו" - לפי זהות מוצר מדויקת (productKey), לא שם בלבד: שני מוצרים
+    עם אותו שם אבל מותג/גודל שונה לא מתערבבים בהשוואה (בדיוק התרחיש שהוביל לדרישה הזו -
+    "מגבונים" כלליים מול מותג/גודל ספציפי). generic=true כש-הזהות בלי מותג/וריאנט - ה-UI
+    חייב לציין את זה במפורש, לא לשתוק (דרישת עמית). */
 export function cheapestStoreSeen(history) {
-  const byProduct = new Map(); // name(lower) -> Map(store -> minPrice)
+  const byKey = new Map(); // productKey -> { name, generic, stores: Map(store -> minPrice) }
   for (const h of history || []) {
-    if (!h.store || !hasValidPrice(h)) continue;
-    const key = norm(h.name).toLowerCase();
-    if (!key) continue;
-    const stores = byProduct.get(key) || new Map();
-    stores.set(h.store, Math.min(stores.get(h.store) ?? Infinity, h.price));
-    byProduct.set(key, stores);
+    if (!h.store || !hasValidPrice(h) || !norm(h.name)) continue;
+    const key = productKey(h);
+    const row = byKey.get(key) || { name: productDisplayName(h), generic: isGenericIdentity(h), stores: new Map() };
+    row.stores.set(h.store, Math.min(row.stores.get(h.store) ?? Infinity, h.price));
+    byKey.set(key, row);
   }
   const out = [];
-  for (const [key, stores] of byProduct) {
-    if (stores.size < 2) continue; // פחות מ-2 חנויות: אין מספיק נתונים להשוואה
-    const ranked = [...stores.entries()].map(([store, minPrice]) => ({ store, minPrice: round2(minPrice) })).sort((a, b) => a.minPrice - b.minPrice || heCompare(a.store, b.store));
-    const displayName = (history.find(h => norm(h.name).toLowerCase() === key) || {}).name || key;
-    out.push({ name: displayName, cheapestStore: ranked[0].store, cheapestPrice: ranked[0].minPrice, stores: ranked });
+  for (const [key, row] of byKey) {
+    if (row.stores.size < 2) continue; // פחות מ-2 חנויות: אין מספיק נתונים להשוואה
+    const ranked = [...row.stores.entries()].map(([store, minPrice]) => ({ store, minPrice: round2(minPrice) })).sort((a, b) => a.minPrice - b.minPrice || heCompare(a.store, b.store));
+    out.push({ key, name: row.name, generic: row.generic, cheapestStore: ranked[0].store, cheapestPrice: ranked[0].minPrice, stores: ranked });
   }
   return out.sort((a, b) => heCompare(a.name, b.name));
+}
+
+/** עד limit הרכישות האחרונות (חדשות קודם) לאותה זהות מוצר בדיוק - "כרטיס פריט". */
+export function productHistory(history, identity, { limit = 10 } = {}) {
+  if (!norm(identity?.name)) return [];
+  const key = productKey(identity);
+  return [...(history || [])]
+    .filter(h => productKey(h) === key)
+    .sort((a, b) => (a.purchasedAt < b.purchasedAt ? 1 : -1))
+    .slice(0, limit);
+}
+
+/** סיכום מחיר ל"כרטיס פריט": מחיר אחרון, הכי נמוך שראינו + איפה/מתי - רק מרכישות עם מחיר
+    תקין, לאותה זהות מוצר בדיוק. בלי מספיק נתונים - last/lowest null, לא בודה מספר.
+    generic=true כש-הזהות בלי מותג/וריאנט (ה-UI מציין "השוואה כללית" לפי דרישת עמית). */
+export function productPriceSummary(history, identity) {
+  const generic = isGenericIdentity(identity);
+  if (!norm(identity?.name)) return { generic, count: 0, last: null, lowest: null };
+  const key = productKey(identity);
+  const priced = (history || []).filter(h => productKey(h) === key && hasValidPrice(h));
+  if (!priced.length) return { generic, count: 0, last: null, lowest: null };
+  const last = [...priced].sort((a, b) => (a.purchasedAt < b.purchasedAt ? 1 : -1))[0];
+  const lowest = [...priced].sort((a, b) => a.price - b.price || (a.purchasedAt < b.purchasedAt ? 1 : -1))[0];
+  return {
+    generic, count: priced.length,
+    last: { price: last.price, store: last.store, purchasedAt: last.purchasedAt },
+    lowest: { price: lowest.price, store: lowest.store, purchasedAt: lowest.purchasedAt },
+  };
+}
+
+/** זהויות מוצר ידועות (שם+מותג+וריאנט) מהרשימה הפעילה + ההיסטוריה, להצעה/השלמה בהוספת
+    פריט חדש - datalist בלבד (לא select סגור), תמיד אפשר להקליד ערך חדש שלא ברשימה. */
+export function knownProducts(state) {
+  const byKey = new Map();
+  for (const entry of [...(state?.items || []), ...(state?.history || [])]) {
+    if (!norm(entry?.name)) continue;
+    const key = productKey(entry);
+    if (!byKey.has(key)) byKey.set(key, { name: norm(entry.name), brand: norm(entry.brand || ""), variant: norm(entry.variant || "") });
+  }
+  return [...byKey.values()].sort((a, b) => heCompare(a.name, b.name) || heCompare(a.brand, b.brand) || heCompare(a.variant, b.variant));
+}
+
+/** אזהרה (לא חסימה - אישור ידני כבר חובה בכל מקרה): ההתאמה המוצעת היא לפריט עם מותג/וריאנט
+    ידועים ברשימה, אבל טקסט השם שנסרק מהקבלה לא כולל אותם בכלל - סימן אפשרי שזה מוצר/גודל
+    שונה בפועל (בדיוק התרחיש: "מגבונים" כללי ברשימה מול מותג/גודל ספציפי בקבלה, ולהפך). אין
+    שדה מותג נפרד בתוצאת הסריקה (רק שם גולמי) - לכן זו בדיקת substring על הטקסט, לא זיהוי מדויק. */
+export function identityMismatchWarning(candidate, scannedName) {
+  const scanned = norm(scannedName).toLowerCase();
+  if (!scanned) return false;
+  const brand = norm(candidate?.brand).toLowerCase();
+  const variant = norm(candidate?.variant).toLowerCase();
+  if (!brand && !variant) return false;
+  const brandFound = !brand || scanned.includes(brand);
+  const variantFound = !variant || scanned.includes(variant);
+  return !(brandFound && variantFound);
 }
 
 const ils = v => "₪" + Math.round(v || 0).toLocaleString("he-IL");

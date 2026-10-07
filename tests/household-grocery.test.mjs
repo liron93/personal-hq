@@ -17,6 +17,7 @@ const {
   monthlySpend, monthlyProductBreakdown, nowMonth, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
+  productKey, productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning,
 } = grocery;
 
 // ---------- זיהוי קטגוריה ----------
@@ -175,25 +176,25 @@ test("lastPromoForProduct: המבצע האחרון (לפי תאריך) לאות�
   s = markPurchased(s, id, { price: 8, purchasedAt: "2026-08-01T10:00:00.000Z", promo: "מבצע ישן" });
   s = quickAddItem(s, "קוטג");
   s = markPurchased(s, s.items[0].id, { price: 7, purchasedAt: "2026-09-01T10:00:00.000Z", promo: "2 ב-14" });
-  const last = lastPromoForProduct(s.history, "קוטג");
+  const last = lastPromoForProduct(s.history, { name: "קוטג" });
   assert.equal(last.promo, "2 ב-14");
   assert.equal(last.purchasedAt, "2026-09-01T10:00:00.000Z");
-  assert.equal(lastPromoForProduct(s.history, "מוצר שלא קיים"), null);
-  assert.equal(lastPromoForProduct([], "קוטג"), null);
-  assert.equal(lastPromoForProduct(s.history, ""), null);
+  assert.equal(lastPromoForProduct(s.history, { name: "מוצר שלא קיים" }), null);
+  assert.equal(lastPromoForProduct([], { name: "קוטג" }), null);
+  assert.equal(lastPromoForProduct(s.history, { name: "" }), null);
 });
 
 test("lastPromoForProduct: גם בלי טקסט מבצע מפורש - כמה יחידות יחד במחיר כולל ידוע נחשב 'שווה הצגה'", () => {
   const s0 = quickAddItem(createGroceryState(), "חומוס");
   const { state: s } = logReceipt(s0, { store: "שופרסל", listItems: [{ id: s0.items[0].id, price: 22, qty: 2 }] });
-  const last = lastPromoForProduct(s.history, "חומוס");
+  const last = lastPromoForProduct(s.history, { name: "חומוס" });
   assert.equal(last.promo, null);
   assert.equal(last.qty, 2);
   assert.equal(last.price, 22);
   // יחידה בודדת (qty=1 או לא ידוע) בלי promo - לא "שווה הצגה"
   const s1 = quickAddItem(createGroceryState(), "לחם");
   const s2 = markPurchased(s1, s1.items[0].id, { price: 8, purchasedAt: "2026-09-01T10:00:00.000Z" });
-  assert.equal(lastPromoForProduct(s2.history, "לחם"), null);
+  assert.equal(lastPromoForProduct(s2.history, { name: "לחם" }), null);
 });
 
 // ---------- מיון / קיבוץ לפי מסלול ----------
@@ -696,12 +697,27 @@ test("mostPurchasedProducts: byFrequency לפי מספר רכישות, bySpend �
     { name: "לחם", price: 100, category: "יבשים ומזווה" },
   ];
   const { byFrequency, bySpend } = mostPurchasedProducts(history);
-  assert.equal(byFrequency[0].key, "חלב");
+  assert.equal(byFrequency[0].name, "חלב");
   assert.equal(byFrequency[0].count, 3);
-  assert.equal(bySpend[0].key, "לחם"); // 100 > 13 (סך החלב עם מחיר תקין)
+  assert.equal(bySpend[0].name, "לחם"); // 100 > 13 (סך החלב עם מחיר תקין)
   assert.equal(bySpend[0].total, 100);
-  const milkSpend = bySpend.find(b => b.key === "חלב");
+  const milkSpend = bySpend.find(b => b.name === "חלב");
   assert.equal(milkSpend.total, 13);
+});
+
+test("mostPurchasedProducts: זהות מוצר מדויקת (productKey) - מותג/גודל שונה לא מתערבב עם מוצר כללי באותו שם", () => {
+  const history = [
+    { name: "מגבונים", price: 10 },
+    { name: "מגבונים", brand: "אריאל", variant: "72 יח'", price: 20 },
+    { name: "מגבונים", brand: "אריאל", variant: "72 יח'", price: 22 },
+  ];
+  const { byFrequency } = mostPurchasedProducts(history);
+  assert.equal(byFrequency.length, 2); // שתי זהויות נפרדות, לא אחת
+  const generic = byFrequency.find(p => p.name === "מגבונים");
+  const branded = byFrequency.find(p => p.name.startsWith("מגבונים ·"));
+  assert.equal(generic.count, 1);
+  assert.equal(branded.count, 2);
+  assert.equal(branded.name, "מגבונים · אריאל · 72 יח'");
 });
 
 test("mostPurchasedCategories: אותו עיקרון, לפי קטגוריה", () => {
@@ -734,6 +750,83 @@ test("cheapestStoreSeen: 'החנות הזולה ביותר שראינו' — ר�
 test("cheapestStoreSeen: אין שום מוצר עם 2+ חנויות => רשימה ריקה, בלי מספר מומצא", () => {
   assert.deepEqual(cheapestStoreSeen([]), []);
   assert.deepEqual(cheapestStoreSeen([{ name: "חלב", price: 6, store: "שופרסל" }]), []);
+});
+
+test("cheapestStoreSeen: מוצר כללי מסומן generic:true; מותג/גודל ספציפי לא מתערבב עם הכללי", () => {
+  const history = [
+    { name: "מגבונים", price: 10, store: "שופרסל" },
+    { name: "מגבונים", price: 9, store: "רמי לוי" }, // "מגבונים" כללי - 2 חנויות, משווים
+    { name: "מגבונים", brand: "אריאל", variant: "72 יח'", price: 25, store: "שופרסל" }, // חנות יחידה לזהות הזו - לא מספיק
+  ];
+  const facts = cheapestStoreSeen(history);
+  assert.equal(facts.length, 1); // רק הכללי יש לו 2+ חנויות
+  assert.equal(facts[0].name, "מגבונים");
+  assert.equal(facts[0].generic, true);
+  assert.equal(facts[0].cheapestStore, "רמי לוי");
+});
+
+// ---------- זהות מוצר (brand/variant) ----------
+test("productKey/productDisplayName/isGenericIdentity: שם+מותג+וריאנט, ריק=פריט כללי", () => {
+  assert.equal(productKey({ name: "מגבונים" }), "מגבונים||");
+  assert.equal(productKey({ name: "מגבונים", brand: "אריאל", variant: "72 יח'" }), "מגבונים|אריאל|72 יח'");
+  assert.equal(productKey({ name: " מגבונים ", brand: "ARIEL" }), productKey({ name: "מגבונים", brand: "ariel" }));
+  assert.equal(productDisplayName({ name: "מגבונים" }), "מגבונים");
+  assert.equal(productDisplayName({ name: "מגבונים", brand: "אריאל" }), "מגבונים · אריאל");
+  assert.equal(productDisplayName({ name: "מגבונים", brand: "אריאל", variant: "72 יח'" }), "מגבונים · אריאל · 72 יח'");
+  assert.equal(isGenericIdentity({ name: "מגבונים" }), true);
+  assert.equal(isGenericIdentity({ name: "מגבונים", brand: "אריאל" }), false);
+});
+
+test("findActiveDuplicate: עם זהות (brand/variant) - פריט כללי ופריט ממותג באותו שם לא נחסמים זה מול זה", () => {
+  const s0 = addItem(createGroceryState(), { name: "מגבונים" }); // כללי, בלי מותג
+  assert.equal(findActiveDuplicate(s0.items, "מגבונים").name, "מגבונים"); // כפילות כללית - נתפס
+  assert.equal(findActiveDuplicate(s0.items, "מגבונים", { brand: "אריאל" }), null); // מותג שונה - לא כפילות
+  const s1 = addItem(s0, { name: "מגבונים", brand: "אריאל", variant: "72 יח'" });
+  assert.equal(findActiveDuplicate(s1.items, "מגבונים", { brand: "אריאל", variant: "72 יח'" }).brand, "אריאל");
+  assert.equal(findActiveDuplicate(s1.items, "מגבונים", { brand: "פמפרס" }), null); // מותג אחר - לא כפילות
+});
+
+test("productHistory/productPriceSummary: רק לאותה זהות מוצר בדיוק; generic מצוין; בלי מספיק נתונים => null", () => {
+  const history = [
+    { name: "מגבונים", price: 10, store: "שופרסל", purchasedAt: "2026-09-01T00:00:00.000Z" },
+    { name: "מגבונים", price: 8, store: "רמי לוי", purchasedAt: "2026-09-10T00:00:00.000Z" },
+    { name: "מגבונים", brand: "אריאל", variant: "72 יח'", price: 25, store: "שופרסל", purchasedAt: "2026-09-05T00:00:00.000Z" },
+  ];
+  const genericHist = productHistory(history, { name: "מגבונים" });
+  assert.equal(genericHist.length, 2); // לא כולל את הממותג
+  assert.equal(genericHist[0].purchasedAt, "2026-09-10T00:00:00.000Z"); // חדש קודם
+
+  const genericSummary = productPriceSummary(history, { name: "מגבונים" });
+  assert.equal(genericSummary.generic, true);
+  assert.equal(genericSummary.last.price, 8);
+  assert.equal(genericSummary.lowest.price, 8);
+  assert.equal(genericSummary.lowest.store, "רמי לוי");
+
+  const brandedSummary = productPriceSummary(history, { name: "מגבונים", brand: "אריאל", variant: "72 יח'" });
+  assert.equal(brandedSummary.generic, false);
+  assert.equal(brandedSummary.last.price, 25);
+
+  const none = productPriceSummary(history, { name: "דבר שלא קיים" });
+  assert.equal(none.last, null);
+  assert.equal(none.lowest, null);
+  assert.equal(none.count, 0);
+});
+
+test("knownProducts: זהויות ייחודיות (שם+מותג+וריאנט) מרשימה פעילה + היסטוריה, ממוין", () => {
+  let s = addItem(createGroceryState(), { name: "חלב" });
+  s = addItem(s, { name: "מגבונים", brand: "אריאל", variant: "72 יח'" });
+  s = { ...s, history: [{ name: "חלב" }, { name: "לחם" }] }; // "חלב" כבר קיים גם ברשימה - לא כפול
+  const known = knownProducts(s);
+  assert.equal(known.length, 3);
+  assert.deepEqual(known.map(p => p.name), ["חלב", "לחם", "מגבונים"]); // מיון לפי he-compare
+});
+
+test("identityMismatchWarning: מותג/וריאנט ידועים שלא מופיעים בטקסט הסריקה - אזהרה; מוזכרים - בלי אזהרה; פריט כללי - בלי אזהרה", () => {
+  assert.equal(identityMismatchWarning({ brand: "אריאל", variant: "72 יח'" }, "חטיפי פיצה גבינה"), true);
+  assert.equal(identityMismatchWarning({ brand: "אריאל", variant: "72 יח'" }, "מגבונים אריאל 72 יח'"), false);
+  assert.equal(identityMismatchWarning({ brand: "Ariel" }, "מגבונים ARIEL רך"), false); // לא רגיש לרישיות (מותג לועזי)
+  assert.equal(identityMismatchWarning({}, "מגבונים כלשהם"), false); // פריט כללי - אין על מה להזהיר
+  assert.equal(identityMismatchWarning({ brand: "אריאל" }, ""), false); // אין טקסט סריקה - לא קובעים כלום
 });
 
 test("שחזור: פריט שסומן בטעות כנרכש חוזר לרשימה ולא נשאר בהיסטוריה", () => {
