@@ -326,7 +326,7 @@ function QuickAdd({ items, onQuickAdd, onOpenForm }) {
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", gap: 8, minWidth: 0 }}>
-        <input className="hq-field" placeholder="הוסיפו פריט ולחצו Enter…" value={name}
+        <input className="hq-field" list="household-known-product-names" placeholder="הוסיפו פריט ולחצו Enter…" value={name}
           onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submit(); }}
           style={{ ...inputStyle, flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 2, padding: "9px 10px" }} />
         <button onClick={submit} aria-label="הוסף פריט" style={{ border: "none", background: INK, color: BG, borderRadius: 2, width: 40, flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -341,12 +341,10 @@ function QuickAdd({ items, onQuickAdd, onOpenForm }) {
   );
 }
 
-function FullAddForm({ dict, items, known, onAdd, onClose }) {
+function FullAddForm({ dict, items, onAdd, onClose }) {
   const [f, setF] = useState({ name: "", qty: "", category: "", priority: "רגיל", note: "", brand: "", variant: "" });
   const detected = f.name.trim() ? detectCategory(f.name, dict) : "";
   const duplicate = f.name.trim() ? findActiveDuplicate(items, f.name, { brand: f.brand, variant: f.variant }) : null;
-  // הצעות שם (פריטים ידועים, לא רשימה סגורה - אפשר תמיד להקליד שם חדש שלא ברשימה).
-  const nameOptions = [...new Set((known || []).map(p => p.name))];
   const submit = () => {
     if (!f.name.trim() || duplicate) return;
     onAdd({ name: f.name, qty: toN(f.qty) || null, category: f.category || undefined, priority: f.priority, note: f.note, brand: f.brand, variant: f.variant });
@@ -355,8 +353,8 @@ function FullAddForm({ dict, items, known, onAdd, onClose }) {
   return (
     <div style={{ ...cardStyle, padding: 14 }}>
       <div style={{ display: "grid", gap: 8 }}>
+        {/* datalist משותפת מוגדרת פעם אחת ב-ShoppingList (household-known-product-names) - גם QuickAdd משתמשת בה. */}
         <input className="hq-field" list="household-known-product-names" placeholder="שם פריט" value={f.name} onChange={e => setF(s => ({ ...s, name: e.target.value }))} style={inputStyle} />
-        <datalist id="household-known-product-names">{nameOptions.map(n => <option key={n} value={n} />)}</datalist>
         {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>"{duplicate.name}" כבר קיים ברשימה (אותו שם, מותג וגודל) - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
         <input className="hq-field" placeholder="כמות" value={f.qty} onChange={e => setF(s => ({ ...s, qty: e.target.value }))} style={inputStyle} />
         <div style={{ display: "flex", gap: 8 }}>
@@ -421,8 +419,11 @@ function ShoppingList({ g, setGrocery }) {
       </div>
 
       <QuickAdd items={g.items} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
-      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} known={knownProducts(g)} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
+      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
       <datalist id="household-known-stores">{knownStores(g).map(s => <option key={s} value={s} />)}</datalist>
+      {/* שמות פריטים ידועים (שם בלבד, לא מותג/וריאנט) - מציעים פריט קיים כבר כשמתחילים להקליד
+          (למשל "מגב" מציע "מגבונים"), בלי לחסום הקלדת שם חדש - משמשת גם QuickAdd וגם FullAddForm. */}
+      <datalist id="household-known-product-names">{[...new Set(knownProducts(g).map(p => p.name))].map(n => <option key={n} value={n} />)}</datalist>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
         {FILTERS.map(f => (
