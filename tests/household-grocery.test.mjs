@@ -150,6 +150,15 @@ test("updateHistoryEntry: אפשר לתקן מחיר בדיעבד, ההיסטו�
   assert.equal(s3.history.length, 1);
 });
 
+test("updateHistoryEntry: אפשר לתקן את שם המוצר בדיעבד (מנורמל); שם ריק לא נשמר, השם הקודם נשאר", () => {
+  const s1 = quickAddItem(createGroceryState(), "חלב 3 אחוז");
+  const s2 = markPurchased(s1, s1.items[0].id);
+  const s3 = updateHistoryEntry(s2, s2.history[0].id, { name: "  חלב תנובה 3%  " });
+  assert.equal(s3.history[0].name, "חלב תנובה 3%");
+  const s4 = updateHistoryEntry(s3, s3.history[0].id, { name: "   " });
+  assert.equal(s4.history[0].name, "חלב תנובה 3%"); // שם ריק - נשאר הקודם, לא נמחק
+});
+
 test("markPurchased: שדה promo אופציונלי, מנורמל (טרים), ריק/לא מצוין => null", () => {
   const s1 = quickAddItem(createGroceryState(), "חלב");
   const s2 = markPurchased(s1, s1.items[0].id, { price: 6, promo: "  2 ב-20  " });

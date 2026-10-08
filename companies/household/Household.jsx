@@ -299,17 +299,27 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
       )}
 
       {open && purchased && (
-        <div style={{ marginTop: 10, marginRight: 4, display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", minWidth: 0 }}>
-          <LabeledInput label="מחיר בפועל (₪)" value={price} onBlur={v => { setPrice(v); onUpdate(item.id, { price: toN(v) || null }); }} />
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>חנות</div>
-            <input className="hq-field" list="household-known-stores" value={store} onChange={e => setStore(e.target.value)}
-              onBlur={e => onUpdate(item.id, { store: e.target.value })} placeholder="איפה קניתם?"
-              style={{ ...inputStyle, minWidth: 0, width: 140 }} />
+        <div style={{ marginTop: 10, marginRight: 4, display: "grid", gap: 8 }}>
+          {/* שם המוצר ניתן לתיקון גם ברכישה שכבר נרשמה - למשל אם הוזן בטעות, או כדי לאחד
+              עם השם שמשתמשים בו היום (דווח: לירון רצה דרך גלויה לתקן, לא רק long-press
+              על השם עצמו, שקיים גם הוא אבל לא גלוי/ידוע). שם ריק לא נשמר - מתעלמים בשקט. */}
+          <LabeledInput label="שם המוצר" text value={item.name} onBlur={v => { const n = v.trim(); if (n) onUpdate(item.id, { name: n }); }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <LabeledInput label="מותג (אופציונלי)" text value={item.brand || ""} onBlur={v => onUpdate(item.id, { brand: v })} />
+            <LabeledInput label="גודל/וריאנט (אופציונלי)" text value={item.variant || ""} onBlur={v => onUpdate(item.id, { variant: v })} />
           </div>
-          <span style={{ fontSize: 11, color: MUTED, paddingBottom: 8 }}>
-            {new Date(item.purchasedAt).toLocaleDateString("he-IL")}
-          </span>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", minWidth: 0 }}>
+            <LabeledInput label="מחיר בפועל (₪)" value={price} onBlur={v => { setPrice(v); onUpdate(item.id, { price: toN(v) || null }); }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>חנות</div>
+              <input className="hq-field" list="household-known-stores" value={store} onChange={e => setStore(e.target.value)}
+                onBlur={e => onUpdate(item.id, { store: e.target.value })} placeholder="איפה קניתם?"
+                style={{ ...inputStyle, minWidth: 0, width: 140 }} />
+            </div>
+            <span style={{ fontSize: 11, color: MUTED, paddingBottom: 8 }}>
+              {new Date(item.purchasedAt).toLocaleDateString("he-IL")}
+            </span>
+          </div>
         </div>
       )}
       {showCard && <ProductCard identity={item} history={history || []} onClose={() => setShowCard(false)} />}

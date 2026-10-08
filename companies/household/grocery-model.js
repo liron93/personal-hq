@@ -265,6 +265,8 @@ export function updateHistoryEntry(state, id, patch) {
   if (Object.prototype.hasOwnProperty.call(patch, "promo")) next.promo = normPromo(patch.promo);
   if (Object.prototype.hasOwnProperty.call(patch, "brand")) next.brand = norm(patch.brand);
   if (Object.prototype.hasOwnProperty.call(patch, "variant")) next.variant = norm(patch.variant);
+  // שם ריק לא נשמר (שדה חובה) - נשאר השם הקודם, לא "נעלם" בטעות.
+  if (Object.prototype.hasOwnProperty.call(patch, "name")) next.name = norm(patch.name) || history[idx].name;
   history[idx] = next;
   return { ...state, history };
 }
