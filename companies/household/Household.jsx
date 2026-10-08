@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag, Ticket, Eye, EyeOff } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
+import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag, Ticket, Eye, EyeOff, History } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { toN } from "@/lib/format";
@@ -15,6 +15,7 @@ import {
   groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
   monthlyProductBreakdown, nowMonth,
+  productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning,
 } from "./grocery-model";
 import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
@@ -112,7 +113,54 @@ function QtyStepper({ qty, onChange }) {
 const NAME_LONG_PRESS_MS = 500;
 const NAME_PRESS_CANCEL_PX = 8; // תזוזה מעבר לזה תוך כדי לחיצה = לא לחיצה ארוכה, לא לפתוח עריכה
 
-function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, lastPromo }) {
+/**
+ * "כרטיס פריט" (Issue #7, P0 זיהוי מוצר): מחיר אחרון, הכי נמוך שראינו (רק לאותה זהות מוצר
+ * בדיוק - productKey, לא שם בלבד) + איפה/מתי, והיסטוריה קצרה. identity = הפריט/רשומת
+ * ההיסטוריה שנלחצו (יש להם name/brand/variant). generic (בלי מותג/וריאנט) מצוין במפורש -
+ * לא בשקט, לפי דרישת עמית: "אם זה פריט כללי, ציין במפורש שההשוואה כללית".
+ */
+function ProductCard({ identity, history, onClose }) {
+  const displayName = productDisplayName(identity);
+  const summary = productPriceSummary(history, identity);
+  const recent = productHistory(history, identity, { limit: 8 });
+  const fmt = iso => new Date(iso).toLocaleDateString("he-IL");
+  return (
+    <div role="dialog" aria-modal="true" aria-label={`כרטיס מוצר: ${displayName}`} onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(10,16,13,.45)", display: "grid", placeItems: "center", padding: 12 }}>
+      <div onClick={e => e.stopPropagation()} style={{ ...cardStyle, background: BG, padding: 16, maxWidth: 420, width: "100%", maxHeight: "80vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+          <h3 style={{ margin: 0, fontSize: 16, overflowWrap: "anywhere" }}>{displayName}</h3>
+          <button type="button" aria-label="סגירת כרטיס המוצר" onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", flexShrink: 0 }}><X size={18} /></button>
+        </div>
+        {summary.generic && (
+          <p style={{ fontSize: 12, color: MUTED, margin: "0 0 10px", lineHeight: 1.5 }}>
+            פריט כללי (בלי מותג/גודל ספציפי שהוזן) — ההשוואה כאן כללית, לא בהכרח לאותו מוצר מדויק בכל פעם.
+          </p>
+        )}
+        {summary.count === 0 ? (
+          <p style={{ fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — אין עדיין רכישה עם מחיר תקין למוצר הזה.</p>
+        ) : (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <Metric label="מחיר אחרון" value={ils(summary.last.price)} sub={`${summary.last.store || "חנות לא ידועה"} · ${fmt(summary.last.purchasedAt)}`} />
+            <Metric label="הכי נמוך שראינו" value={ils(summary.lowest.price)} sub={`${summary.lowest.store || "חנות לא ידועה"} · ${fmt(summary.lowest.purchasedAt)}`} color={GREEN} />
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: MUTED, marginBottom: 4 }}>היסטוריה אחרונה</div>
+        {recent.length === 0 ? (
+          <p style={{ fontSize: 13, color: MUTED }}>אין היסטוריה עדיין.</p>
+        ) : recent.map(h => (
+          <div key={h.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
+            <span style={{ color: MUTED, flexShrink: 0 }}>{fmt(h.purchasedAt)}{h.store ? ` · ${h.store}` : ""}</span>
+            <span style={{ flexShrink: 0 }}>{h.price != null ? ils(h.price) : "אין מחיר"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, lastPromo, history }) {
+  const [showCard, setShowCard] = useState(false);
   const [open, setOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [price, setPrice] = useState(item.price ?? "");
@@ -178,6 +226,9 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
               </div>
             </div>
           )}
+          {(item.brand || item.variant) && (
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 2, overflowWrap: "anywhere" }}>{[item.brand, item.variant].filter(Boolean).join(" · ")}</div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 4 }}>
             <Pill color={INK}>{item.category}</Pill>
             {!purchased && <Pill color={PRIORITY_COLOR[item.priority] || MUTED}>{item.priority}</Pill>}
@@ -189,6 +240,13 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
                 aria-label={purchased ? "המבצע ברכישה הזו" : "המבצע האחרון שראינו במוצר הזה"}
                 style={{ display: "inline-flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: AMBER, cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit" }}>
                 <Tag size={13} /> מבצע
+              </button>
+            )}
+            {history && (
+              <button type="button" onClick={() => setShowCard(true)}
+                aria-label={`כרטיס מוצר והיסטוריית מחיר של ${item.name}`}
+                style={{ display: "inline-flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: MUTED, cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit" }}>
+                <History size={13} /> היסטוריית מחיר
               </button>
             )}
           </div>
@@ -221,6 +279,10 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <LabeledInput label="מותג (אופציונלי)" text value={item.brand || ""} onBlur={v => onUpdate(item.id, { brand: v })} />
+            <LabeledInput label="גודל/וריאנט (אופציונלי)" text value={item.variant || ""} onBlur={v => onUpdate(item.id, { variant: v })} />
+          </div>
           <LabeledInput label="הערה" text value={item.note} onBlur={v => onUpdate(item.id, { note: v })} />
           {!confirmDel ? (
             <button onClick={() => setConfirmDel(true)} style={{ fontSize: 12, color: RUST, background: "none", border: "none", cursor: "pointer", textAlign: "right", padding: 0, fontFamily: "inherit" }}>
@@ -250,6 +312,7 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
           </span>
         </div>
       )}
+      {showCard && <ProductCard identity={item} history={history || []} onClose={() => setShowCard(false)} />}
     </div>
   );
 }
@@ -278,21 +341,29 @@ function QuickAdd({ items, onQuickAdd, onOpenForm }) {
   );
 }
 
-function FullAddForm({ dict, items, onAdd, onClose }) {
-  const [f, setF] = useState({ name: "", qty: "", category: "", priority: "רגיל", note: "" });
+function FullAddForm({ dict, items, known, onAdd, onClose }) {
+  const [f, setF] = useState({ name: "", qty: "", category: "", priority: "רגיל", note: "", brand: "", variant: "" });
   const detected = f.name.trim() ? detectCategory(f.name, dict) : "";
-  const duplicate = f.name.trim() ? findActiveDuplicate(items, f.name) : null;
+  const duplicate = f.name.trim() ? findActiveDuplicate(items, f.name, { brand: f.brand, variant: f.variant }) : null;
+  // הצעות שם (פריטים ידועים, לא רשימה סגורה - אפשר תמיד להקליד שם חדש שלא ברשימה).
+  const nameOptions = [...new Set((known || []).map(p => p.name))];
   const submit = () => {
     if (!f.name.trim() || duplicate) return;
-    onAdd({ name: f.name, qty: toN(f.qty) || null, category: f.category || undefined, priority: f.priority, note: f.note });
+    onAdd({ name: f.name, qty: toN(f.qty) || null, category: f.category || undefined, priority: f.priority, note: f.note, brand: f.brand, variant: f.variant });
     onClose();
   };
   return (
     <div style={{ ...cardStyle, padding: 14 }}>
       <div style={{ display: "grid", gap: 8 }}>
-        <input className="hq-field" placeholder="שם פריט" value={f.name} onChange={e => setF(s => ({ ...s, name: e.target.value }))} style={inputStyle} />
-        {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>"{duplicate.name}" כבר קיים ברשימה - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
+        <input className="hq-field" list="household-known-product-names" placeholder="שם פריט" value={f.name} onChange={e => setF(s => ({ ...s, name: e.target.value }))} style={inputStyle} />
+        <datalist id="household-known-product-names">{nameOptions.map(n => <option key={n} value={n} />)}</datalist>
+        {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>"{duplicate.name}" כבר קיים ברשימה (אותו שם, מותג וגודל) - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
         <input className="hq-field" placeholder="כמות" value={f.qty} onChange={e => setF(s => ({ ...s, qty: e.target.value }))} style={inputStyle} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <input className="hq-field" placeholder="מותג (אופציונלי)" value={f.brand} onChange={e => setF(s => ({ ...s, brand: e.target.value }))} style={{ ...inputStyle, flex: 1 }} />
+          <input className="hq-field" placeholder="גודל/וריאנט (אופציונלי)" value={f.variant} onChange={e => setF(s => ({ ...s, variant: e.target.value }))} style={{ ...inputStyle, flex: 1 }} />
+        </div>
+        <p style={{ fontSize: 11, color: MUTED, margin: 0, lineHeight: 1.5 }}>מותג/גודל עוזרים להשוות מחיר נכון בין רכישות אמיתיות של אותו מוצר, במקום לערבב מוצרים שונים עם שם דומה (למשל "מגבונים" ממותגים שונים).</p>
         <div>
           <div style={{ fontSize: 11, color: MUTED, marginBottom: 3 }}>קטגוריה {f.category ? "" : detected && `(זוהה אוטומטית: ${detected})`}</div>
           <select value={f.category} onChange={e => setF(s => ({ ...s, category: e.target.value }))} className="hq-field" style={{ ...inputStyle, width: "100%" }}>
@@ -350,7 +421,7 @@ function ShoppingList({ g, setGrocery }) {
       </div>
 
       <QuickAdd items={g.items} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
-      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
+      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} known={knownProducts(g)} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
       <datalist id="household-known-stores">{knownStores(g).map(s => <option key={s} value={s} />)}</datalist>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
@@ -370,7 +441,7 @@ function ShoppingList({ g, setGrocery }) {
           <div key={category} style={{ marginBottom: 4 }}>
             <Sec title={category} />
             <div style={cardStyle}>
-              {items.map(item => <ItemRow key={item.id} item={item} purchased={false} onUpdate={onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} lastPromo={lastPromoForProduct(g.history, item.name)} />)}
+              {items.map(item => <ItemRow key={item.id} item={item} purchased={false} onUpdate={onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} lastPromo={lastPromoForProduct(g.history, item)} history={g.history} />)}
             </div>
           </div>
         ))
@@ -380,7 +451,7 @@ function ShoppingList({ g, setGrocery }) {
           {entries.map(item => (
             <ItemRow key={`${item.purchased ? "h" : "i"}-${item.id}`} item={item} purchased={item.purchased}
               onUpdate={item.purchased ? onUpdatePurchased : onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore}
-              lastPromo={item.purchased ? null : lastPromoForProduct(g.history, item.name)} />
+              lastPromo={item.purchased ? null : lastPromoForProduct(g.history, item)} history={g.history} />
           ))}
         </div>
       )}
@@ -425,7 +496,7 @@ function Savings({ g, setGrocery }) {
       <div style={cardStyle}>
         {repProducts.length === 0 && <div style={{ padding: "4px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — עדיין אין מוצר שנרכש ביותר מחודש אחד.</div>}
         {repProducts.map(r => (
-          <div key={r.name} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
+          <div key={r.key} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
             <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{r.name}</span><span style={{ color: MUTED, flexShrink: 0 }}>{r.count} חודשים</span>
           </div>
         ))}
@@ -467,6 +538,12 @@ function AdHocRow({ row, onChange, onRemove, linkOptions }) {
         <input className="hq-field" placeholder="כמות" value={row.qty} onChange={e => onChange({ ...row, qty: e.target.value })} style={{ ...inputStyle, minWidth: 0 }} />
         <button type="button" aria-label="הסרת שורה" onClick={onRemove} style={{ border: "none", background: "transparent", color: MUTED, cursor: "pointer", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><X size={15} /></button>
       </div>
+      {!row.linkedId && (
+        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+          <input className="hq-field" placeholder="מותג (אופציונלי)" value={row.brand || ""} onChange={e => onChange({ ...row, brand: e.target.value })} style={{ ...inputStyle, minWidth: 0, flex: 1, fontSize: 12 }} />
+          <input className="hq-field" placeholder="גודל/וריאנט (אופציונלי)" value={row.variant || ""} onChange={e => onChange({ ...row, variant: e.target.value })} style={{ ...inputStyle, minWidth: 0, flex: 1, fontSize: 12 }} />
+        </div>
+      )}
       {/* מבצע: תמיד ניתן לעריכה ידנית, לא רק כשהסריקה זיהתה - דווח שהזיהוי האוטומטי לא תמיד תופס מבצע אמיתי על הקבלה. */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
         <Tag size={12} color={AMBER} style={{ flexShrink: 0 }} />
@@ -659,7 +736,7 @@ function ReceiptForm({ g, setGrocery }) {
       const entry = { price: toN(r.price) || null, qty: toN(r.qty) || null, promo: r.promo || null };
       if (r.linkedId && activeIds.has(r.linkedId)) listItems.push({ id: r.linkedId, ...entry });
       else if (r.linkedId && historyIds.has(r.linkedId)) historyUpdates.push({ id: r.linkedId, ...entry });
-      else if (r.name.trim()) adHocItems.push({ name: r.name, ...entry });
+      else if (r.name.trim()) adHocItems.push({ name: r.name, brand: r.brand || "", variant: r.variant || "", ...entry });
     }
     if (!store.trim()) { setError("בחרו או הזינו שם חנות."); return; }
     if (listItems.length === 0 && adHocItems.length === 0 && historyUpdates.length === 0) { setError("בחרו לפחות פריט אחד מהרשימה, או הוסיפו שורה ידנית."); return; }
@@ -707,11 +784,17 @@ function ReceiptForm({ g, setGrocery }) {
           <p style={{ fontSize: 12, color: MUTED, margin: "0 0 10px" }}>הסריקה מצאה דמיון בין מה שבקבלה למה שברשימה, אבל זה לא תמיד אותו מוצר באמת - למשל "פיצה" ברשימה מול "חטיפי פיצה גבינה" בקבלה. אשרו רק אם זה באמת אותו דבר.</p>
           {pendingMatches.map(p => {
             const fromList = g.items.some(i => i.id === p.suggested.id);
+            const mismatch = identityMismatchWarning(p.suggested, p.scanned.name);
             return (
               <div key={p.id} style={{ borderBottom: `1px solid ${LINE}`, padding: "8px 0" }}>
                 <div style={{ fontSize: 13, overflowWrap: "anywhere" }}>
-                  בקבלה: <strong>{p.scanned.name}</strong> ({ils(p.scanned.price)}) — זה <strong>{p.suggested.name}</strong> {fromList ? "מהרשימה" : "שכבר סומן כנרכש"}?
+                  בקבלה: <strong>{p.scanned.name}</strong> ({ils(p.scanned.price)}) — זה <strong>{productDisplayName(p.suggested)}</strong> {fromList ? "מהרשימה" : "שכבר סומן כנרכש"}?
                 </div>
+                {mismatch && (
+                  <div style={{ fontSize: 12, color: RUST, marginTop: 4, lineHeight: 1.5 }}>
+                    ⚠ הפריט ברשימה מוגדר כ-{[p.suggested.brand, p.suggested.variant].filter(Boolean).join(" · ")}, אבל השם שנסרק מהקבלה לא מזכיר זאת - ייתכן שזה מותג/גודל אחר. בדקו לפני אישור.
+                  </div>
+                )}
                 {/* מבצע: ניתן לעריכה ידנית גם כאן, לפני האישור - אם הסריקה לא זיהתה מבצע על הפריט הזה. */}
                 <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6 }}>
                   <Tag size={12} color={AMBER} style={{ flexShrink: 0 }} />
@@ -734,7 +817,7 @@ function ReceiptForm({ g, setGrocery }) {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: GREEN }}>אושרו ({resolvedMatches.length})</div>
           {resolvedMatches.map(p => (
             <div key={p.id} style={{ fontSize: 13, padding: "4px 0", overflowWrap: "anywhere" }}>
-              ✓ {p.scanned.name} ({ils(p.scanned.price)}) → {p.suggested.name}
+              ✓ {p.scanned.name} ({ils(p.scanned.price)}) → {productDisplayName(p.suggested)}
             </div>
           ))}
         </div>
@@ -838,7 +921,7 @@ function ByStore({ g }) {
   const products = mostPurchasedProducts(g.history);
   const cats = mostPurchasedCategories(g.history);
   const cheapest = cheapestStoreSeen(g.history);
-  const cheapestByName = new Map(cheapest.map(c => [c.name.toLowerCase(), c]));
+  const cheapestByKey = new Map(cheapest.map(c => [c.key, c]));
 
   return (
     <div>
@@ -849,11 +932,11 @@ function ByStore({ g }) {
       <div style={cardStyle}>
         {monthly.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — עדיין אין רכישות מתועדות החודש.</div>}
         {monthly.map(p => {
-          const cheapestForProduct = cheapestByName.get(p.name.toLowerCase());
+          const cheapestForProduct = cheapestByKey.get(p.key);
           return (
-            <div key={p.name} style={{ padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
+            <div key={p.key} style={{ padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.name}</span>
+                <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.name}{p.generic && <span style={{ color: MUTED }}> (כללי)</span>}</span>
                 <span style={{ color: MUTED, flexShrink: 0 }}>{p.count} פעמים{p.pricedCount > 0 ? ` · ${ils(p.total)}` : ""}</span>
               </div>
               {cheapestForProduct && (
@@ -883,7 +966,7 @@ function ByStore({ g }) {
         {products.byFrequency.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA}</div>}
         {products.byFrequency.slice(0, 8).map(p => (
           <div key={p.key} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
-            <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.key}</span><span style={{ color: MUTED, flexShrink: 0 }}>{p.count} פעמים</span>
+            <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.name}</span><span style={{ color: MUTED, flexShrink: 0 }}>{p.count} פעמים</span>
           </div>
         ))}
       </div>
@@ -893,7 +976,7 @@ function ByStore({ g }) {
         {products.bySpend.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED }}>{INSUFFICIENT_DATA} — עדיין אין רכישות עם מחיר תקין.</div>}
         {products.bySpend.slice(0, 8).map(p => (
           <div key={p.key} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13, gap: 8 }}>
-            <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.key}</span><span style={{ color: MUTED, flexShrink: 0 }}>{ils(p.total)}</span>
+            <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{p.name}</span><span style={{ color: MUTED, flexShrink: 0 }}>{ils(p.total)}</span>
           </div>
         ))}
       </div>
@@ -912,9 +995,9 @@ function ByStore({ g }) {
       <div style={cardStyle}>
         {cheapest.length === 0 && <div style={{ padding: "6px 0", fontSize: 13, color: MUTED, lineHeight: 1.6 }}>{INSUFFICIENT_DATA} — נדרש מחיר לאותו מוצר מ-2 חנויות שונות לפחות כדי להשוות.</div>}
         {cheapest.slice(0, 10).map(f => (
-          <div key={f.name} style={{ padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
+          <div key={f.key} style={{ padding: "6px 0", borderBottom: `1px solid ${LINE}`, fontSize: 13 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{f.name}</span>
+              <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{f.name}{f.generic && <span style={{ color: MUTED }}> (השוואה כללית - בלי מותג/גודל ספציפי)</span>}</span>
               <span style={{ color: GREEN, flexShrink: 0 }}>{f.cheapestStore} · {ils(f.cheapestPrice)}</span>
             </div>
             <div style={{ color: MUTED, fontSize: 12, marginTop: 2 }}>
