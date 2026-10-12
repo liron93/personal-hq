@@ -6,7 +6,7 @@ import styles from "./career.module.css";
 import { useStore } from "@/lib/store";
 import { DEFAULT_PREFS, normalizePrefs } from "./practice-tracks";
 import { effectiveStatus, isActiveJob, statusForSave, withFlag } from "./job-status";
-import { buildActionQueue, queueReason } from "./job-queue";
+import { buildActionQueue, queueReason, statusBreakdown } from "./job-queue";
 import { PracticeHub, HistoryHub, InterviewHub, LearningHub, CommunicationsHub } from "./CareerExpansion";
 
 const STATUS = {
@@ -132,13 +132,18 @@ function QueueRow({ job, today, onOpen, onDone, onSnooze }) {
 function Today({ jobs, flags, onOpen, onNavigate, onSave }) {
   const day = today();
   const result = useMemo(() => buildActionQueue(jobs, flags, day), [jobs, flags, day]);
+  const breakdown = useMemo(() => statusBreakdown(jobs), [jobs]);
   const focus = result.queue[0];
+  // Issue #7 (P0, חלק ב'): "הפעולה הבאה" = עד 3 פעולות קונקרטיות, לא כל התור - דף הבית
+  // צריך לענות תוך 5 שניות, לא להציג רשימה ארוכה (בדיוק הבעיה שתור הפעולות עצמו תיקן).
+  const topQueue = result.queue.slice(0, 3);
+  const extraCount = result.queue.length - topQueue.length;
   const markDone = job => onSave({ ...job, next_action: "", next_action_at: "" }, job.id);
   const snoozeWeek = job => { const d = new Date(day); d.setDate(d.getDate() + 7); onSave({ ...job, next_action_at: d.toISOString().slice(0, 10) }, job.id); };
   return <div className={styles.stack}>
     <section className={styles.hero}>
       <span>מרכז הפיקוד של הקריירה</span>
-      <h2>{focus ? "יש פעולה אחת שכדאי לקדם עכשיו." : "אין לך פעולה דחופה כרגע."}</h2>
+      <h2>{focus ? (result.queue.length === 1 ? "יש פעולה אחת שכדאי לקדם עכשיו." : `יש ${topQueue.length}${extraCount > 0 ? "+" : ""} פעולות שכדאי לקדם עכשיו.`) : "אין לך פעולה דחופה כרגע."}</h2>
       <p>{focus ? focus.company_name + " · " + focus.role_title : "אפשר לעיין בכל המשרות הפעילות, או להוסיף מעקב חדש."}</p>
       {focus ? <button className={styles.primary} onClick={() => onOpen(focus)}>להמשיך במשרה</button> : <button className={styles.primary} onClick={() => onNavigate("jobs")}>למשרות הפעילות</button>}
     </section>
@@ -149,9 +154,20 @@ function Today({ jobs, flags, onOpen, onNavigate, onSave }) {
       <Metric label="ארכיון" value={result.archiveCount} />
     </section>
     <section className={styles.panel}>
+      <div className={styles.sectionTitle}><div><p>תמונת מצב</p><h3>מכל הזמנים</h3></div></div>
+      <section className={styles.kpis}>
+        <Metric label="הוגשו" value={breakdown.applied} />
+        <Metric label="בתהליך (ראיון/הצעה)" value={breakdown.inProcess} />
+        <Metric label="נדחו" value={breakdown.rejected} />
+      </section>
+    </section>
+    <section className={styles.panel}>
       <div className={styles.sectionTitle}><div><p>תור הפעולות</p><h3>מה דורש טיפול עכשיו או השבוע</h3></div><button className={styles.textButton} onClick={() => onNavigate("jobs")}>לכל המשרות ({result.activeCount} פעילות)</button></div>
-      {result.queue.length
-        ? result.queue.map(job => <QueueRow key={job.id} job={job} today={day} onOpen={onOpen} onDone={markDone} onSnooze={snoozeWeek} />)
+      {topQueue.length
+        ? <>
+            {topQueue.map(job => <QueueRow key={job.id} job={job} today={day} onOpen={onOpen} onDone={markDone} onSnooze={snoozeWeek} />)}
+            {extraCount > 0 && <p className={styles.muted}>ועוד {extraCount} פעולות בתור - לכל המשרות הפעילות למעלה.</p>}
+          </>
         : <Empty label="אין לך פעולה דחופה כרגע" action="למשרות הפעילות" onClick={() => onNavigate("jobs")} />}
     </section>
   </div>;

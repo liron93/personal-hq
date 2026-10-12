@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { queueReason, isQueueActionable, buildActionQueue } from "../companies/avoda/job-queue.mjs";
+import { queueReason, isQueueActionable, buildActionQueue, statusBreakdown } from "../companies/avoda/job-queue.mjs";
 
 const TODAY = "2026-10-05";
 const job = (over) => ({ id: "j1", company_name: "חברה", role_title: "תפקיד", status: "applied", next_action: "", next_action_at: "", ...over });
@@ -84,4 +84,21 @@ test("buildActionQueue: קלט ריק/חסר לא קורס", () => {
   assert.equal(result.activeCount, 0);
   const result2 = buildActionQueue(null, null, TODAY);
   assert.equal(result2.activeCount, 0);
+});
+
+test("statusBreakdown: הוגשו/בתהליך (ראיון+הצעה)/נדחו - מכל הזמנים, לא מושפע מ'לא רלוונטי' (withdrawn)", () => {
+  const jobs = [
+    job({ id: "a", status: "applied" }), job({ id: "b", status: "applied" }),
+    job({ id: "c", status: "interview" }), job({ id: "d", status: "offer" }),
+    job({ id: "e", status: "rejected" }),
+    job({ id: "f", status: "withdrawn" }), // "לא רלוונטי" או נסגרה - לא נספר בשום דלי
+    job({ id: "g", status: "considering" }), // לפני הגשה - לא נספר בשום דלי
+  ];
+  const b = statusBreakdown(jobs);
+  assert.deepEqual(b, { applied: 2, inProcess: 2, rejected: 1 });
+});
+
+test("statusBreakdown: קלט ריק/חסר לא קורס", () => {
+  assert.deepEqual(statusBreakdown([]), { applied: 0, inProcess: 0, rejected: 0 });
+  assert.deepEqual(statusBreakdown(null), { applied: 0, inProcess: 0, rejected: 0 });
 });
