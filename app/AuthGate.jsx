@@ -42,6 +42,10 @@ export default function AuthGate({ children }) {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  // null = עדיין לא ידוע (בודקים), true/false = תוצאה ממשית. דווח: "כל הזמן יש הודעה של
+  // passkey" - הכפתור "הוסף Passkey" הוצג תמיד, גם למי שכבר יש לו Passkey על החשבון (כולל
+  // מי שבדיוק נכנס באמצעותו!). עם hasPasskey - מוצג רק כש-אין אף Passkey רשום בפועל.
+  const [hasPasskey, setHasPasskey] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -60,6 +64,18 @@ export default function AuthGate({ children }) {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) { setHasPasskey(null); return; }
+    let active = true;
+    supabase.auth.passkey.list().then(({ data, error }) => {
+      if (!active) return;
+      // שגיאה - לא ידוע בוודאות אם יש Passkey, אז נשארים בהתנהגות הבטוחה הקודמת (מציגים
+      // את הכפתור) במקום להסתיר אותו בטעות ממי שבאמת צריך אותו.
+      setHasPasskey(error ? false : Array.isArray(data) && data.length > 0);
+    }).catch(() => { if (active) setHasPasskey(false); });
+    return () => { active = false; };
+  }, [user]);
 
   async function signInWithPasskey() {
     setBusy(true);
@@ -86,6 +102,7 @@ export default function AuthGate({ children }) {
     setMessage("");
     const { error } = await supabase.auth.registerPasskey();
     setMessage(error ? error.message : "ה־Passkey נוסף בהצלחה למכשיר הזה.");
+    if (!error) setHasPasskey(true); // מעלימים את הכפתור מיד, בלי לחכות לבדיקה נוספת
     setBusy(false);
   }
 
@@ -131,7 +148,9 @@ export default function AuthGate({ children }) {
     <>
       <div style={{ background: "#EEF4FF", borderBottom: "1px solid #C7D7FE", padding: "4px 16px", display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", justifyContent: "center", direction: "rtl", fontSize: 13 }}>
         <span>מחובר באופן מאובטח. הנתונים מסתנכרנים לחשבון שלך.</span>
-        <button onClick={registerPasskey} disabled={busy} style={{ border: 0, background: "transparent", color: "#1D4ED8", cursor: "pointer", fontWeight: 700, minHeight: 44, padding: "0 8px" }}>הוסף Passkey למכשיר הזה</button>
+        {hasPasskey === false && (
+          <button onClick={registerPasskey} disabled={busy} style={{ border: 0, background: "transparent", color: "#1D4ED8", cursor: "pointer", fontWeight: 700, minHeight: 44, padding: "0 8px" }}>הוסף Passkey למכשיר הזה</button>
+        )}
         <button onClick={signOut} style={{ border: 0, background: "transparent", color: "#475467", cursor: "pointer", minHeight: 44, padding: "0 8px" }}>יציאה</button>
       </div>
       {message && <div role="status" style={{ textAlign: "center", background: "#FFFAEB", padding: 8, color: "#7A5B00", direction: "rtl" }}>{message}</div>}
