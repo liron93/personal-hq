@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   inWindow, daysSinceLastWorkout, workoutWindowSummary, sessionSplit, muscleGroupVolume, untrainedGroups,
+  recentExerciseSignals, weeklyBrief,
 } from "../companies/health/coach.mjs";
 
 const TODAY = "2026-10-18";
@@ -117,4 +118,83 @@ test("קלט ריק/חסר לא קורס בשום פונקציה", () => {
   assert.equal(groups.length, 9);
   assert.equal(unmapped.length, 0);
   assert.deepEqual(untrainedGroups(null), []);
+});
+
+// ---------- recentExerciseSignals / weeklyBrief (כללי גל, שלב 2) ----------
+
+test("recentExerciseSignals: רק תרגילים עם >=2 ביצועים ב-28 הימים האחרונים (לא ביצוע בודד, לא מעבר לחלון)", () => {
+  const workouts = [
+    w({ id: "a", date: "2026-10-17", log: { exercises: [ex("Bench Press", [{ weight: 60, reps: 10 }])] } }),
+    w({ id: "b", date: "2026-10-10", log: { exercises: [ex("Bench Press", [{ weight: 55, reps: 10 }])] } }),
+    w({ id: "c", date: "2026-09-01", log: { exercises: [ex("Bench Press", [{ weight: 50, reps: 10 }])] } }), // מעבר ל-28 יום - לא נספר
+    w({ id: "d", date: "2026-10-16", log: { exercises: [ex("Squat", [{ weight: 80, reps: 5 }])] } }), // ביצוע בודד - לא מספיק
+  ];
+  const signals = recentExerciseSignals(workouts, TODAY);
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].name, "Bench Press");
+  assert.equal(signals[0].sessions, 2);
+  assert.equal(signals[0].trend.kind, "up"); // 55 -> 60
+});
+
+test("weeklyBrief: אין שום אימון בכלל => CTA 'no_data', בלי תובנות/פעולה", () => {
+  const brief = weeklyBrief({ workouts: [] }, TODAY);
+  assert.equal(brief.cta.kind, "no_data");
+  assert.deepEqual(brief.insights, []);
+  assert.equal(brief.action, null);
+});
+
+test("weeklyBrief: מגבלה מתועדת בפרופיל => הפעולה היחידה היא הפניה לאיש מקצוע, גוברת על הכול", () => {
+  const data = {
+    profile: { sensitiveFlag: true, baseline: { weeklyWorkoutGoal: 1 } },
+    workouts: [w({ id: "a", date: "2026-10-17" })],
+  };
+  const brief = weeklyBrief(data, TODAY);
+  assert.equal(brief.action.kind, "safety");
+  assert.match(brief.action.text, /איש.*מקצוע/);
+});
+
+test("weeklyBrief: לא עמדו ביעד השבועי => הפעולה היא 'עוד X אימונים', לא פער כיסוי", () => {
+  const data = {
+    profile: { baseline: { weeklyWorkoutGoal: 3 } },
+    workouts: [w({ id: "a", date: "2026-10-17" })], // 1 מתוך 3 השבוע
+  };
+  const brief = weeklyBrief(data, TODAY);
+  assert.equal(brief.action.kind, "weekly_goal");
+  assert.match(brief.action.text, /עוד 2 אימונים/);
+});
+
+test("weeklyBrief: יעד שבועי הושג וחסר כיסוי לקבוצה => הפעולה היא פער הכיסוי", () => {
+  const data = {
+    profile: { baseline: { weeklyWorkoutGoal: 1 } },
+    workouts: [w({ id: "a", date: "2026-10-17", log: { exercises: [ex("Bench Press", [{ weight: 60, reps: 10 }])] } })],
+  };
+  const brief = weeklyBrief(data, TODAY);
+  assert.equal(brief.action.kind, "coverage_gap");
+  assert.match(brief.action.text, /לא תועדה ב-28 הימים האחרונים/);
+});
+
+test("weeklyBrief: הכול מכוסה, בלי מגמה יורדת => 'אין פעולה דחופה'", () => {
+  // שם אחד לכל קבוצת שריר (מילת מפתח תואמת ב-DEFAULT_MUSCLE_DICT) - כל התשע מכוסות.
+  const names = ["bench", "row", "shoulder", "curl", "tricep", "squat", "hamstring", "glute", "core"];
+  const log = { exercises: names.map(name => ex(name, [{ weight: 50, reps: 10 }])) };
+  const data = {
+    profile: { baseline: { weeklyWorkoutGoal: 1 } },
+    workouts: [w({ id: "a", date: "2026-10-17", log })],
+  };
+  const brief = weeklyBrief(data, TODAY);
+  assert.equal(brief.action.kind, "on_track");
+});
+
+test("weeklyBrief: תובנות נושאות מקור וחלון זמן; עד 3 בלבד", () => {
+  const data = {
+    workouts: [
+      w({ id: "a", date: "2026-10-17", log: { exercises: [ex("Bench Press", [{ weight: 65, reps: 10 }])] } }),
+      w({ id: "b", date: "2026-10-10", log: { exercises: [ex("Bench Press", [{ weight: 60, reps: 10 }])] } }),
+    ],
+  };
+  const brief = weeklyBrief(data, TODAY);
+  assert.ok(brief.insights.length > 0);
+  assert.equal(brief.insights[0].source, "Bench Press");
+  assert.equal(brief.insights[0].window, "28 יום אחרונים");
+  assert.ok(brief.insights.length <= 3);
 });

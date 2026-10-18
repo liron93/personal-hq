@@ -4,6 +4,7 @@ import { ChevronLeft, Dumbbell, Pencil } from "lucide-react";
 import { todayState, nextSession } from "../today.mjs";
 import { SHORT_ALTERNATIVE, formatLoads } from "../program.mjs";
 import { resolveProgram } from "../plan.mjs";
+import { weightGoalLine } from "./Coach";
 import css from "./health-v2.module.css";
 
 const fmt = value => new Date(value + "T12:00").toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" });
@@ -18,11 +19,13 @@ export function TodayScreen({ d, today, onStart, onResume, onLogShort, onOpenJou
   const [shortOpen, setShortOpen] = useState(false);
   const s = todayState(d, today);
   const recs = s.recommendations.map((text, i) => <p key={i} className={css.recommend}>{text}</p>);
+  // "מטרת השבוע" (יעד משקל) גם כאן, לא רק בפרופיל/התקדמות - כלל גל, שלב 2.
   const week = <div className={css.weekLine}><span>אימונים השבוע</span><strong>{s.weekDone}{s.goal ? " מתוך " + s.goal : ""}</strong></div>;
+  const weightLine = <p className={css.subtle}>{weightGoalLine(d, today)}</p>;
 
   if (s.status === "empty" && !d.liveWorkout) return <div className={css.stack}>
     <section className={css.actionHero}><p className={css.eyebrow}>{fmt(today)}</p><h2>אין עדיין תוכנית אימונים</h2><p>בנו או ייבאו תוכנית A/B/C, ואז המסך הזה יציג את האימון הבא בלחיצה אחת.</p><button className={css.heroCta} onClick={onBuildPlan}>בניית או ייבוא תוכנית<ChevronLeft size={20} /></button></section>
-    <section className={css.card}>{week}</section>
+    <section className={css.card}>{week}{weightLine}</section>
     {recs.length > 0 && <section className={css.card + " " + css.stack}>{recs}</section>}
   </div>;
 
@@ -55,7 +58,7 @@ export function TodayScreen({ d, today, onStart, onResume, onLogShort, onOpenJou
         <button className={css.secondary} onClick={onLogShort}>סיימתי, לרשום אימון קצר</button>
       </>}
     </section>}
-    <section className={css.card}>{week}</section>
+    <section className={css.card}>{week}{weightLine}</section>
     {recs.length > 0 && <section className={css.card + " " + css.stack}>{recs}</section>}
   </div>;
 }
