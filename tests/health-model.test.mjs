@@ -18,7 +18,13 @@ test("importHevyWorkouts: מוסיף אימונים חדשים עם log.exercise
   assert.ok(entry.id);
   assert.equal(entry.log.exercises.length, 1);
   assert.equal(entry.log.exercises[0].name, "לחיצת חזה");
-  assert.deepEqual(entry.log.exercises[0].sets, [{ weight: 60, reps: 10 }]);
+  assert.deepEqual(entry.log.exercises[0].sets, [{ weight: 60, reps: 10, type: "normal" }]);
+});
+
+test("importHevyWorkouts: type של סט (warmup/וכו') עובר כפי שהוא, לא נדרס ל-normal", () => {
+  const withType = { hevySourceId: "w2", title: "אימון", date: "2026-10-01", exercises: [{ name: "סקוואט", sets: [{ reps: 5, weightKg: 20, type: "warmup" }] }] };
+  const { state } = importHevyWorkouts(INIT, [withType]);
+  assert.equal(state.workouts[0].log.exercises[0].sets[0].type, "warmup");
 });
 
 test("importHevyWorkouts: דווח שהייבוא 'הגיע לעמוד ריק' - אימון מיובא חייב להופיע ב-historyList (התקדמות), לא רק להישמר", () => {
