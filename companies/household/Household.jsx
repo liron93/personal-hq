@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag, Ticket, Eye, EyeOff, History } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
+import { ShoppingBasket, ChevronDown, Plus, Receipt, Store, X, ScanLine, Tag, Ticket, Eye, EyeOff, History, RefreshCw } from "lucide-react"; // RotateCcw הוסר - הצ'קבוקס מבטל סימון כשמסירים ✓
 import { INK, BG, GREEN, RUST, AMBER, MUTED, LINE, cardStyle, inputStyle, tabBtn } from "@/lib/theme";
 import { apiFetch, apiErrorMessage } from "@/lib/api-client.mjs";
 import { toN } from "@/lib/format";
@@ -1150,7 +1150,7 @@ function Vouchers({ g, setGrocery }) {
 }
 
 export default function Household() {
-  const { data: d, setData: setD, ready } = useStore(STORE_KEY, INIT);
+  const { data: d, setData: setD, ready, reload, status } = useStore(STORE_KEY, INIT);
   const [sub, setSub] = useState("list"); // list | receipt | byStore | savings | vouchers
 
   // תאימות אחורה: משלים שדות חסרים בנתונים ישנים בלי לדרוס שום דבר קיים.
@@ -1162,16 +1162,24 @@ export default function Household() {
 
   if (!ready || !d) return <p style={{ fontSize: 14, color: MUTED }}>טוען…</p>;
   const g = ensureHousehold(d);
+  const refreshing = status === "loading";
 
   return (
     <div style={{ minWidth: 0 }}>
       <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, קבלות עם חנות ותמונה, היסטוריית הזמנות, ניתוח חיסכון, ושוברים — v1: סופר בלבד (מלבד שוברים, שלא קשורים דווקא לסופר).</p>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={() => setSub("list")} style={tabBtn(sub === "list")}><ShoppingBasket size={13} style={{ marginLeft: 5 }} />רשימת קניות</button>
         <button onClick={() => setSub("receipt")} style={tabBtn(sub === "receipt")}><Receipt size={13} style={{ marginLeft: 5 }} />קבלה</button>
         <button onClick={() => setSub("byStore")} style={tabBtn(sub === "byStore")}><Store size={13} style={{ marginLeft: 5 }} />היסטוריית הזמנות</button>
         <button onClick={() => setSub("savings")} style={tabBtn(sub === "savings")}>חיסכון</button>
         <button onClick={() => setSub("vouchers")} style={tabBtn(sub === "vouchers")}><Ticket size={13} style={{ marginLeft: 5 }} />שוברים</button>
+        {/* דווח: לירון באמצע קניות, ליאור מוסיפה פריט לרשימה המשותפת - לא רואה את זה בלי
+            לרענן את הדף. useStore כבר חושף reload() (היה קיים, לא היה מחובר לאף כפתור) -
+            טוען מחדש מה-ענן בלי לרפרש את כל האתר. */}
+        <button onClick={reload} disabled={refreshing} aria-label="רענון הרשימה מהענן" title="רענון - לראות עדכונים ששותף/ה אחר/ת הוסיפ/ה"
+          style={{ ...tabBtn(false), marginInlineStart: "auto", display: "flex", alignItems: "center", gap: 5, cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}>
+          <RefreshCw size={13} />{refreshing ? "מרענן…" : "רענון"}
+        </button>
       </div>
       {sub === "list" && <ShoppingList g={g} setGrocery={setD} />}
       {sub === "receipt" && <ReceiptForm g={g} setGrocery={setD} />}
