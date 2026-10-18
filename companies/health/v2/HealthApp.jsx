@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, MoreHorizontal, Pencil, Settings, Trash2, TrendingUp, X } from "lucide-react";
+import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, MoreHorizontal, Pencil, Settings, Sparkles, Trash2, TrendingUp, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, uid } from "../model";
 import { resolveProgram, normalizeProgram, applyLoads } from "../plan.mjs";
@@ -14,6 +14,7 @@ import PlanEditor from "./PlanEditor";
 import GoalsView from "./GoalsView";
 import PlanBuilder from "./PlanBuilder";
 import HevyConnect from "./HevyConnect";
+import Coach from "./Coach";
 import css from "./health-v2.module.css";
 
 const NAV = [
@@ -21,6 +22,7 @@ const NAV = [
   ["workout", "אימון", Dumbbell],
   ["nutrition", "תזונה", Apple],
   ["progress", "התקדמות", TrendingUp],
+  ["coach", "מאמן", Sparkles],
   ["more", "עוד", MoreHorizontal],
 ];
 const localISO = () => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
@@ -115,6 +117,6 @@ export default function HealthApp() {
  const live=liveOpen&&d.liveWorkout?<LiveWorkout key={d.liveWorkout.id} initial={d.liveWorkout} today={today} onCommit={l=>setD(p=>({...p,liveWorkout:l}))} onFinish={finishLive} onLeave={leaveLive} exitReq={exitReq} onRequestExit={t=>setExitReq({tab:t})} onDismissExit={()=>setExitReq(null)} onUpdatePlan={updatePlan}/>:null;
  const build=()=>{setComposer(null);setTab("workout");setPlanView("builder");};
  const workoutTab=<><WorkoutTab d={d} onStart={startSession} onResume={()=>setLiveOpen(true)} onEditPlan={()=>setPlanView("editor")} onBuildPlan={()=>setPlanView("builder")}/><Journal d={d} setD={setD} setComposer={setComposer} remove={remove} mode="move"/></>;
- const content=hevyOpen?<HevyConnect d={d} setD={setD} onClose={()=>setHevyOpen(false)} onImported={()=>{setHevyOpen(false);setTab("progress");}}/>:composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:live?live:planView==="builder"?<PlanBuilder hasExisting={!program.empty} onLoad={loadPlan} onManual={()=>setPlanView("editor")} onClose={()=>setPlanView(null)}/>:planView==="editor"?<PlanEditor program={program} onSave={savePlan} onClose={()=>setPlanView(null)}/>:tab==="today"?<TodayScreen d={d} today={today} onStart={startSession} onResume={()=>setLiveOpen(true)} onLogShort={logShort} onOpenJournal={()=>navigate("workout")} onBuildPlan={build}/>:tab==="workout"?workoutTab:tab==="nutrition"?<NutritionTab d={d} today={today}><Journal d={d} setD={setD} setComposer={setComposer} remove={remove} mode="food"/></NutritionTab>:tab==="progress"?<GoalsView d={d} setD={setD} today={today} uid={uid}/>:<SettingsView d={d} setD={setD} editProfile={editProfile} openHevy={()=>setHevyOpen(true)}/>;
+ const content=hevyOpen?<HevyConnect d={d} setD={setD} onClose={()=>setHevyOpen(false)} onImported={()=>{setHevyOpen(false);setTab("progress");}}/>:composer?<Composer kind={composer} onClose={()=>setComposer(null)} d={d} setD={setD} onSaved={notify}/>:live?live:planView==="builder"?<PlanBuilder hasExisting={!program.empty} onLoad={loadPlan} onManual={()=>setPlanView("editor")} onClose={()=>setPlanView(null)}/>:planView==="editor"?<PlanEditor program={program} onSave={savePlan} onClose={()=>setPlanView(null)}/>:tab==="today"?<TodayScreen d={d} today={today} onStart={startSession} onResume={()=>setLiveOpen(true)} onLogShort={logShort} onOpenJournal={()=>navigate("workout")} onBuildPlan={build}/>:tab==="workout"?workoutTab:tab==="nutrition"?<NutritionTab d={d} today={today}><Journal d={d} setD={setD} setComposer={setComposer} remove={remove} mode="food"/></NutritionTab>:tab==="progress"?<GoalsView d={d} setD={setD} today={today} uid={uid}/>:tab==="coach"?<Coach d={d} today={today}/>:<SettingsView d={d} setD={setD} editProfile={editProfile} openHevy={()=>setHevyOpen(true)}/>;
  return <div className={css.shell}><Header/><Nav tab={tab} onNavigate={navigate}/><main className={css.content}>{content}</main>{toast&&<div className={css.toast} role="status"><span>{toast}</span>{deleted&&<button onClick={undo}>ביטול</button>}</div>}</div>;
 }
