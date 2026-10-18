@@ -17,7 +17,7 @@ import {
   monthlyProductBreakdown, nowMonth,
   productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning,
 } from "./grocery-model";
-import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers } from "./vouchers-model";
+import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers, totalRemaining } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
 // אין fallback ל-base64, ו"לא מופעל" הוא ההתנהגות הצפויה כל עוד Storage לא הופעל בפרודקשן.
 // ייבוא חוצה-חברות מקובל כאן כי זה widget UI גנרי, לא לוגיקת דומיין; הזזה ל-lib/ תיעשה בנפרד בעתיד.
@@ -1112,6 +1112,15 @@ function Vouchers({ g, setGrocery }) {
     <div>
       <h3 style={{ margin: "0 0 4px", fontSize: 18 }}>שוברים</h3>
       <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>שוברים וכרטיסי מתנה - כמה נשאר בכל אחד, בלי לחשב ידנית.</p>
+
+      {/* סה"כ יתרה בכל השוברים הפעילים (לא נוצלו במלואם) - totalRemaining כבר היה קיים
+          ב-vouchers-model.js (לשימוש עתידי) ולא היה מחובר לשום תצוגה. דווח: Liron רוצה
+          לראות את הסכום הכולל שיש לו כרגע, בלי לסכום ידנית שובר-שובר. */}
+      {vouchers.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <Metric label="סה״כ יתרה בכל השוברים" value={ils(totalRemaining(vouchers))} color={GREEN} />
+        </div>
+      )}
 
       <div style={{ ...cardStyle, padding: 14, marginBottom: 14, display: "grid", gap: 8 }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 8 }}>
