@@ -43,7 +43,9 @@ export function importHevyWorkouts(state, hevyWorkouts) {
       startedAt: null, finishedAt: null,
       exercises: (Array.isArray(w.exercises) ? w.exercises : []).map(ex => ({
         name: ex.name, status: "done",
-        sets: (Array.isArray(ex.sets) ? ex.sets : []).map(s => ({ weight: s.weightKg ?? null, reps: s.reps ?? null })),
+        // type ("normal"/"warmup"/וכו', ראה lib/hevy-service.mjs) מועבר כפי שהוא - נדרש
+        // כדי שהתקדמות תרגיל (history.mjs) תוכל להחריג חימום מהשוואה (גל, P1).
+        sets: (Array.isArray(ex.sets) ? ex.sets : []).map(s => ({ weight: s.weightKg ?? null, reps: s.reps ?? null, type: s.type || "normal" })),
       })),
     },
   }));

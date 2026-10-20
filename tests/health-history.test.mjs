@@ -69,3 +69,41 @@ test("historyList is sorted by latest date", () => {
   assert.equal(list.length, 3);
   assert.equal(list[0].last.date, "2026-09-15");
 });
+
+// ---------- גל (P1, ביקורת שחרור): חימום אינו סט עבודה; השוואה רק בטווח חזרות תואם ----------
+
+test("warm-up sets (type != 'normal') never count toward best or trend", () => {
+  const w = [
+    wk("2026-09-01", [{ name: "סקוואט", status: "pending", sets: [{ weight: 20, reps: 5, type: "warmup" }, { weight: 60, reps: 5, type: "normal" }] }]),
+    wk("2026-09-08", [{ name: "סקוואט", status: "pending", sets: [{ weight: 15, reps: 5, type: "warmup" }, { weight: 65, reps: 5, type: "normal" }] }]),
+  ];
+  const h = exerciseHistory(w).get("סקוואט");
+  const s = summarizeExercise(h);
+  assert.equal(s.best.weight, 65); // לא 20/15 (חימום) ולא מתערבב
+  assert.deepEqual(s.trend, { kind: "up", delta: 5, sessions: 2 }); // 65-60, לא 15-20
+});
+
+test("sets without type (old data / manual live workouts) are treated as work sets - no regression", () => {
+  // S() הקיים לא מגדיר type בכלל - בדיוק כמו סט שנרשם ידנית ב-live.mjs.
+  const w = [wk("2026-09-01", [ex("משהו", [S(40, 10)])]), wk("2026-09-08", [ex("משהו", [S(45, 10)])])];
+  const s = summarizeExercise(exerciseHistory(w).get("משהו"));
+  assert.equal(s.trend.kind, "up");
+  assert.equal(s.best.weight, 45);
+});
+
+test("no matching rep range between the oldest and newest session in the window => not_comparable, not a guessed trend", () => {
+  const w = [
+    wk("2026-09-01", [{ name: "לחיצת חזה", status: "pending", sets: [{ weight: 80, reps: 3, type: "normal" }] }]), // כוח מקסימלי, 3 חזרות
+    wk("2026-09-08", [{ name: "לחיצת חזה", status: "pending", sets: [{ weight: 30, reps: 15, type: "normal" }] }]), // סבולת, 15 חזרות - אין קשר
+  ];
+  const s = summarizeExercise(exerciseHistory(w).get("לחיצת חזה"));
+  assert.equal(s.trend.kind, "not_comparable");
+  assert.equal(s.trend.delta, undefined);
+});
+
+test("rep tolerance: within 2 reps counts as comparable, beyond that does not", () => {
+  const close = exerciseHistory([wk("2026-09-01", [ex("a", [S(50, 10)])]), wk("2026-09-08", [ex("a", [S(55, 12)])])]).get("a");
+  assert.equal(summarizeExercise(close).trend.kind, "up"); // |12-10|=2, בטווח
+  const far = exerciseHistory([wk("2026-09-01", [ex("b", [S(50, 10)])]), wk("2026-09-08", [ex("b", [S(55, 13)])])]).get("b");
+  assert.equal(summarizeExercise(far).trend.kind, "not_comparable"); // |13-10|=3, מעבר לטווח
+});

@@ -35,15 +35,29 @@ test("testConnection: 429 -> rate_limited, 5xx -> unavailable, רשת נכשלת
 });
 
 test("fetchWorkouts: מדפדף עד page_count, ממפה רק שדות בטוחים (לא מעתיק routine_id/notes גולמיים)", async () => {
-  const page1 = { page: 1, page_count: 2, workouts: [{ id: "w1", title: "בוקר", start_time: "2026-09-01T08:00:00Z", exercises: [{ title: "לחיצת חזה", sets: [{ reps: 10, weight_kg: 60 }] }] }] };
+  const page1 = { page: 1, page_count: 2, workouts: [{ id: "w1", title: "בוקר", start_time: "2026-09-01T08:00:00Z", exercises: [{ title: "לחיצת חזה", sets: [{ reps: 10, weight_kg: 60, type: "normal" }] }] }] };
   const page2 = { page: 2, page_count: 2, workouts: [{ id: "w2", title: "ערב", start_time: "2026-09-03T18:00:00Z", exercises: [] }] };
   let calls = 0;
   const service = createHevyService({ fetcher: async url => { calls += 1; const u = new URL(url); return Response.json(u.searchParams.get("page") === "1" ? page1 : page2); } });
   const workouts = await service.fetchWorkouts(FAKE_KEY);
   assert.equal(calls, 2);
   assert.deepEqual(workouts, [
-    { hevySourceId: "w1", title: "בוקר", date: "2026-09-01", exercises: [{ name: "לחיצת חזה", sets: [{ reps: 10, weightKg: 60 }] }] },
+    { hevySourceId: "w1", title: "בוקר", date: "2026-09-01", exercises: [{ name: "לחיצת חזה", sets: [{ reps: 10, weightKg: 60, type: "normal" }] }] },
     { hevySourceId: "w2", title: "ערב", date: "2026-09-03", exercises: [] },
+  ]);
+});
+
+test("fetchWorkouts: type של סט מועבר כפי שהוא (warmup/failure/וכו') - נדרש כדי להחריג חימום מהתקדמות (גל, P1); ברירת מחדל 'normal' כש-חסר/לא תקין", async () => {
+  const page = { page: 1, page_count: 1, workouts: [{
+    id: "w1", title: "אימון", start_time: "2026-09-01T08:00:00Z",
+    exercises: [{ title: "סקוואט", sets: [{ reps: 5, weight_kg: 20, type: "warmup" }, { reps: 5, weight_kg: 100 }, { reps: 5, weight_kg: 90, type: 123 }] }],
+  }] };
+  const service = createHevyService({ fetcher: async () => Response.json(page) });
+  const workouts = await service.fetchWorkouts(FAKE_KEY);
+  assert.deepEqual(workouts[0].exercises[0].sets, [
+    { reps: 5, weightKg: 20, type: "warmup" },
+    { reps: 5, weightKg: 100, type: "normal" }, // חסר - ברירת מחדל normal
+    { reps: 5, weightKg: 90, type: "normal" }, // לא תקין (מספר, לא מחרוזת) - ברירת מחדל normal
   ]);
 });
 
