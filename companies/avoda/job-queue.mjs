@@ -62,3 +62,20 @@ export function buildActionQueue(jobs, flags, today) {
   const archiveCount = list.filter(job => CLOSED_STATUSES.includes(job?.status)).length;
   return { queue, dueToday, dueThisWeek, awaitingReplyCount, archiveCount, activeCount: active.length };
 }
+
+/**
+ * תמונת מצב למסך הבית (Issue #7, P0 חלק ב' - "הוגשו/בתהליך/נדחו"): מונים לפי status
+ * האמיתי ב-DB, מכל הזמנים (לא מסוננים ל"פעיל השבוע" כמו buildActionQueue - זה מדד פייפליין
+ * כללי, לא תור פעולות). לא מושפע מהדגל "לא רלוונטי" המקומי בכוונה - "לא רלוונטי" נשמר
+ * ב-DB כ-withdrawn (ראה job-status.js), אז הוא כבר לא נספר כ-applied/interview/offer/
+ * rejected ממילא.
+ */
+export function statusBreakdown(jobs) {
+  const list = jobs || [];
+  const count = status => list.filter(job => job?.status === status).length;
+  return {
+    applied: count("applied"),
+    inProcess: count("interview") + count("offer"),
+    rejected: count("rejected"),
+  };
+}
