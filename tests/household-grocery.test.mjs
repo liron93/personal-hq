@@ -90,6 +90,17 @@ test("findReceiptMatch: מוצרים שונים לגמרי לא מתאימים, 
   assert.equal(findReceiptMatch(null, "עגבניות"), null);
 });
 
+test("findReceiptMatch: יחיד/רבים בעברית מוצעים כהתאמה בסריקת קבלה", () => {
+  let state = quickAddItem(createGroceryState(), "מלפפונים");
+  state = quickAddItem(state, "ביצה");
+  state = quickAddItem(state, "עגבנייה שרי");
+  assert.equal(findReceiptMatch(state.items, "מלפפון").name, "מלפפונים");
+  assert.equal(findReceiptMatch(state.items, "ביצים").name, "ביצה");
+  assert.equal(findReceiptMatch(state.items, "עגבניות שרי").name, "עגבנייה שרי");
+  // זו התאמת קבלה בלבד, לא מיזוג שקט של מוצרים בהיסטוריה.
+  assert.notEqual(productKey({ name: "מלפפון" }), productKey({ name: "מלפפונים" }));
+});
+
 test("addItem: טופס מלא עם קטגוריה ידנית מבטל את הדגל האוטומטי", () => {
   const s0 = createGroceryState();
   const s1 = addItem(s0, { name: "משהו", category: "ניקיון", qty: 2, unit: "יח׳", priority: "דחוף", note: "לבדוק מבצע" });
