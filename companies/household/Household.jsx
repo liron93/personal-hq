@@ -654,7 +654,16 @@ function ReceiptForm({ g, setGrocery }) {
   const [scanInfo, setScanInfo] = useState(""); // משוב הצלחה - בלי זה סריקה שמצאה פריטים הייתה "שקטה" לגמרי (באג שדווח: "לא עובד, אין הודעת שגיאה" - בפועל כן עבד, רק בלי משוב)
   const scanInputRef = useRef(null);
 
-  const toggleItem = id => setPrices(prev => { const next = { ...prev }; if (id in next) delete next[id]; else next[id] = ""; return next; });
+  const toggleItem = id => {
+    const wasSelected = id in prices;
+    setPrices(prev => { const next = { ...prev }; if (wasSelected) delete next[id]; else next[id] = ""; return next; });
+    setScanQtys(prev => {
+      const next = { ...prev };
+      if (wasSelected) delete next[id];
+      else if (next[id] == null) next[id] = 1;
+      return next;
+    });
+  };
   const reset = () => { tracker.settle(images, false); tracker.reset([]); setStore(""); setPrices({}); setScanPromos({}); setScanQtys({}); setIsOldReceipt(false); setPendingMatches([]); setResolvedMatches([]); setAdHoc([]); setImages([]); setSavedMsg(""); setScanError(""); setScanInfo(""); };
 
   // מחיל פריט שנסרק (מהקבלה) על פריט קיים ברשימה - מצטבר (לא דורס) כדי שאם כמה שורות
@@ -675,7 +684,7 @@ function ReceiptForm({ g, setGrocery }) {
     setAdHoc(prev => {
       const key = p.scanned.name.trim().toLowerCase();
       if (prev.some(r => r.name.trim().toLowerCase() === key)) return prev;
-      return [...prev, { name: p.scanned.name, price: String(p.scanned.price), qty: p.scanned.qty != null ? String(p.scanned.qty) : "", promo: p.scanned.promo || null }];
+      return [...prev, { name: p.scanned.name, price: String(p.scanned.price), qty: p.scanned.qty != null ? String(p.scanned.qty) : "1", promo: p.scanned.promo || null }];
     });
     setPendingMatches(prev => prev.filter(x => x.id !== p.id));
   };
@@ -725,7 +734,7 @@ function ReceiptForm({ g, setGrocery }) {
         setAdHoc(prev => {
           const existing = new Set(prev.map(r => r.name.trim().toLowerCase()));
           const toAdd = unmatchedItems.filter(item => !existing.has(item.name.trim().toLowerCase()));
-          return [...prev, ...toAdd.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "", promo: item.promo || null }))];
+          return [...prev, ...toAdd.map(item => ({ name: item.name, price: String(item.price), qty: item.qty != null ? String(item.qty) : "1", promo: item.promo || null }))];
         });
       }
       setScanInfo(isOldReceipt
@@ -778,9 +787,9 @@ function ReceiptForm({ g, setGrocery }) {
   // לשיוך ידני של שורת אד-הוק שהסריקה לא הצליחה לשייך לבד ("אין לי אופציה לשייך את המוצרים
   // שהוא לא זיהה") - אותם מועמדים בדיוק כמו matchPool בסריקה (unpricedHistory למעלה + g.items).
   const linkOptions = [
-    ...unpricedHistory.map(h => ({ id: h.id, label: `${h.name} (כבר סומן כנרכש)` })),
-    ...g.items.map(i => ({ id: i.id, label: i.name })),
-  ];
+    ...unpricedHistory.map(h => ({ id: h.id, label: `${h.name} (כבר סומן כנרכש)`, sortName: h.name })),
+    ...g.items.map(i => ({ id: i.id, label: i.name, sortName: i.name })),
+  ].sort((a, b) => a.sortName.localeCompare(b.sortName, "he"));
 
   return (
     <div>
@@ -879,7 +888,7 @@ function ReceiptForm({ g, setGrocery }) {
                       {checked && (
                         <>
                           <input className="hq-field" placeholder="מחיר ₪" value={prices[item.id]} onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 90, flexShrink: 0 }} />
-                          <input className="hq-field" placeholder="כמות" value={scanQtys[item.id] ?? ""} onChange={e => setScanQtys(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 64, flexShrink: 0 }} />
+                          <input className="hq-field" placeholder="כמות" value={scanQtys[item.id] ?? 1} onChange={e => setScanQtys(prev => ({ ...prev, [item.id]: e.target.value }))} style={{ ...inputStyle, width: 64, flexShrink: 0 }} />
                         </>
                       )}
                     </div>
@@ -904,7 +913,7 @@ function ReceiptForm({ g, setGrocery }) {
               <AdHocRow key={i} row={row} linkOptions={linkOptions} onChange={r => setAdHoc(rows => rows.map((x, idx) => (idx === i ? r : x)))} onRemove={() => setAdHoc(rows => rows.filter((_, idx) => idx !== i))} />
             ))}
           </div>
-          <button type="button" onClick={() => setAdHoc(rows => [...rows, { name: "", price: "", qty: "", promo: null, linkedId: null }])}
+          <button type="button" onClick={() => setAdHoc(rows => [...rows, { name: "", price: "", qty: "1", promo: null, linkedId: null }])}
             style={{ marginTop: 8, fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "6px 10px", cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 5 }}>
             <Plus size={13} /> הוספת שורה
           </button>
