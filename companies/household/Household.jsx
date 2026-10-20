@@ -23,6 +23,7 @@ import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers
 // ייבוא חוצה-חברות מקובל כאן כי זה widget UI גנרי, לא לוגיקת דומיין; הזזה ל-lib/ תיעשה בנפרד בעתיד.
 import ImageAttachments, { ImageStrip, useImageTracker, purgeImages } from "@/companies/beit-hadash/ImageAttachments";
 import { imagesOf } from "@/companies/beit-hadash/images";
+import css from "./household.module.css";
 
 /*
   משק בית — v1: "סופר" בלבד (רשימת קניות משותפת + היסטוריית רכישות + חיסכון).
@@ -327,27 +328,29 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
   );
 }
 
-function QuickAdd({ items, onQuickAdd, onOpenForm }) {
+function QuickAdd({ items, recent, onQuickAdd, onOpenForm }) {
   const [name, setName] = useState("");
   // אזהרה לפני הוספה כפולה בטעות, במקום ליצור שורה כפולה בשקט - פידבק מפורש. חוסמת
   // בפועל (submit לא מוסיף) - הכפילות עצמה עדיין קיימת ברשימה, מוטב לכוון לשנות כמות שם.
   const duplicate = name.trim() ? findActiveDuplicate(items, name) : null;
   const submit = () => { if (!name.trim() || duplicate) return; onQuickAdd(name); setName(""); };
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: "flex", gap: 8, minWidth: 0 }}>
+    <section className={css.quickCapture}>
+      <label htmlFor="grocery-quick-add">להוסיף לרשימה</label>
+      <div className={css.quickCaptureRow}>
         <input className="hq-field" list="household-known-product-names" placeholder="הוסיפו פריט ולחצו Enter…" value={name}
-          onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submit(); }}
-          style={{ ...inputStyle, flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 2, padding: "9px 10px" }} />
-        <button onClick={submit} aria-label="הוסף פריט" style={{ border: "none", background: INK, color: BG, borderRadius: 2, width: 40, flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Plus size={16} />
+          id="grocery-quick-add" onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submit(); }}
+          style={{ ...inputStyle, minWidth: 0 }} />
+        <button onClick={submit} aria-label="הוסף פריט" className={css.quickAddButton}>
+          <Plus size={17} />הוספה
         </button>
-        <button onClick={onOpenForm} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "0 10px", flexShrink: 0, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
-          טופס מלא
+        <button onClick={onOpenForm} className={css.detailsButton}>
+          פרטים
         </button>
       </div>
       {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: "6px 0 0" }}>"{duplicate.name}" כבר קיים ברשימה - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
-    </div>
+      {recent.length > 0 && <div className={css.recentItems}><span>קניתם לאחרונה:</span>{recent.map(item => <button key={item} type="button" onClick={() => onQuickAdd(item)} disabled={Boolean(findActiveDuplicate(items, item))}>{item}</button>)}</div>}
+    </section>
   );
 }
 
@@ -420,26 +423,27 @@ function ShoppingList({ g, setGrocery }) {
   const entries = filterEntries(g, filter);
   const activeCount = g.items.length;
   const routeGroups = groupByRoute(g.items);
+  const recentItems = [...g.history].sort((a,b) => String(b.purchasedAt||"").localeCompare(String(a.purchasedAt||""))).reduce((names,item) => item.name && !names.includes(item.name) ? [...names,item.name] : names,[]).slice(0,6);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 18 }}>הקנייה הבאה</h3>
-        <span style={{ fontSize: 12, color: MUTED }}>{activeCount} פריטים ברשימה</span>
-      </div>
+    <div className={css.groceryWorkspace}>
+      <section className={css.groceryHero}>
+        <div><p>רשימת קניות משותפת</p><h3>הקנייה הבאה</h3><span>{activeCount ? `${activeCount} פריטים מחכים ברשימה` : "הרשימה פנויה — אפשר להוסיף מה שחסר."}</span></div>
+        <div className={css.groceryCount}><b>{activeCount}</b><span>פריטים</span></div>
+      </section>
 
-      <QuickAdd items={g.items} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
+      <QuickAdd items={g.items} recent={recentItems} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
       {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
       <datalist id="household-known-stores">{knownStores(g).map(s => <option key={s} value={s} />)}</datalist>
       {/* שמות פריטים ידועים (שם בלבד, לא מותג/וריאנט) - מציעים פריט קיים כבר כשמתחילים להקליד
           (למשל "מגב" מציע "מגבונים"), בלי לחסום הקלדת שם חדש - משמשת גם QuickAdd וגם FullAddForm. */}
       <datalist id="household-known-product-names">{[...new Set(knownProducts(g).map(p => p.name))].map(n => <option key={n} value={n} />)}</datalist>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+      <div className={css.listToolbar}>
         {FILTERS.map(f => (
           <button key={f} onClick={() => setFilter(f)} style={tabBtn(filter === f)}>{FILTER_LABEL[f]}</button>
         ))}
-        <div style={{ flex: 1 }} />
+        <div className={css.toolbarSpacer} />
         <button onClick={() => setView(v => (v === "route" ? "flat" : "route"))} style={{ fontSize: 12, border: `1px solid ${LINE}`, background: "transparent", borderRadius: 2, padding: "0 10px", height: 34, cursor: "pointer", fontFamily: "inherit" }}>
           {view === "route" ? "תצוגה: לפי מסלול קנייה" : "תצוגה: רשימה שטוחה"}
         </button>
@@ -451,13 +455,13 @@ function ShoppingList({ g, setGrocery }) {
         ) : routeGroups.map(({ category, items }) => (
           <div key={category} style={{ marginBottom: 4 }}>
             <Sec title={category} />
-            <div style={cardStyle}>
+            <div style={{ ...cardStyle, borderRadius: 14, boxShadow: "0 3px 12px rgba(16,24,40,.06)" }}>
               {items.map(item => <ItemRow key={item.id} item={item} purchased={false} onUpdate={onUpdate} onDelete={onDelete} onPurchase={onPurchase} onRestore={onRestore} lastPromo={lastPromoForProduct(g.history, item)} history={g.history} />)}
             </div>
           </div>
         ))
       ) : (
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, borderRadius: 14, boxShadow: "0 3px 12px rgba(16,24,40,.06)" }}>
           {entries.length === 0 && <div style={{ padding: 16, fontSize: 14, color: MUTED, lineHeight: 1.7 }}>אין פריטים להצגה בפילטר הזה.</div>}
           {entries.map(item => (
             <ItemRow key={`${item.purchased ? "h" : "i"}-${item.id}`} item={item} purchased={item.purchased}
@@ -1165,22 +1169,22 @@ export default function Household() {
   const refreshing = status === "loading";
 
   return (
-    <div style={{ minWidth: 0 }}>
-      <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>רשימת קניות משותפת, קבלות עם חנות ותמונה, היסטוריית הזמנות, ניתוח חיסכון, ושוברים — v1: סופר בלבד (מלבד שוברים, שלא קשורים דווקא לסופר).</p>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={() => setSub("list")} style={tabBtn(sub === "list")}><ShoppingBasket size={13} style={{ marginLeft: 5 }} />רשימת קניות</button>
-        <button onClick={() => setSub("receipt")} style={tabBtn(sub === "receipt")}><Receipt size={13} style={{ marginLeft: 5 }} />קבלה</button>
-        <button onClick={() => setSub("byStore")} style={tabBtn(sub === "byStore")}><Store size={13} style={{ marginLeft: 5 }} />היסטוריית הזמנות</button>
-        <button onClick={() => setSub("savings")} style={tabBtn(sub === "savings")}>חיסכון</button>
-        <button onClick={() => setSub("vouchers")} style={tabBtn(sub === "vouchers")}><Ticket size={13} style={{ marginLeft: 5 }} />שוברים</button>
+    <div className={css.householdShell} dir="rtl">
+      <header className={css.householdHeader}><div><p>משק בית</p><h2>הסופר והקניות בבית</h2><span>רשימה משותפת, קבלות, מחירים ושוברים — במקום אחד.</span></div><div className={css.basketIcon}><ShoppingBasket size={25} /></div></header>
+      <nav className={css.householdNav} aria-label="ניווט משק בית">
+        <button onClick={() => setSub("list")} className={sub === "list" ? css.navActive : ""}><ShoppingBasket size={16} />רשימת קניות</button>
+        <button onClick={() => setSub("receipt")} className={sub === "receipt" ? css.navActive : ""}><Receipt size={16} />קבלה</button>
+        <button onClick={() => setSub("byStore")} className={sub === "byStore" ? css.navActive : ""}><Store size={16} />היסטוריה</button>
+        <button onClick={() => setSub("savings")} className={sub === "savings" ? css.navActive : ""}>חיסכון</button>
+        <button onClick={() => setSub("vouchers")} className={sub === "vouchers" ? css.navActive : ""}><Ticket size={16} />שוברים</button>
         {/* דווח: לירון באמצע קניות, ליאור מוסיפה פריט לרשימה המשותפת - לא רואה את זה בלי
             לרענן את הדף. useStore כבר חושף reload() (היה קיים, לא היה מחובר לאף כפתור) -
             טוען מחדש מה-ענן בלי לרפרש את כל האתר. */}
         <button onClick={reload} disabled={refreshing} aria-label="רענון הרשימה מהענן" title="רענון - לראות עדכונים ששותף/ה אחר/ת הוסיפ/ה"
-          style={{ ...tabBtn(false), marginInlineStart: "auto", display: "flex", alignItems: "center", gap: 5, cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}>
+          className={css.refreshButton} style={{ cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}>
           <RefreshCw size={13} />{refreshing ? "מרענן…" : "רענון"}
         </button>
-      </div>
+      </nav>
       {sub === "list" && <ShoppingList g={g} setGrocery={setD} />}
       {sub === "receipt" && <ReceiptForm g={g} setGrocery={setD} />}
       {sub === "byStore" && <ByStore g={g} />}
