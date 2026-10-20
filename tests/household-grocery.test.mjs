@@ -17,7 +17,7 @@ const {
   monthlySpend, monthlyProductBreakdown, nowMonth, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
-  productKey, productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct,
+  productKey, productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct, productMergeCandidates, mergeProductIdentity,
 } = grocery;
 
 // ---------- זיהוי קטגוריה ----------
@@ -809,6 +809,29 @@ test("findSimilarProduct: מציע זהות קיימת כש-יש חפיפת מי
   assert.equal(findSimilarProduct(known, ""), null);
   assert.equal(findSimilarProduct(null, "אפונה"), null);
   assert.equal(findSimilarProduct([], "אפונה"), null);
+});
+
+test("איחוד מוצרים: מציע רק שם קצר/מפורט תואם, ובאישור מחבר היסטוריה בלי למחוק רכישות", () => {
+  const state = {
+    ...createGroceryState(),
+    items: [{ id: "active", name: "אפונה עדינה", brand: "", variant: "" }],
+    history: [
+      { id: "one", name: "אפונה עדינה", brand: "", variant: "", price: 9, receiptId: "r1" },
+      { id: "two", name: "אפונה עדינה קפואה", brand: "", variant: "", price: 12, receiptId: "r2" },
+      { id: "three", name: "אפונה עדינה", brand: "מותג א", variant: "", price: 10 },
+      { id: "four", name: "אפונה עדינה קפואה", brand: "מותג ב", variant: "", price: 11 },
+    ],
+  };
+  const candidates = productMergeCandidates(state);
+  assert.equal(candidates.length, 1); // המותגים המפורשים השונים לא מוצעים לאיחוד
+  assert.equal(candidates[0].source.name, "אפונה עדינה");
+  assert.equal(candidates[0].target.name, "אפונה עדינה קפואה");
+  const merged = mergeProductIdentity(state, candidates[0].source, candidates[0].target);
+  assert.equal(merged.history.length, 4); // לא נמחקה אף רכישה
+  assert.equal(merged.history[0].name, "אפונה עדינה קפואה");
+  assert.equal(merged.history[0].price, 9);
+  assert.equal(merged.history[0].receiptId, "r1");
+  assert.equal(merged.items[0].name, "אפונה עדינה קפואה");
 });
 
 test("findActiveDuplicate: עם זהות (brand/variant) - פריט כללי ופריט ממותג באותו שם לא נחסמים זה מול זה", () => {
