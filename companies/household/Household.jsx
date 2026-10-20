@@ -15,7 +15,7 @@ import {
   groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
   monthlyProductBreakdown, nowMonth,
-  productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning,
+  productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct,
 } from "./grocery-model";
 import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers, totalRemaining } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
@@ -354,10 +354,14 @@ function QuickAdd({ items, recent, onQuickAdd, onOpenForm }) {
   );
 }
 
-function FullAddForm({ dict, items, onAdd, onClose }) {
+function FullAddForm({ dict, items, known, onAdd, onClose }) {
   const [f, setF] = useState({ name: "", qty: "", category: "", priority: "רגיל", note: "", brand: "", variant: "" });
   const detected = f.name.trim() ? detectCategory(f.name, dict) : "";
   const duplicate = f.name.trim() ? findActiveDuplicate(items, f.name, { brand: f.brand, variant: f.variant }) : null;
+  // דווח (Liron): אותו מוצר נרשם בכמה ניסוחים ("אפונה עדינה" מול "אפונה עדינה קפואה")
+  // ופוצל בטעות להיסטוריות נפרדות. לא ממזגים בשקט - רק מציעים, עם אישור מפורש.
+  const similar = !duplicate && f.name.trim() ? findSimilarProduct(known, f.name, { brand: f.brand, variant: f.variant }) : null;
+  const useSimilar = () => setF(s => ({ ...s, name: similar.name, brand: similar.brand || "", variant: similar.variant || "" }));
   const submit = () => {
     if (!f.name.trim() || duplicate) return;
     onAdd({ name: f.name, qty: toN(f.qty) || null, category: f.category || undefined, priority: f.priority, note: f.note, brand: f.brand, variant: f.variant });
@@ -369,6 +373,12 @@ function FullAddForm({ dict, items, onAdd, onClose }) {
         {/* datalist משותפת מוגדרת פעם אחת ב-ShoppingList (household-known-product-names) - גם QuickAdd משתמשת בה. */}
         <input className="hq-field" list="household-known-product-names" placeholder="שם פריט" value={f.name} onChange={e => setF(s => ({ ...s, name: e.target.value }))} style={inputStyle} />
         {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>"{duplicate.name}" כבר קיים ברשימה (אותו שם, מותג וגודל) - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
+        {similar && (
+          <div style={{ fontSize: 12, color: INK, background: BG, border: `1px solid ${LINE}`, borderRadius: 2, padding: "6px 8px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 0 }}>כבר קיים פריט דומה: "{productDisplayName(similar)}" - זה אותו מוצר?</span>
+            <button type="button" onClick={useSimilar} style={{ border: "none", background: "transparent", color: GREEN, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", fontSize: 12, flexShrink: 0 }}>כן, זה אותו</button>
+          </div>
+        )}
         <input className="hq-field" placeholder="כמות" value={f.qty} onChange={e => setF(s => ({ ...s, qty: e.target.value }))} style={inputStyle} />
         <div style={{ display: "flex", gap: 8 }}>
           <input className="hq-field" placeholder="מותג (אופציונלי)" value={f.brand} onChange={e => setF(s => ({ ...s, brand: e.target.value }))} style={{ ...inputStyle, flex: 1 }} />
@@ -433,7 +443,7 @@ function ShoppingList({ g, setGrocery }) {
       </section>
 
       <QuickAdd items={g.items} recent={recentItems} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
-      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
+      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} known={knownProducts(g)} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
       <datalist id="household-known-stores">{knownStores(g).map(s => <option key={s} value={s} />)}</datalist>
       {/* שמות פריטים ידועים (שם בלבד, לא מותג/וריאנט) - מציעים פריט קיים כבר כשמתחילים להקליד
           (למשל "מגב" מציע "מגבונים"), בלי לחסום הקלדת שם חדש - משמשת גם QuickAdd וגם FullAddForm. */}
