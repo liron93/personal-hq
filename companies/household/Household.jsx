@@ -1153,8 +1153,20 @@ function Vouchers({ g, setGrocery }) {
   );
 }
 
+// דווח (Liron): "אשתי מתלוננת שהיא רושמת פריטים ואני לא רואה אותם גם כשאני עושה רענון".
+// useStore כבר מחשב sync/syncError (conflict/cloud-error/read-only וכו') - אבל עד כה שום
+// מקום לא הציג אותם במשק בית (רק התנגשות אמיתית מוצגת, ב-AccessGate, כבאנר גלובלי). אם
+// השמירה נכשלת מסיבה אחרת (שגיאת רשת/שרת חולפת, read-only) - זה היה קורה בלי שום סימן:
+// הפריט נראה נוסף אצל מי שהוסיף (הוא כבר ב-state המקומי ובלוקל-סטורג' שלו/ה), אבל
+// מעולם לא הגיע בפועל לענן - אז לעולם לא יופיע אצל מישהו אחר, ולא עוזר "לרענן".
+const SYNC_LABEL = {
+  "sync-error": "לא נשמר לענן - השינוי האחרון עדיין רק אצלך במכשיר הזה.",
+  "conflict": "מישהו אחר עדכן בינתיים - הרשימה רועננה, נסו שוב את השינוי האחרון.",
+  "read-only": "אין לך הרשאת עריכה למשק הבית - רואים בלבד.",
+};
+
 export default function Household() {
-  const { data: d, setData: setD, ready, reload, status } = useStore(STORE_KEY, INIT);
+  const { data: d, setData: setD, ready, reload, status, sync, syncError, retrySync } = useStore(STORE_KEY, INIT);
   const [sub, setSub] = useState("list"); // list | receipt | byStore | savings | vouchers
 
   // תאימות אחורה: משלים שדות חסרים בנתונים ישנים בלי לדרוס שום דבר קיים.
@@ -1167,10 +1179,17 @@ export default function Household() {
   if (!ready || !d) return <p style={{ fontSize: 14, color: MUTED }}>טוען…</p>;
   const g = ensureHousehold(d);
   const refreshing = status === "loading";
+  const syncIssue = SYNC_LABEL[sync];
 
   return (
     <div className={css.householdShell} dir="rtl">
       <header className={css.householdHeader}><div><p>משק בית</p><h2>הסופר והקניות בבית</h2><span>רשימה משותפת, קבלות, מחירים ושוברים — במקום אחד.</span></div><div className={css.basketIcon}><ShoppingBasket size={25} /></div></header>
+      {syncIssue && (
+        <div role="alert" style={{ background: "#FEF3F2", border: `1px solid ${RUST}`, color: RUST, borderRadius: 2, padding: "8px 12px", marginBottom: 12, fontSize: 13, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ flex: 1, minWidth: 0 }}>{syncIssue}{syncError ? ` (${syncError})` : ""}</span>
+          <button onClick={() => { retrySync(); reload(); }} style={{ border: "none", background: "transparent", color: RUST, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", fontSize: 13, flexShrink: 0 }}>ניסיון חוזר</button>
+        </div>
+      )}
       <nav className={css.householdNav} aria-label="ניווט משק בית">
         <button onClick={() => setSub("list")} className={sub === "list" ? css.navActive : ""}><ShoppingBasket size={16} />רשימת קניות</button>
         <button onClick={() => setSub("receipt")} className={sub === "receipt" ? css.navActive : ""}><Receipt size={16} />קבלה</button>
