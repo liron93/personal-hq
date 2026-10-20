@@ -676,6 +676,56 @@ export function knownProducts(state) {
   return [...byKey.values()].sort((a, b) => heCompare(a.name, b.name) || heCompare(a.brand, b.brand) || heCompare(a.variant, b.variant));
 }
 
+/**
+ * מוצרים שכנראה הוזנו בשתי צורות, למשל "אפונה עדינה" מול "אפונה עדינה קפואה".
+ * זו רשימת הצעות בלבד: היא שמרנית בכוונה ולא מתאימה בין מותגים או וריאנטים שונים.
+ * האיחוד עצמו תמיד דורש לחיצה מפורשת של המשתמש ב-UI.
+ */
+export function productMergeCandidates(state, { limit = 8 } = {}) {
+  const products = knownProducts(state);
+  const result = [];
+  for (let i = 0; i < products.length; i += 1) {
+    for (let j = i + 1; j < products.length; j += 1) {
+      const a = products[i];
+      const b = products[j];
+      if (productKey(a) === productKey(b)) continue;
+      const aBrand = norm(a.brand).toLowerCase();
+      const bBrand = norm(b.brand).toLowerCase();
+      const aVariant = norm(a.variant).toLowerCase();
+      const bVariant = norm(b.variant).toLowerCase();
+      // לא מציעים לאחד זהויות עם מותג/וריאנט שונים או חסרים: "כללי" אינו אותו מוצר
+      // כמו ממותג, גם אם השם דומה. הכלי הזה מטפל רק בפיצול של ניסוח השם עצמו.
+      if (aBrand !== bBrand || aVariant !== bVariant) continue;
+      const aTokens = new Set(tokensOf(a.name));
+      const bTokens = new Set(tokensOf(b.name));
+      if (aTokens.size < 2 || bTokens.size < 2) continue;
+      const [shorter, longer] = aTokens.size <= bTokens.size ? [aTokens, bTokens] : [bTokens, aTokens];
+      if (![...shorter].every(token => longer.has(token))) continue;
+      // השם המפורט יותר הוא יעד עדיף: פחות מידע הולך לאיבוד לאחר האיחוד.
+      const source = aTokens.size <= bTokens.size ? a : b;
+      const target = source === a ? b : a;
+      result.push({ source, target });
+    }
+  }
+  return result.slice(0, limit);
+}
+
+/**
+ * מאחד שתי זהויות מוצר אחרי אישור מפורש. כל הרכישות, המחירים, הקבלות והכמויות נשמרים;
+ * רק הזהות של הפריט מתוקנת כדי שהיסטוריית המחיר והניתוחים יוצגו יחד.
+ */
+export function mergeProductIdentity(state, source, target) {
+  const sourceKey = productKey(source);
+  const targetKey = productKey(target);
+  if (!sourceKey || sourceKey === targetKey) return state;
+  const canonical = { name: norm(target?.name), brand: norm(target?.brand), variant: norm(target?.variant) };
+  if (!canonical.name) return state;
+  const replace = entry => productKey(entry) === sourceKey
+    ? { ...entry, ...canonical, updatedAt: new Date().toISOString() }
+    : entry;
+  return { ...state, items: (state.items || []).map(replace), history: (state.history || []).map(replace) };
+}
+
 /** אזהרה (לא חסימה - אישור ידני כבר חובה בכל מקרה): ההתאמה המוצעת היא לפריט עם מותג/וריאנט
     ידועים ברשימה, אבל טקסט השם שנסרק מהקבלה לא כולל אותם בכלל - סימן אפשרי שזה מוצר/גודל
     שונה בפועל (בדיוק התרחיש: "מגבונים" כללי ברשימה מול מותג/גודל ספציפי בקבלה, ולהפך). אין
