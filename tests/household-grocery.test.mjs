@@ -17,7 +17,7 @@ const {
   monthlySpend, monthlyProductBreakdown, nowMonth, budgetVsActual, budgetTrend, pricePerUnit, repeatProducts, repeatCategories,
   missingCategorizationItems, groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
-  productKey, productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning,
+  productKey, productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct,
 } = grocery;
 
 // ---------- זיהוי קטגוריה ----------
@@ -784,6 +784,31 @@ test("productKey/productDisplayName/isGenericIdentity: שם+מותג+וריאנ�
   assert.equal(productDisplayName({ name: "מגבונים", brand: "אריאל", variant: "72 יח'" }), "מגבונים · אריאל · 72 יח'");
   assert.equal(isGenericIdentity({ name: "מגבונים" }), true);
   assert.equal(isGenericIdentity({ name: "מגבונים", brand: "אריאל" }), false);
+});
+
+test("productKey: אותן מילים בסדר אחר הן אותה זהות קנונית - אין פיצול היסטוריה מיותר (דווח: לירון)", () => {
+  assert.equal(productKey({ name: "אפונה עדינה קפואה" }), productKey({ name: "אפונה קפואה עדינה" }));
+  assert.equal(productKey({ name: "רוטב סויה" }), productKey({ name: "סויה רוטב" }));
+  // עדיין לא אותו דבר כש-המילים עצמן שונות (לא רק הסדר) - "אפונה עדינה" לא זהה ל"אפונה עדינה קפואה".
+  assert.notEqual(productKey({ name: "אפונה עדינה" }), productKey({ name: "אפונה עדינה קפואה" }));
+});
+
+test("findSimilarProduct: מציע זהות קיימת כש-יש חפיפת מילים חד-כיוונית, לא כש-כבר אותה זהות קנונית", () => {
+  const known = [
+    { name: "אפונה עדינה קפואה", brand: "", variant: "" },
+    { name: "חלב 3% תנובה", brand: "", variant: "" },
+  ];
+  // "אפונה עדינה" (חסרה "קפואה") - תת-קבוצת מילים של הפריט הקיים - מוצע, לא נחסם.
+  const suggestion = findSimilarProduct(known, "אפונה עדינה");
+  assert.equal(suggestion.name, "אפונה עדינה קפואה");
+  // אותן מילים בדיוק (סדר שונה) - זו כבר אותה זהות קנונית, לא "הצעה" נפרדת.
+  assert.equal(findSimilarProduct(known, "אפונה קפואה עדינה"), null);
+  // מוצר לגמרי לא קשור - אין הצעה.
+  assert.equal(findSimilarProduct(known, "קוטג'"), null);
+  // קלט ריק/חסר לא קורס.
+  assert.equal(findSimilarProduct(known, ""), null);
+  assert.equal(findSimilarProduct(null, "אפונה"), null);
+  assert.equal(findSimilarProduct([], "אפונה"), null);
 });
 
 test("findActiveDuplicate: עם זהות (brand/variant) - פריט כללי ופריט ממותג באותו שם לא נחסמים זה מול זה", () => {

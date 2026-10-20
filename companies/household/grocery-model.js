@@ -69,8 +69,16 @@ const norm = s => String(s || "").trim();
 // השוואה/היסטוריה. פריט ישן בלי brand/variant ממשיך לקבץ אך ורק מול פריטים אחרים בלי
 // brand/variant באותו שם (לא "נבלע" לתוך/לא "בולע" גרסה ממותגת חדשה בטעות) - זה בדיוק מה
 // שמבטיח "מגבונים כלליים יוצגו כפריט כללי ולא ישויכו אוטומטית למותג/וריאנט חדש".
+// דווח (Liron): אותו מוצר ממש נרשם בכמה סדרי מילים שונים ("אפונה עדינה קפואה" מול
+// "אפונה קפואה עדינה") ופוצל בטעות לשתי זהויות נפרדות - היסטוריית המחיר התפצלה בלי
+// סיבה, למרות שאלה בדיוק אותן מילים. שם קנוני = מילים ממוינות (לא לפי סדר ההקלדה),
+// כך ששני הניסוחים האלה הם תמיד אותה זהות בדיוק - זה בטוח לגמרי (אותן מילים, לא
+// ניחוש), בניגוד להתאמה מטושטשת (ראו findSimilarProduct למטה, שמציעה ולא ממזגת
+// בשקט). productDisplayName ממשיך להציג את השם כפי שהוזן, לא הגרסה הממוינת.
+const canonicalNameKey = name => tokensOf(name).sort().join(" ");
+
 export function productKey(entry) {
-  const name = norm(entry?.name).toLowerCase();
+  const name = canonicalNameKey(entry?.name);
   const brand = norm(entry?.brand).toLowerCase();
   const variant = norm(entry?.variant).toLowerCase();
   return `${name}|${brand}|${variant}`;
@@ -168,6 +176,30 @@ export function findReceiptMatch(items, scannedName) {
     if (!itemSet.size) continue;
     const [smaller, larger] = itemSet.size <= scannedSet.size ? [itemSet, scannedSet] : [scannedSet, itemSet];
     if ([...smaller].every(t => larger.has(t))) return item;
+  }
+  return null;
+}
+
+/**
+ * הצעת "זהות דומה" בהוספת פריט חדש (דווח: לירון הקליד "אפונה עדינה" כש-"אפונה עדינה
+ * קפואה" כבר קיים, ושני אלה פוצלו בטעות). לא מיזוג שקט - productKey כבר מטפל בסדר
+ * מילים זהה (ראו canonicalNameKey) - זו רק הצעה כש-המילים לא זהות לגמרי (תת-קבוצה
+ * חד-כיוונית, כמו findReceiptMatch) אבל כבר יש זהות קנונית שונה בפועל, כדי שהמשתמש/ת
+ * יבחרו במפורש "כן, זה אותו" במקום ליצור בטעות זהות שלישית. candidates = knownProducts(state).
+ * מתעלם מהצעה שהיא ממילא אותה זהות קנונית (אין טעם "להציע" את מה שכבר יתמזג לבד).
+ */
+export function findSimilarProduct(candidates, name, identity = {}) {
+  const n = norm(name);
+  if (!n) return null;
+  const typedKey = productKey({ name: n, brand: identity.brand, variant: identity.variant });
+  const typedTokens = new Set(tokensOf(n));
+  if (!typedTokens.size) return null;
+  for (const candidate of candidates || []) {
+    if (productKey(candidate) === typedKey) continue; // כבר אותה זהות קנונית - לא "הצעה", פשוט אותו דבר
+    const candidateTokens = new Set(tokensOf(candidate.name));
+    if (!candidateTokens.size) continue;
+    const [smaller, larger] = candidateTokens.size <= typedTokens.size ? [candidateTokens, typedTokens] : [typedTokens, candidateTokens];
+    if ([...smaller].every(t => larger.has(t))) return candidate;
   }
   return null;
 }
