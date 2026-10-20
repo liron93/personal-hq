@@ -15,7 +15,7 @@ import {
   groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
   monthlyProductBreakdown, nowMonth,
-  productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct,
+  productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct, productMergeCandidates, mergeProductIdentity,
 } from "./grocery-model";
 import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers, totalRemaining } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
@@ -939,7 +939,35 @@ function ReceiptForm({ g, setGrocery }) {
   );
 }
 
-function ByStore({ g }) {
+function ProductMergeTool({ g, setGrocery }) {
+  const candidates = productMergeCandidates(g);
+  const [notice, setNotice] = useState("");
+  if (!candidates.length) return null;
+  const merge = ({ source, target }) => {
+    setGrocery(prev => mergeProductIdentity(prev, source, target));
+    setNotice(`אוחד: ${productDisplayName(source)} תחת ${productDisplayName(target)}. כל הרכישות והמחירים נשמרו.`);
+  };
+  return (
+    <section className={css.mergeTool} aria-label="איחוד מוצרים דומים">
+      <div className={css.mergeToolTitle}>
+        <div><strong>מוצרים שנראים דומים</strong><span>נמצאו שמות שעשויים לתאר אותו מוצר. איחוד הוא תמיד בהחלטה שלך.</span></div>
+        <span className={css.mergeCount}>{candidates.length}</span>
+      </div>
+      <div className={css.mergeCandidates}>
+        {candidates.map(({ source, target }) => (
+          <div className={css.mergeCandidate} key={`${source.name}-${target.name}-${source.brand}-${target.brand}`}>
+            <div><span>{productDisplayName(source)}</span><b>←</b><span>{productDisplayName(target)}</span></div>
+            <button type="button" onClick={() => merge({ source, target })}>לאחד</button>
+          </div>
+        ))}
+      </div>
+      <p>האיחוד לא מוחק שום קנייה או קבלה — הוא רק מחבר את היסטוריית המחיר תחת שם אחד.</p>
+      {notice && <div role="status" className={css.mergeNotice}>{notice}</div>}
+    </section>
+  );
+}
+
+function ByStore({ g, setGrocery }) {
   const month = nowMonth();
   const monthly = monthlyProductBreakdown(g.history, month);
   const totals = storeTotals(g.history);
@@ -952,6 +980,8 @@ function ByStore({ g }) {
     <div>
       <h3 style={{ margin: "0 0 10px", fontSize: 18 }}>היסטוריית הזמנות</h3>
       <p style={{ fontSize: 13, color: MUTED, margin: "0 0 14px" }}>מה קניתם החודש, כמה פעמים, וכמה זה עלה — ואיפה הכי כדאי לקנות כל מוצר, לפי מה שתועד בפועל.</p>
+
+      <ProductMergeTool g={g} setGrocery={setGrocery} />
 
       <Sec title={`החודש (${month})`} />
       <div style={cardStyle}>
@@ -1216,7 +1246,7 @@ export default function Household() {
       </nav>
       {sub === "list" && <ShoppingList g={g} setGrocery={setD} />}
       {sub === "receipt" && <ReceiptForm g={g} setGrocery={setD} />}
-      {sub === "byStore" && <ByStore g={g} />}
+      {sub === "byStore" && <ByStore g={g} setGrocery={setD} />}
       {sub === "savings" && <Savings g={g} setGrocery={setD} />}
       {sub === "vouchers" && <Vouchers g={g} setGrocery={setD} />}
     </div>
