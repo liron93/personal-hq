@@ -15,7 +15,7 @@ import {
   groceryAlerts, INSUFFICIENT_DATA,
   knownStores, logReceipt, updateReceiptImages, removeReceiptRecord, storeTotals, mostPurchasedProducts, mostPurchasedCategories, cheapestStoreSeen,
   monthlyProductBreakdown, nowMonth,
-  productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct, productMergeCandidates, mergeProductIdentity,
+  productDisplayName, isGenericIdentity, productHistory, productPriceSummary, knownProducts, identityMismatchWarning, findSimilarProduct, productKey, productMergeCandidates, mergeProductIdentity,
 } from "./grocery-model";
 import { addVoucher, updateVoucher, removeVoucher, remainingAmount, sortVouchers, totalRemaining } from "./vouchers-model";
 // רכיב תמונות גנרי, מרחב-משותף, שאול מ"בית חדש" (companies/beit-hadash) בכוונה — ראה תיאור ה-PR:
@@ -941,25 +941,52 @@ function ReceiptForm({ g, setGrocery }) {
 
 function ProductMergeTool({ g, setGrocery }) {
   const candidates = productMergeCandidates(g);
+  const products = knownProducts(g);
   const [notice, setNotice] = useState("");
-  if (!candidates.length) return null;
+  const [sourceKey, setSourceKey] = useState("");
+  const [targetKey, setTargetKey] = useState("");
   const merge = ({ source, target }) => {
     setGrocery(prev => mergeProductIdentity(prev, source, target));
     setNotice(`אוחד: ${productDisplayName(source)} תחת ${productDisplayName(target)}. כל הרכישות והמחירים נשמרו.`);
+    setSourceKey("");
+    setTargetKey("");
   };
+  const mergeManually = () => {
+    const source = products.find(product => productKey(product) === sourceKey);
+    const target = products.find(product => productKey(product) === targetKey);
+    if (!source || !target || sourceKey === targetKey) return;
+    merge({ source, target });
+  };
+  if (products.length < 2) return null;
   return (
     <section className={css.mergeTool} aria-label="איחוד מוצרים דומים">
       <div className={css.mergeToolTitle}>
-        <div><strong>מוצרים שנראים דומים</strong><span>נמצאו שמות שעשויים לתאר אותו מוצר. איחוד הוא תמיד בהחלטה שלך.</span></div>
-        <span className={css.mergeCount}>{candidates.length}</span>
+        <div><strong>איחוד מוצרים בהיסטוריה</strong><span>אפשר לאחד שמות שנכתבו אחרת. שום איחוד לא קורה אוטומטית.</span></div>
+        {candidates.length > 0 && <span className={css.mergeCount}>{candidates.length}</span>}
       </div>
-      <div className={css.mergeCandidates}>
+      {candidates.length > 0 && <div className={css.mergeCandidates}>
         {candidates.map(({ source, target }) => (
           <div className={css.mergeCandidate} key={`${source.name}-${target.name}-${source.brand}-${target.brand}`}>
             <div><span>{productDisplayName(source)}</span><b>←</b><span>{productDisplayName(target)}</span></div>
             <button type="button" onClick={() => merge({ source, target })}>לאחד</button>
           </div>
         ))}
+      </div>}
+      <div className={css.manualMerge}>
+        <strong>לא מצאנו התאמה? אפשר לאחד ידנית</strong>
+        <span>בחר את השם שצריך להיעלם, ואז את השם שיישאר.</span>
+        <div className={css.manualMergeRow}>
+          <select aria-label="המוצר לאיחוד" value={sourceKey} onChange={event => setSourceKey(event.target.value)}>
+            <option value="">השם שצריך להיעלם</option>
+            {products.map(product => <option key={productKey(product)} value={productKey(product)}>{productDisplayName(product)}</option>)}
+          </select>
+          <span>←</span>
+          <select aria-label="המוצר הקנוני" value={targetKey} onChange={event => setTargetKey(event.target.value)}>
+            <option value="">השם שיישאר</option>
+            {products.map(product => <option key={productKey(product)} value={productKey(product)}>{productDisplayName(product)}</option>)}
+          </select>
+          <button type="button" disabled={!sourceKey || !targetKey || sourceKey === targetKey} onClick={mergeManually}>איחוד ידני</button>
+        </div>
       </div>
       <p>האיחוד לא מוחק שום קנייה או קבלה — הוא רק מחבר את היסטוריית המחיר תחת שם אחד.</p>
       {notice && <div role="status" className={css.mergeNotice}>{notice}</div>}
