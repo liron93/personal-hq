@@ -156,6 +156,23 @@ export function findActiveDuplicate(items, name, identity = {}) {
 
 const tokensOf = name => norm(name).toLowerCase().split(/[\s,.-]+/).filter(Boolean);
 
+// בסריקת קבלה צריך לזהות גם יחיד/רבים בעברית: "מלפפון" מול "מלפפונים",
+// "ביצה" מול "ביצים" ו"עגבנייה" מול "עגבניות". זה נשאר מנגנון הצעה בלבד;
+// productKey לא משתמש בגזירה הזו, ולכן היסטוריית מוצרים לא מתאחדת בלי אישור.
+const receiptWordStem = word => {
+  let stem = String(word || "").toLowerCase();
+  if (/יות$/.test(stem)) stem = `${stem.slice(0, -3)}יה`;
+  else if (/אות$/.test(stem)) stem = `${stem.slice(0, -3)}ה`;
+  else if (/(ים|ות)$/.test(stem)) stem = stem.slice(0, -2);
+  // אות סופית משתנה ברבים (מלפפון → מלפפונים), לכן משווים תמיד לצורה הלא-סופית.
+  stem = stem.replace(/[ךםןףץ]/g, char => ({ "ך": "כ", "ם": "מ", "ן": "נ", "ף": "פ", "ץ": "צ" }[char]));
+  if (stem.length > 3 && /ה$/.test(stem)) stem = stem.slice(0, -1);
+  // כתיב מלא/חסר נפוץ: עגבנייה מול עגבניה.
+  stem = stem.replace(/יי/g, "י");
+  return stem;
+};
+const receiptTokensOf = name => tokensOf(name).map(receiptWordStem).filter(Boolean);
+
 /**
  * התאמת שם פריט שנסרק מקבלה (למשל "רוטב סויה יאמסה") לפריט קיים ברשימה (למשל "רוטב סויה") -
  * לשימוש בסריקת קבלה בלבד, לא להוספה ידנית (שם משתמשים ב-findActiveDuplicate המדויק, כדי לא
@@ -168,16 +185,19 @@ const tokensOf = name => norm(name).toLowerCase().split(/[\s,.-]+/).filter(Boole
 export function findReceiptMatch(items, scannedName) {
   const exact = findActiveDuplicate(items, scannedName);
   if (exact) return exact;
-  const scannedTokens = tokensOf(scannedName);
+  const scannedTokens = receiptTokensOf(scannedName);
   if (!scannedTokens.length) return null;
   const scannedSet = new Set(scannedTokens);
+  let best = null;
   for (const item of items || []) {
-    const itemSet = new Set(tokensOf(item.name));
+    const itemSet = new Set(receiptTokensOf(item.name));
     if (!itemSet.size) continue;
     const [smaller, larger] = itemSet.size <= scannedSet.size ? [itemSet, scannedSet] : [scannedSet, itemSet];
-    if ([...smaller].every(t => larger.has(t))) return item;
+    if (![...smaller].every(t => larger.has(t))) continue;
+    const score = smaller.size / larger.size;
+    if (!best || score > best.score) best = { item, score };
   }
-  return null;
+  return best?.item || null;
 }
 
 /**
