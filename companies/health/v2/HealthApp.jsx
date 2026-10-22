@@ -38,42 +38,57 @@ function Nav({ tab, onNavigate }) { return <><aside className={css.desktopAside}
 
 function Onboarding({ d, setD, onExit }) {
   const steps = [
-    { key:"goal", title:"מה חשוב לך להשיג?", help:"אפשר לבחור יותר ממטרה אחת.", multi:true, options:["להיכנס לכושר לקראת החתונה","לבנות כוח ומסת שריר","לרדת במשקל","לחזור לכושר","להרגיש יותר אנרגיה","לשפר ביטחון עצמי","לשפר סיבולת"] },
-    { key:"focus", title:"מה תרצה/י לכלול בתוכנית?", help:"אפשר לבחור כמה כיוונים.", multi:true, options:["אימוני כוח","כושר אירובי","ניידות וגמישות","תזונה והרגלים","שילוב מאוזן","רק להתחיל בעדינות"] },
-    { key:"experience", title:"מה נקודת הפתיחה שלך?", help:"בחירה אחת שתעזור לקבוע קצב התחלתי.", options:["מתחיל/ה מאפס","חוזר/ת אחרי הפסקה","מתאמן/ת לסירוגין","מתאמן/ת קבוע"] },
-    { key:"place", title:"איפה נוח לך להתאמן?", help:"אפשר לבחור יותר מאפשרות אחת.", multi:true, options:["חדר כושר","בבית עם ציוד","בבית בלי ציוד","בחוץ","סטודיו או קבוצה"] },
-    { key:"availability", title:"כמה אימונים ריאליים בשבוע?", help:"נבנה סביב מה שאפשר לשמור עליו.", options:["1","2","3","4","5 או יותר","עדיין לא יודע/ת"] },
-    { key:"sessionLength", title:"כמה זמן יש לך לאימון?", help:"נעדיף זמן אמיתי על תוכנית מושלמת.", options:["10–15 דקות","20–30 דקות","40–45 דקות","שעה או יותר","משתנה"] },
-    { key:"trainingDays", title:"באילו ימים בדרך כלל אפשר?", help:"אפשר לבחור כמה ימים; אפשר לשנות בכל שבוע.", multi:true, options:["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","שבת","משתנה"] },
-    { key:"trainingTime", title:"מתי הכי נוח לך להתאמן?", help:"אפשר לבחור יותר מחלון זמן אחד.", multi:true, options:["בוקר","צהריים","ערב","לילה","משתנה"] },
-    { key:"comfort", title:"איזה סגנון מרגיש לך נכון?", help:"המערכת תעדיף פעולות שמתאימות לך.", options:["קצר ופשוט","מובנה ומסודר","גמיש לפי היום","עם תזכורות","לנסות ולגלות"] },
-    { key:"likes", title:"אילו פעילויות אתה אוהב?", help:"אפשר לבחור כמה, כדי שהתוכנית תהיה כזו שתרצה באמת לבצע.", multi:true, options:["הליכה","ריצה","אימוני כוח","מכונות","משקולות חופשיים","תרגילי משקל גוף","אופניים","שחייה","יוגה / פילאטיס"] },
-    { key:"dislikes", title:"מה פחות מתאים לך?", help:"אפשר לבחור כמה; נמנע מלהכניס אותם כברירת מחדל.", multi:true, options:["ריצה","קפיצות","תרגילים על הרצפה","חדר כושר עמוס","אימונים ארוכים","אימוני קבוצה","לא בטוח/ה"] },
-    { key:"stepsBaseline", title:"כמה צעדים יש לך ביום ממוצע?", help:"זה רק קו פתיחה ליעד אישי שניתן לשנות.", options:["עד 3,000","3,000–5,000","5,000–7,500","7,500–10,000","מעל 10,000","לא יודע/ת"] },
-    { key:"safety", title:"יש משהו שחשוב לקחת בחשבון?", help:"אם יש כאב, פציעה או מגבלה — לא בונים כאן תוכנית מותאמת. כדאי להתייעץ עם איש/ת מקצוע.", options:["לא ידוע לי על מגבלה","יש מגבלה ואני מתייעץ/ת עם איש מקצוע","לא בטוח/ה"] },
+    { section:"היעד", key:"goal", title:"מה אתה רוצה להשיג?", help:"אפשר לבחור יותר ממטרה אחת. נשתמש בזה כדי לקבוע סדר עדיפויות, לא כדי לתת סיסמה כללית.", multi:true, options:["לרדת במשקל ולהיות חטוב","להיכנס לכושר לקראת החתונה","לבנות כוח ומסת שריר","לשפר סיבולת","להרגיש יותר אנרגיה","לחזור לכושר","לשפר ביטחון עצמי"] },
+    { section:"היעד", key:"goalPriority", title:"אם נצליח רק בדבר אחד ב-90 הימים הקרובים — מה הוא יהיה?", help:"בחירה אחת. היא תכריע בין אימון, תזונה, צעדים והתאוששות כשהכול מתנגש.", options:["לרדת במשקל","להתמיד בשגרה שאני נהנה ממנה","להתחזק באימוני כוח","להרגיש טוב ואנרגטי יותר","להתכונן לאירוע או תאריך"] },
+    { section:"היעד", key:"goalHorizon", title:"מה מסגרת הזמן שלך?", help:"נשתמש בה כדי לבנות קצב מציאותי, לא הבטחה לא מציאותית.", options:["אין תאריך — חשוב לי תהליך יציב","עד 3 חודשים","3–6 חודשים","יותר מחצי שנה","יש אירוע קרוב"] },
+    { section:"הגוף", key:"currentWeight", title:"מה המשקל הנוכחי שלך בק״ג?", help:"מספר מדויק מאפשר לחשב מגמה אמיתית. אפשר לעדכן אותו אחר כך בכל עת.", kind:"number", inputMode:"decimal", placeholder:"למשל 92", suffix:"ק״ג" },
+    { section:"הגוף", key:"targetWeight", title:"לאיזה משקל אתה רוצה להגיע, אם יש לך יעד?", help:"אם אין מספר ברור, בחר ‘עוד לא יודע’ בשלב הבא של היעדים. היעד ניתן לשינוי תמיד.", kind:"number", inputMode:"decimal", placeholder:"למשל 82", suffix:"ק״ג" },
+    { section:"הגוף", key:"heightCm", title:"מה הגובה שלך בס״מ?", help:"נשתמש בו רק לתמונת פתיחה ולמדדים שלך.", kind:"number", inputMode:"numeric", placeholder:"למשל 183", suffix:"ס״מ" },
+    { section:"הגוף", key:"ageRange", title:"באיזו קבוצת גיל אתה?", help:"זה עוזר להתאים קצב התאוששות כללי. אין צורך בתאריך לידה.", options:["18–24","25–34","35–44","45–54","55+","מעדיף לא לציין"] },
+    { section:"בריאות והתאוששות", key:"safety", title:"יש משהו שחשוב לקחת בחשבון לפני שבונים עומס?", help:"אם יש כאב, פציעה, מגבלה רפואית או אי־ודאות — לא נבנה עבורך תוכנית מותאמת אוטומטית. עדיף איש/ת מקצוע.", options:["אין כאב או מגבלה שידועים לי","יש מגבלה ואני כבר מתייעץ עם איש/ת מקצוע","יש כאב או פציעה פעילים","לא בטוח"] },
+    { section:"בריאות והתאוששות", key:"sleep", title:"כמה שעות שינה יש לך בדרך כלל בלילה?", help:"בלי התאוששות, עוד נפח אימון לא בהכרח יקדם אותך.", options:["פחות מ-5","5–6","6–7","7–8","יותר מ-8","משתנה מאוד"] },
+    { section:"בריאות והתאוששות", key:"stress", title:"איך נראה העומס שלך בתקופה הזו?", help:"התוכנית צריכה להתאים לחיים שלך, לא להתחרות בהם.", options:["נמוך יחסית","בינוני","גבוה","משתנה מאוד"] },
+    { section:"אימונים", key:"experience", title:"מה נקודת הפתיחה שלך?", help:"בחירה אחת שתעזור לקבוע נפח וקצב התקדמות התחלתי.", options:["מתחיל מאפס","חוזר אחרי הפסקה","מתאמן לסירוגין","מתאמן קבוע כבר חצי שנה או יותר"] },
+    { section:"אימונים", key:"currentFrequency", title:"כמה אימונים ביצעת בפועל בשבוע ממוצע בחודש האחרון?", help:"לא מה שכתוב בתוכנית — מה שבאמת קרה.", options:["0","1","2","3","4","5 או יותר"] },
+    { section:"אימונים", key:"place", title:"איפה יש לך גישה להתאמן?", help:"אפשר לבחור יותר מאפשרות אחת.", multi:true, options:["חדר כושר מלא","בית עם משקולות/ספסל","בית בלי ציוד","בחוץ","סטודיו או קבוצה"] },
+    { section:"אימונים", key:"availability", title:"כמה אימוני כוח אתה רוצה להתחייב אליהם בשבוע?", help:"זו התחייבות בסיס, לא תקרת זכוכית. נבנה כך שתוכל לנצח גם בשבוע עמוס.", options:["2","3","4","5","עוד לא בטוח"] },
+    { section:"אימונים", key:"sessionLength", title:"כמה זמן אמיתי יש לך לאימון כוח?", help:"כולל חימום ומקלחת? חשוב לבחור מציאות ולא גרסה אידאלית שלך.", options:["עד 30 דקות","40–50 דקות","60 דקות","75 דקות או יותר","משתנה"] },
+    { section:"אימונים", key:"trainingDays", title:"באילו ימים לרוב אפשר להתאמן?", help:"אפשר לבחור כמה ימים. זה יקבע את פיזור ההתאוששות.", multi:true, options:["א׳","ב׳","ג׳","ד׳","ה׳","ו׳","שבת","משתנה"] },
+    { section:"אימונים", key:"trainingTime", title:"מתי הכי נוח לך להתאמן?", help:"אפשר לבחור יותר מחלון אחד.", multi:true, options:["בוקר","צהריים","ערב","לילה","משתנה"] },
+    { section:"אימונים", key:"likes", title:"מה אתה באמת נהנה לעשות?", help:"אפשר לבחור כמה. תרגילים שתאהב יקבלו עדיפות בתוכנית.", multi:true, options:["מכונות","משקולות חופשיים","תרגילי גוף","הליכה","אופניים","ריצה","שחייה","אימונים קצרים ומהירים","אימון מובנה ומסודר"] },
+    { section:"אימונים", key:"dislikes", title:"מה אתה לא רוצה לראות בתוכנית כברירת מחדל?", help:"אפשר לבחור כמה. אפשר תמיד לשנות את דעתך בהמשך.", multi:true, options:["ריצה","קפיצות","תרגילים על הרצפה","סקוואט/דדליפט חופשי","אימונים ארוכים","חדר כושר עמוס","אימוני קבוצה","קרדיו משעמם"] },
+    { section:"אימונים", key:"cardioPreference", title:"איזה אירובי אתה מוכן לעשות בקביעות?", help:"לא חייבים לבחור ריצה. המטרה היא פעילות שאפשר להחזיק לאורך זמן.", multi:true, options:["הליכה בחוץ","הליכון בשיפוע","אופניים","אליפטיקל","שחייה","ספורט עם חברים","לא רוצה אירובי מובנה כרגע"] },
+    { section:"יום־יום", key:"stepsBaseline", title:"כמה צעדים יש לך ביום ממוצע?", help:"זה קו ההתחלה; לא נזרוק עליך 10,000 צעדים בלי לדעת איפה אתה היום.", options:["עד 3,000","3,000–5,000","5,000–7,500","7,500–10,000","מעל 10,000","לא יודע"] },
+    { section:"יום־יום", key:"workActivity", title:"כמה אתה זז במהלך יום עבודה רגיל?", help:"זה משפיע על יעד הצעדים ועל ההתאוששות.", options:["בעיקר יושב","תערובת של ישיבה ותנועה","עומד/הולך הרבה","עבודה פיזית","משתנה מאוד"] },
+    { section:"תזונה", key:"foodPattern", title:"איך נראה האוכל שלך כרגע?", help:"בחר את התיאור הכי קרוב, בלי שיפוט. מכאן נבנה שינוי אחד או שניים, לא דיאטה בלתי אפשרית.", options:["מסודר רוב הזמן","טוב ביום, נשבר בערב","הרבה אוכל בחוץ / משלוחים","מדלג על ארוחות ואז רעב מאוד","משתנה ואין לי שגרה","אני כבר עוקב אחרי תזונה"] },
+    { section:"תזונה", key:"mealControl", title:"עד כמה יש לך שליטה על הכנת האוכל?", help:"נבנה תוכנית שמתאימה למציאות שלך.", options:["מכין רוב הארוחות בבית","חלק בבית וחלק בחוץ","בעיקר קונה/מזמין","מישהו אחר מבשל לרוב","משתנה"] },
+    { section:"תזונה", key:"nutritionPriority", title:"מה יפיל אותך הכי מהר מתוכנית תזונה?", help:"אפשר לבחור יותר מאפשרות אחת. זה חשוב לא פחות מהקלוריות על הנייר.", multi:true, options:["רעב בין ארוחות","מתוקים","נשנושים בערב","סופי שבוע","אכילה בחוץ","חוסר זמן","אני לא יודע מה לאכול","אין לי בעיה מרכזית"] },
+    { section:"ביצוע", key:"comfort", title:"איזה סגנון מעקב יעזור לך לבצע?", help:"נבנה את הדשבורד ואת היעדים סביב זה.", options:["רשימת משימות ברורה","מספרים ומדדים","תוכנית יומית קצרה","גמישות לפי היום","תזכורות ודחיפה"] },
+    { section:"ביצוע", key:"checkIn", title:"כמה פעמים בשבוע מתאים לך לבצע בדיקת מצב קצרה?", help:"בדיקה של 2–3 דקות: משקל, צעדים, אימונים ואיך היה השבוע.", options:["פעם בשבוע","פעמיים בשבוע","כל יום","רק כשצריך"] },
   ];
   const [step, setStep] = useState(Math.min(d.profile.onboardingStep || 0, steps.length - 1));
   const [draft, setDraft] = useState(d.profile);
   const [attempted, setAttempted] = useState(false);
   const current = steps[step];
   const selectedValues = Array.isArray(draft[current.key]) ? draft[current.key] : draft[current.key] ? [draft[current.key]] : [];
-  const hasSelection = selectedValues.length > 0;
+  const numericValue = Number(draft[current.key]);
+  const hasSelection = current.kind === "number" ? (current.key === "heightCm" ? numericValue >= 100 && numericValue <= 250 : numericValue >= 20 && numericValue <= 400) : selectedValues.length > 0;
   const select = value => setDraft(profile => {
     const old = Array.isArray(profile[current.key]) ? profile[current.key] : profile[current.key] ? [profile[current.key]] : [];
     return { ...profile, [current.key]: current.multi ? (old.includes(value) ? old.filter(item => item !== value) : [...old, value]) : value };
   });
   const persist = nextStep => { setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:nextStep } })); setStep(nextStep); };
-  const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:steps.length, complete:true, editingProfile:false } })); };
+  const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:steps.length, complete:true, editingProfile:false }, goal:{ ...(data.goal || {}), targetKg:Number(draft.targetWeight) || data.goal?.targetKg }, weighIns:(data.weighIns || []).length ? data.weighIns : (Number(draft.currentWeight) ? [{ id:uid(), date:localISO(), kg:Number(draft.currentWeight), createdAt:new Date().toISOString() }] : []) })); };
   const previous = () => { if (step > 0) { setAttempted(false); persist(step - 1); } };
   return <main className={css.onboard}>
     <div className={css.onboardingActions}><button className={css.back} onClick={onExit}>חזרה לדשבורד</button><Link href="/" className={css.back}>חזרה למנכ״ל</Link></div>
-    <p className={css.eyebrow}>פרופיל האימונים שלך · {step + 1} מתוך {steps.length}</p>
+    <p className={css.eyebrow}>{current.section} · אבחון לבניית תוכנית אישית · {step + 1} מתוך {steps.length}</p>
     <div className={css.progressLine}>{steps.map((_,i) => <i key={i} className={i <= step ? css.done : ""} />)}</div>
     <section className={css.card+" "+css.stack}>
       <h2 className={css.title}>{current.title}</h2><p className={css.subtle}>{current.help}</p>
-      <div className={css.choiceGrid}>{current.options.map(value => <button key={value} aria-pressed={selectedValues.includes(value)} onClick={() => {setAttempted(false);select(value)}} className={css.choice+" "+(selectedValues.includes(value) ? css.selected : "")}>{value}</button>)}</div>
-      {attempted && <p className={css.validation} role="alert">כדי להמשיך, צריך לבחור לפחות אפשרות אחת.</p>}
-      <div className={css.onboardingActions}>{step > 0 && <button className={css.secondary} onClick={previous}>חזרה</button>}<button className={css.primary} onClick={next}>{step === steps.length - 1 ? "בניית התוכנית" : "המשך"}<ChevronLeft size={18}/></button></div>
+      {current.kind === "number" ? <label className={css.questionNumber}>{current.suffix}<input autoFocus className={css.field} type="number" inputMode={current.inputMode} min="1" step={current.inputMode === "decimal" ? "0.1" : "1"} value={draft[current.key] || ""} onChange={e => { setAttempted(false); setDraft(profile => ({ ...profile, [current.key]:e.target.value })); }} placeholder={current.placeholder} /></label> : <div className={css.choiceGrid}>{current.options.map(value => <button key={value} aria-pressed={selectedValues.includes(value)} onClick={() => {setAttempted(false);select(value)}} className={css.choice+" "+(selectedValues.includes(value) ? css.selected : "")}>{value}</button>)}</div>}
+      {attempted && <p className={css.validation} role="alert">{current.kind === "number" ? "הזינו מספר תקין כדי להמשיך." : "כדי להמשיך, צריך למלא את השאלה הזו."}</p>}
+      <div className={css.onboardingActions}>{step > 0 && <button className={css.secondary} onClick={previous}>חזרה</button>}<button className={css.primary} onClick={next}>{step === steps.length - 1 ? "שמירה ובניית התוכנית" : "המשך"}<ChevronLeft size={18}/></button></div>
     </section>
   </main>;
 }
