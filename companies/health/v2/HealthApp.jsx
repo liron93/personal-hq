@@ -1,10 +1,11 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Activity, Apple, CalendarDays, Check, ChevronLeft, CirclePlus, Dumbbell, MoreHorizontal, Pencil, Settings, Sparkles, Trash2, TrendingUp, X } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, uid } from "../model";
 import { resolveProgram, normalizeProgram, applyLoads } from "../plan.mjs";
+import { buildPersonalPlan, buildPersonalProgram } from "../personal-plan.mjs";
 import { weekSummary } from "../goals.mjs";
 import { startLive } from "../live.mjs";
 import { sessionLogEntry } from "../today.mjs";
@@ -78,7 +79,7 @@ function Onboarding({ d, setD, onExit }) {
     return { ...profile, [current.key]: current.multi ? (old.includes(value) ? old.filter(item => item !== value) : [...old, value]) : value };
   });
   const persist = nextStep => { setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:nextStep } })); setStep(nextStep); };
-  const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => ({ ...data, profile:{ ...data.profile, ...draft, onboardingStep:steps.length, complete:true, editingProfile:false }, goal:{ ...(data.goal || {}), targetKg:Number(draft.targetWeight) || data.goal?.targetKg }, weighIns:(data.weighIns || []).length ? data.weighIns : (Number(draft.currentWeight) ? [{ id:uid(), date:localISO(), kg:Number(draft.currentWeight), createdAt:new Date().toISOString() }] : []) })); };
+  const next = () => { if (!hasSelection) { setAttempted(true); return; } setAttempted(false); if (step < steps.length - 1) persist(step + 1); else setD(data => { const now = new Date().toISOString(); const generated = buildPersonalPlan(draft, now); return { ...data, profile:{ ...data.profile, ...draft, baseline:{ ...(data.profile?.baseline || {}), weeklyWorkoutGoal:String(generated.weekly.workouts), weeklyStepGoal:String(generated.weekly.steps), weeklyFoodGoal:String(generated.weekly.foodDays) }, onboardingStep:steps.length, complete:true, editingProfile:false }, goal:{ ...(data.goal || {}), targetKg:Number(draft.targetWeight) || data.goal?.targetKg }, weighIns:(data.weighIns || []).length ? data.weighIns : (Number(draft.currentWeight) ? [{ id:uid(), date:localISO(), kg:Number(draft.currentWeight), createdAt:now }] : []), program:buildPersonalProgram(now), personalPlan:generated }; }); };
   const previous = () => { if (step > 0) { setAttempted(false); persist(step - 1); } };
   return <main className={css.onboard}>
     <div className={css.onboardingActions}><button className={css.back} onClick={onExit}>חזרה לדשבורד</button><Link href="/" className={css.back}>חזרה למנכ״ל</Link></div>
@@ -110,6 +111,16 @@ function SettingsView({ d,setD,editProfile,openHevy,openNutrition }) {const [con
 
 export default function HealthApp() {
  const {data:d,setData:setD,ready}=useStore(STORE_KEY,INIT);const [tab,setTab]=useState("today"),[composer,setComposer]=useState(null),[deleted,setDeleted]=useState(null),[toast,setToast]=useState(""),[liveOpen,setLiveOpen]=useState(false),[exitReq,setExitReq]=useState(null),[planView,setPlanView]=useState(null),[hevyOpen,setHevyOpen]=useState(false);
+ // משתמש שכבר סיים את השאלון מקבל את אותה תוכנית גם אם סיים לפני שהיכולת עלתה לאוויר.
+ useEffect(() => {
+   if (!ready || !d?.profile?.complete || d.personalPlan || d.profile.sensitiveFlag || (d.profile.safety && d.profile.safety !== "אין כאב או מגבלה שידועים לי" && d.profile.safety !== "לא ידוע לי על מגבלה")) return;
+   setD(current => {
+     if (current.personalPlan) return current;
+     const now = new Date().toISOString(); const generated = buildPersonalPlan(current.profile, now);
+     return { ...current, programBackup: current.programBackup || current.program, program: buildPersonalProgram(now), personalPlan: generated,
+       profile: { ...current.profile, baseline: { ...(current.profile?.baseline || {}), weeklyWorkoutGoal:String(generated.weekly.workouts), weeklyStepGoal:String(generated.weekly.steps), weeklyFoodGoal:String(generated.weekly.foodDays) } } };
+   });
+ }, [ready, d?.profile?.complete, d?.profile?.sensitiveFlag, d?.profile?.safety, d?.personalPlan, setD]);
  // ניווט בזמן אימון חי: לא יוצאים בשקט, מבקשים אישור (או זורקים אימון ריק).
  const navigate = nextTab => { if(liveOpen&&d.liveWorkout){setExitReq({tab:nextTab});return;} setComposer(null); setPlanView(null); setHevyOpen(false); setTab(nextTab); };
  // עדכון פרופיל נפתח רק מ"עוד", ביוזמת המשתמש. לא משנים את complete.
