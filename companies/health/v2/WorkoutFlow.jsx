@@ -22,6 +22,7 @@ export function TodayScreen({ d, today, onStart, onResume, onLogShort, onOpenJou
   // "מטרת השבוע" (יעד משקל) גם כאן, לא רק בפרופיל/התקדמות - כלל גל, שלב 2.
   const week = <div className={css.weekLine}><span>אימונים השבוע</span><strong>{s.weekDone}{s.goal ? " מתוך " + s.goal : ""}</strong></div>;
   const weightLine = <p className={css.subtle}>{weightGoalLine(d, today)}</p>;
+  const plan = d.personalPlan;
 
   if (s.status === "empty" && !d.liveWorkout) return <div className={css.stack}>
     <section className={css.actionHero}><p className={css.eyebrow}>{fmt(today)}</p><h2>אין עדיין תוכנית אימונים</h2><p>בנו או ייבאו תוכנית A/B/C, ואז המסך הזה יציג את האימון הבא בלחיצה אחת.</p><button className={css.heroCta} onClick={onBuildPlan}>בניית או ייבוא תוכנית<ChevronLeft size={20} /></button></section>
@@ -59,6 +60,7 @@ export function TodayScreen({ d, today, onStart, onResume, onLogShort, onOpenJou
       </>}
     </section>}
     <section className={css.card}>{week}{weightLine}</section>
+    {plan && <section className={css.card + " " + css.stack}><p className={css.eyebrow}>{plan.phase}</p><h3>המסלול שלך</h3><p className={css.subtle}>{plan.training}</p><div className={css.weekRows}><div><span>אימונים</span><strong>{plan.weekly.workouts} בשבוע</strong></div><div><span>צעדים</span><strong>{plan.weekly.steps.toLocaleString("he-IL")} ביום</strong></div><div><span>שקילות</span><strong>{plan.weekly.weighIns} בשבוע</strong></div></div><strong>תזונה השבוע</strong><ul className={css.plainList}>{plan.nutrition.map(item => <li key={item}>{item}</li>)}</ul><p className={css.disclaimer}>{plan.progression}</p></section>}
     {recs.length > 0 && <section className={css.card + " " + css.stack}>{recs}</section>}
   </div>;
 }
