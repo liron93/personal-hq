@@ -65,6 +65,16 @@ test("safe file names and object paths: one folder, no traversal, no control cha
   assert.equal(p.split("/").length, 2);
 });
 
+test("object keys are ASCII-only (Hebrew file names break Supabase Storage with InvalidKey); display name keeps Hebrew", () => {
+  assert.equal(docs.storageKeyName("הסכם מכר.pdf"), "file.pdf");
+  assert.equal(docs.storageKeyName("הסכם מכר 2026 final.PDF"), "2026_final.pdf");
+  assert.equal(docs.storageKeyName("a b.pdf"), "a_b.pdf");
+  const p = docs.objectPath("ws-1", "id-1", "הסכם מכר.pdf");
+  assert.equal(p, "ws-1/id-1-file.pdf");
+  assert.ok(/^[\x20-\x7e]+$/.test(p));
+  assert.equal(docs.safeFileName("הסכם מכר.pdf"), "הסכם_מכר.pdf"); // השם המוצג נשמר בעברית
+});
+
 function fakeClient({ workspaces, workspacesError, upload, sign, remove } = {}) {
   return {
     from: table => { assert.equal(table, "workspaces"); return { select: () => ({ eq: () => ({ limit: async () => ({ data: workspaces, error: workspacesError ?? null }) }) }) }; },
@@ -88,6 +98,7 @@ test("upload maps storage errors to stable codes and never throws", async () => 
   assert.equal((await run({ message: "Bucket not found", statusCode: "404" })).code, "not_enabled");
   assert.equal((await run({ message: "new row violates row-level security policy", statusCode: "403" })).code, "forbidden");
   assert.equal((await run({ message: "The object exceeded the maximum allowed size", statusCode: "413" })).code, "too_large");
+  assert.equal((await run({ message: "Invalid key: ws/id-הסכם.pdf", statusCode: "400" })).code, "bad_name");
   assert.equal((await run({ message: "mime type text/html is not supported" })).code, "bad_type");
   assert.equal((await run({ message: "The resource already exists", statusCode: "409" })).code, "conflict");
   assert.equal((await run({ message: "fetch failed" })).code, "network");
