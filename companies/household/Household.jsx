@@ -328,7 +328,26 @@ function ItemRow({ item, onUpdate, onDelete, onPurchase, onRestore, purchased, l
   );
 }
 
-function QuickAdd({ items, recent, onQuickAdd, onOpenForm }) {
+// השלמה אוטומטית משלנו במקום <datalist>: ב-datalist במובייל ההצעות לא מופיעות/נפתחות בצד שמאל.
+function NameSuggest({ names, value, onChange, onPick, onEnter, ...rest }) {
+  const [open, setOpen] = useState(false);
+  const q = value.trim();
+  const matches = q ? names.filter(n => n !== q && n.includes(q)).slice(0, 6) : [];
+  return (
+    <div className={css.suggestWrap}>
+      <input {...rest} autoComplete="off" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
+        onKeyDown={e => { if (e.key === "Enter") { setOpen(false); onEnter && onEnter(); } }} />
+      {open && matches.length > 0 && (
+        <ul className={css.suggestList} role="listbox">
+          {matches.map(n => <li key={n}><button type="button" role="option" onPointerDown={e => e.preventDefault()} onClick={() => { onPick(n); setOpen(false); }}>{n}</button></li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function QuickAdd({ items, names, recent, onQuickAdd, onOpenForm }) {
   const [name, setName] = useState("");
   // אזהרה לפני הוספה כפולה בטעות, במקום ליצור שורה כפולה בשקט - פידבק מפורש. חוסמת
   // בפועל (submit לא מוסיף) - הכפילות עצמה עדיין קיימת ברשימה, מוטב לכוון לשנות כמות שם.
@@ -338,8 +357,8 @@ function QuickAdd({ items, recent, onQuickAdd, onOpenForm }) {
     <section className={css.quickCapture}>
       <label htmlFor="grocery-quick-add">להוסיף לרשימה</label>
       <div className={css.quickCaptureRow}>
-        <input className="hq-field" list="household-known-product-names" placeholder="הוסיפו פריט ולחצו Enter…" value={name}
-          id="grocery-quick-add" onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") submit(); }}
+        <NameSuggest names={names} className="hq-field" placeholder="הוסיפו פריט ולחצו Enter…" value={name}
+          id="grocery-quick-add" onChange={setName} onPick={setName} onEnter={submit}
           style={{ ...inputStyle, minWidth: 0 }} />
         <button onClick={submit} aria-label="הוסף פריט" className={css.quickAddButton}>
           <Plus size={17} />הוספה
@@ -354,7 +373,7 @@ function QuickAdd({ items, recent, onQuickAdd, onOpenForm }) {
   );
 }
 
-function FullAddForm({ dict, items, known, onAdd, onClose }) {
+function FullAddForm({ dict, items, known, names, onAdd, onClose }) {
   const [f, setF] = useState({ name: "", qty: "", category: "", priority: "רגיל", note: "", brand: "", variant: "" });
   const detected = f.name.trim() ? detectCategory(f.name, dict) : "";
   const duplicate = f.name.trim() ? findActiveDuplicate(items, f.name, { brand: f.brand, variant: f.variant }) : null;
@@ -370,8 +389,7 @@ function FullAddForm({ dict, items, known, onAdd, onClose }) {
   return (
     <div style={{ ...cardStyle, padding: 14 }}>
       <div style={{ display: "grid", gap: 8 }}>
-        {/* datalist משותפת מוגדרת פעם אחת ב-ShoppingList (household-known-product-names) - גם QuickAdd משתמשת בה. */}
-        <input className="hq-field" list="household-known-product-names" placeholder="שם פריט" value={f.name} onChange={e => setF(s => ({ ...s, name: e.target.value }))} style={inputStyle} />
+        <NameSuggest names={names} className="hq-field" placeholder="שם פריט" value={f.name} onChange={v => setF(s => ({ ...s, name: v }))} onPick={v => setF(s => ({ ...s, name: v }))} style={inputStyle} />
         {duplicate && <p role="alert" style={{ color: RUST, fontSize: 12, margin: 0 }}>"{duplicate.name}" כבר קיים ברשימה (אותו שם, מותג וגודל) - אפשר לשנות כמות בשורה הקיימת במקום להוסיף שוב.</p>}
         {similar && (
           <div style={{ fontSize: 12, color: INK, background: BG, border: `1px solid ${LINE}`, borderRadius: 2, padding: "6px 8px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -433,6 +451,7 @@ function ShoppingList({ g, setGrocery }) {
   const entries = filterEntries(g, filter);
   const activeCount = g.items.length;
   const routeGroups = groupByRoute(g.items);
+  const productNames = [...new Set(knownProducts(g).map(p => p.name))];
   const recentItems = [...g.history].sort((a,b) => String(b.purchasedAt||"").localeCompare(String(a.purchasedAt||""))).reduce((names,item) => item.name && !names.includes(item.name) ? [...names,item.name] : names,[]).slice(0,6);
 
   return (
@@ -442,12 +461,9 @@ function ShoppingList({ g, setGrocery }) {
         <div className={css.groceryCount}><b>{activeCount}</b><span>פריטים</span></div>
       </section>
 
-      <QuickAdd items={g.items} recent={recentItems} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
-      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} known={knownProducts(g)} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
+      <QuickAdd items={g.items} names={productNames} recent={recentItems} onQuickAdd={onQuickAdd} onOpenForm={() => setShowFullForm(s => !s)} />
+      {showFullForm && <FullAddForm dict={g.categoryDict} items={g.items} known={knownProducts(g)} names={productNames} onAdd={onAdd} onClose={() => setShowFullForm(false)} />}
       <datalist id="household-known-stores">{knownStores(g).map(s => <option key={s} value={s} />)}</datalist>
-      {/* שמות פריטים ידועים (שם בלבד, לא מותג/וריאנט) - מציעים פריט קיים כבר כשמתחילים להקליד
-          (למשל "מגב" מציע "מגבונים"), בלי לחסום הקלדת שם חדש - משמשת גם QuickAdd וגם FullAddForm. */}
-      <datalist id="household-known-product-names">{[...new Set(knownProducts(g).map(p => p.name))].map(n => <option key={n} value={n} />)}</datalist>
 
       <div className={css.listToolbar}>
         {FILTERS.map(f => (
