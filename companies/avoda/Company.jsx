@@ -145,7 +145,12 @@ function Today({ jobs, flags, onOpen, onNavigate, onSave }) {
       <span>מרכז הפיקוד של הקריירה</span>
       <h2>{focus ? (result.queue.length === 1 ? "יש פעולה אחת שכדאי לקדם עכשיו." : `יש ${topQueue.length}${extraCount > 0 ? "+" : ""} פעולות שכדאי לקדם עכשיו.`) : "אין לך פעולה דחופה כרגע."}</h2>
       <p>{focus ? focus.company_name + " · " + focus.role_title : "אפשר לעיין בכל המשרות הפעילות, או להוסיף מעקב חדש."}</p>
-      {focus ? <button className={styles.primary} onClick={() => onOpen(focus)}>להמשיך במשרה</button> : <button className={styles.primary} onClick={() => onNavigate("jobs")}>למשרות הפעילות</button>}
+      {focus && <p className={styles.heroAction}><strong>{focus.next_action || queueReason(focus, day)}</strong>{focus.next_action && <small>{queueReason(focus, day)}{focus.next_action_at ? " · " + focus.next_action_at : ""}</small>}</p>}
+      {focus ? <div className={styles.heroButtons}>
+        {focus.next_action && <button className={styles.heroPrimary} onClick={() => markDone(focus)}>בוצע</button>}
+        {focus.next_action_at && <button className={styles.heroGhost} onClick={() => snoozeWeek(focus)}>דחייה בשבוע</button>}
+        <button className={styles.heroGhost} onClick={() => onOpen(focus)}>פרטי המשרה</button>
+      </div> : <button className={styles.primary} onClick={() => onNavigate("jobs")}>למשרות הפעילות</button>}
     </section>
     <section className={styles.kpis}>
       <Metric label="לטיפול היום" value={result.dueToday.length} warn={result.dueToday.length > 0} />
