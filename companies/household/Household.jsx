@@ -7,6 +7,7 @@ import { toN } from "@/lib/format";
 import { Sec, Metric, LabeledInput } from "@/lib/ui";
 import { useStore } from "@/lib/store";
 import { STORE_KEY, INIT, ensureHousehold } from "./model";
+import { mergeHousehold } from "./merge.mjs";
 import {
   CATEGORIES, PRIORITIES, FILTERS,
   quickAddItem, addItem, updateItem, removeItem, markPurchased, updateHistoryEntry, findActiveDuplicate, findReceiptMatch, lastPromoForProduct,
@@ -1257,8 +1258,11 @@ const SYNC_LABEL = {
   "read-only": "אין לך הרשאת עריכה למשק הבית - רואים בלבד.",
 };
 
+// מיזוג שינויים של שני עורכים במקביל + בדיקת עדכון כל 20 שניות וכשחוזרים לאפליקציה (ראו merge.mjs).
+const HOUSEHOLD_SYNC = { merge: mergeHousehold, refreshMs: 20000 };
+
 export default function Household() {
-  const { data: d, setData: setD, ready, reload, status, sync, syncError, retrySync } = useStore(STORE_KEY, INIT);
+  const { data: d, setData: setD, ready, reload, status, sync, syncError, retrySync } = useStore(STORE_KEY, INIT, HOUSEHOLD_SYNC);
   const [sub, setSub] = useState("list"); // list | receipt | byStore | savings | vouchers
 
   // תאימות אחורה: משלים שדות חסרים בנתונים ישנים בלי לדרוס שום דבר קיים.

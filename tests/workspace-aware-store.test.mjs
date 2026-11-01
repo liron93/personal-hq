@@ -7,7 +7,7 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||= "placeholder-anon-key";
 const ls = new Map();
 globalThis.window = { localStorage: { getItem: k => (ls.has(k) ? ls.get(k) : null), setItem: (k, v) => { ls.set(k, String(v)); }, removeItem: k => { ls.delete(k); } } };
 
-const { loadStateWithClient, loadWithClient, saveWithClient, localKey } = await import("../lib/store.js");
+const { loadStateWithClient, loadWithClient, saveWithClient, fetchRemoteChangeWithClient, localKey } = await import("../lib/store.js");
 const { resolveAccess, visibleCompanySlugs, isCompanyReadOnly, isHqVisible, canViewCompany, isMissingRelation } = await import("../lib/workspace.js");
 const { capabilitiesForTemplate, DEFAULT_PARTNER_TEMPLATE } = await import("../lib/authz/capabilities.js");
 const { buildJarvisContext } = await import("../lib/jarvis-context.js");
@@ -345,6 +345,38 @@ test("two editors: a stale write is rejected as a conflict and never overwrites 
   assert.deepEqual(await loadWithClient(lior, BEIT), { items: ["base", "shaked"] });
   assert.deepEqual(await saveWithClient(lior, BEIT, { items: ["base", "shaked", "lior"] }), { synced: true });
   assert.deepEqual(db.wsData(BEIT).items, ["base", "shaked", "lior"]);
+});
+
+test("fetchRemoteChange: returns base+theirs after a conflict, so the caller can merge and re-save without losing either edit", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
+  db.putWs(BEIT, { items: ["base"] });
+  const lior = db.client(PARTNER), shaked = db.client(DESIGNER);
+  await loadWithClient(lior, BEIT); await loadWithClient(shaked, BEIT);
+  await saveWithClient(shaked, BEIT, { items: ["base", "shaked"] });
+  assert.equal((await saveWithClient(lior, BEIT, { items: ["base", "lior"] })).reason, "conflict");
+  const change = await fetchRemoteChangeWithClient(lior, BEIT, true);
+  assert.deepEqual(change.base, { items: ["base"] });
+  assert.deepEqual(change.theirs, { items: ["base", "shaked"] });
+  assert.deepEqual(await saveWithClient(lior, BEIT, { items: ["base", "shaked", "lior"] }), { synced: true });
+  assert.deepEqual(db.wsData(BEIT).items, ["base", "shaked", "lior"]);
+});
+
+test("fetchRemoteChange: null when nothing changed, change once when another editor saved, then null again", async () => {
+  reset(); const db = fakeDb({ members: { [PARTNER]: { caps: caps("partner_full_finance_edit") }, [DESIGNER]: { caps: caps("designer_beit_hadash") } } });
+  db.putWs(BEIT, { n: 1 });
+  const lior = db.client(PARTNER), shaked = db.client(DESIGNER);
+  await loadWithClient(lior, BEIT); await loadWithClient(shaked, BEIT);
+  assert.equal(await fetchRemoteChangeWithClient(lior, BEIT, false), null);
+  await saveWithClient(shaked, BEIT, { n: 2 });
+  assert.deepEqual((await fetchRemoteChangeWithClient(lior, BEIT, false)).theirs, { n: 2 });
+  assert.equal(await fetchRemoteChangeWithClient(lior, BEIT, false), null);
+  assert.deepEqual(await saveWithClient(lior, BEIT, { n: 2 }), { synced: true }); // אימוץ הענן כמו שהוא לא כותב ולא יוצר התנגשות
+});
+
+test("fetchRemoteChange: personal keys and no session never fetch", async () => {
+  reset(); const db = fakeDb();
+  assert.equal(await fetchRemoteChangeWithClient(db.client(null), KESEF, true), null);
+  assert.equal(db.calls.length, 0);
 });
 
 test("two editors: creating the same missing row concurrently is a conflict, not an overwrite", async () => {
